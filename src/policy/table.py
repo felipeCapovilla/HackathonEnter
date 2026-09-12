@@ -11,37 +11,29 @@ from __future__ import annotations
 
 import math
 
+from .artefato import carregar
+
+# Números medidos na base e gravados por scripts/gerar_tabela_politica.py.
+# Nada aqui é digitado à mão: regenerar o artefato recalibra a política.
+_ARTEFATO = carregar()
+
 # (contrato, extrato, comprovante) x sub_assunto -> (n, p_perda)
 TABELA: dict[tuple[int, int, int, str], tuple[int, float]] = {
-    (0, 0, 0, "Generico"): (664, 0.9714),
-    (0, 0, 0, "Golpe"): (3216, 0.9888),
-    (0, 0, 1, "Generico"): (455, 0.9033),
-    (0, 0, 1, "Golpe"): (2158, 0.9648),
-    (0, 1, 0, "Generico"): (1149, 0.6075),
-    (0, 1, 0, "Golpe"): (3964, 0.8151),
-    (0, 1, 1, "Generico"): (1454, 0.2895),
-    (0, 1, 1, "Golpe"): (3957, 0.5428),
-    (1, 0, 0, "Generico"): (472, 0.6123),
-    (1, 0, 0, "Golpe"): (1748, 0.7735),
-    (1, 0, 1, "Generico"): (650, 0.3092),
-    (1, 0, 1, "Golpe"): (1742, 0.5235),
-    (1, 1, 0, "Generico"): (4177, 0.0642),
-    (1, 1, 0, "Golpe"): (8196, 0.1661),
-    (1, 1, 1, "Generico"): (9351, 0.0213),
-    (1, 1, 1, "Golpe"): (16647, 0.0522),
+    (s["contrato"], s["extrato"], s["comprovante"], s["sub_assunto"]): (s["n"], s["p_perda"])
+    for s in _ARTEFATO["segmentos"]
 }
 
-# UF como cluster de 3. Cruzar 26 UFs x 16 segmentos daria 416 células com
-# n médio de 144 — fino demais para uma taxa estável.
-UF_ALTO = {"AM", "AP", "BA", "GO", "RJ", "RS"}
-UF_BAIXO = {"MA", "MS", "MT", "PI", "PR", "RN", "RO", "TO"}
+# UF como grupo de 3 pela taxa histórica de derrota.
+CLUSTER_POR_UF: dict[str, str] = _ARTEFATO["uf"]["clusters"]
+UF_ALTO = {uf for uf, grupo in CLUSTER_POR_UF.items() if grupo == "alto"}
+UF_BAIXO = {uf for uf, grupo in CLUSTER_POR_UF.items() if grupo == "baixo"}
 
 # Ajuste em LOG-ODDS, não multiplicativo. Multiplicar probabilidade quebra nos
 # extremos: 0,9888 x 1,15 estouraria 1, e 0,9888 x 0,85 = 0,84 subestimaria
 # grosseiramente um segmento onde o banco perde quase sempre. Em log-odds o
 # deslocamento é uniforme e a probabilidade nunca sai de (0,1).
-# Offsets medidos na base: logit(P(perda) do cluster) - logit(P(perda) global).
-OFFSET_UF_LOGIT = {"alto": +0.4362, "medio": -0.0325, "baixo": -0.3252}
+# Offsets: logit(P(perda) do grupo) - logit(P(perda) global).
+OFFSET_UF_LOGIT: dict[str, float] = _ARTEFATO["uf"]["offset_logit"]
 
 
 def cluster_uf(uf: str) -> str:

@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from .artefato import carregar
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -88,12 +90,21 @@ class Premissa:
     fonte: str
 
 
-P1 = Premissa("P1", "E[condenação | derrota] como fração do valor da causa", 0.72,
-              "DERIVADO: 2/3 x 0,63 (parcial) + 1/3 x 0,90 (procedência), base 60k")
-P2_ALVO = Premissa("P2", "Fator alvo do acordo", 0.30,
-                   "OBSERVADO: mediana dos 280 acordos reais (média 0,298)")
-P2_PISO = Premissa("P2a", "Piso da banda de acordo", 0.24, "OBSERVADO: P25 dos 280 acordos")
-P2_TETO = Premissa("P2b", "Teto da banda de acordo", 0.40, "OBSERVADO: P90 dos 280 acordos")
+_BASE = carregar()
+_PERDA = _BASE["condenacao_sobre_causa_se_perde"]
+_ACORDO = _BASE["acordo_sobre_causa"]
+
+P1 = Premissa("P1", "Condenação média como fração do valor da causa, dado que perdeu", _PERDA["media"],
+              f"MEDIDO: {_PERDA['n']} derrotas; procedência {_PERDA['procedencia']:.2f}, "
+              f"parcial {_PERDA['parcial_procedencia']:.2f}")
+P2_PISO = Premissa("P2a", "Abertura da negociação (P25 dos acordos)", _ACORDO["p25"],
+                   f"MEDIDO: {_ACORDO['n']} acordos da base")
+P2_ALVO = Premissa("P2", "Alvo do acordo (mediana dos acordos)", _ACORDO["mediana"],
+                   f"MEDIDO: {_ACORDO['n']} acordos da base")
+P2_MAXIMO = Premissa("P2c", "Máximo aceitável (P75 dos acordos)", _ACORDO["p75"],
+                     f"MEDIDO: {_ACORDO['n']} acordos da base")
+P2_TETO = Premissa("P2b", "Teto absoluto (P90 dos acordos)", _ACORDO["p90"],
+                   f"MEDIDO: {_ACORDO['n']} acordos da base")
 P3 = Premissa("P3", "Probabilidade de o autor aceitar o acordo", 0.40,
               "ASSUMIDO: sem dado de recusa na base. Parametrizável (slider 0,2-0,8)")
 P4 = Premissa("P4", "Recuperabilidade com sinal forte (dossiê/laudo presente)", 0.70,
@@ -104,6 +115,6 @@ P6 = Premissa("P6", "Honorários sucumbenciais sobre a condenação", 0.15,
 # P7 (custo do escritório externo por processo) NÃO é assumido de propósito.
 # O banco tem esse número; inventá-lo distorce toda a política.
 
-TODAS = [P1, P2_ALVO, P2_PISO, P2_TETO, P3, P4, P5, P6]
+TODAS = [P1, P2_PISO, P2_ALVO, P2_MAXIMO, P2_TETO, P3, P4, P5, P6]
 
 GATE_P_VITORIA_OBSERVADA = 0.027  # C0/E0: 2,7% de vitória em 6.493 casos
