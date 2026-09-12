@@ -25,6 +25,7 @@ MIN_DECISOES_RANKING = 20       # abaixo disso o advogado aparece com "amostra i
 MIN_OUTROS_CLIENTES = 2         # benchmark anônimo: o escritório precisa atender outros 2 clientes...
 MIN_DECISOES_MERCADO = 50       # ...e somar 50 decisões fora deste banco
 LIMIAR_DIVERGENCIA = 1000.0     # divergência com custo esperado acima disso vira exceção
+MIN_CASOS_SEGMENTO = 10         # tipo de caso com menos processos não entra no ranking de tempo
 FEATURE_DOC = {"CONTRATO": ("Contrato", "contrato"), "EXTRATO": ("Extrato", "extrato"),
                "COMPROVANTE_CREDITO": ("Comprovante de crédito", "comprovante")}
 DOC_NOMES = {"CONTRATO": "Contrato", "EXTRATO": "Extrato", "COMPROVANTE_CREDITO": "Comprovante de crédito",
@@ -96,6 +97,14 @@ def _parse_date(value: str | None) -> datetime | None:
 
 def _ratio(numerador: float, denominador: float) -> float | None:
     return round(numerador / denominador, 4) if denominador else None
+
+
+def _brl(valor: float) -> str:
+    return "R$ " + f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _pct(valor: float) -> str:
+    return f"{valor:.1%}".replace(".", ",")
 
 
 def _mediana(valores: list[float]) -> float | None:
@@ -345,6 +354,8 @@ def _engajamento(itens: list[dict]) -> dict:
         por_segmento[x["segmento"]].append(x)
     segmentos = []
     for segmento, grupo in por_segmento.items():
+        if len(grupo) < MIN_CASOS_SEGMENTO:
+            continue
         ativos = [x["segundos_ativos"] / 60 for x in grupo if x["segundos_ativos"]]
         segmentos.append({"segmento": segmento, "casos": len(grupo), "tempo_ativo_mediano_min": _mediana(ativos),
                           "com_ressalva": _ratio(sum(x["com_ressalva"] for x in grupo), len(grupo)),
@@ -370,14 +381,16 @@ def _excecoes(itens: list[dict]) -> dict:
                 "escritorio": x["law_firm_name"], "data": x["decidido_em"].isoformat() if x["decidido_em"] else None}
         if x["acima_walk_away"]:
             lista.append({**base, "tipo": "ACORDO_ACIMA_WALK_AWAY", "impacto": round(x["fechado"] - float(x["walk_away"]), 2),
-                          "detalhe": f"Fechou em R$ {x['fechado']:,.2f}; walk-away era R$ {float(x['walk_away']):,.2f}."})
+                          "detalhe": f"Fechou em {_brl(x['fechado'])}; walk-away era {_brl(float(x['walk_away']))}."})
         if x["custo_divergencia"] >= LIMIAR_DIVERGENCIA:
             lista.append({**base, "tipo": "DIVERGENCIA_CARA", "impacto": round(x["custo_divergencia"], 2),
                           "detalhe": f"Política recomendou {x['recomendacao']}; advogado escolheu {x['acao']}."})
         if x["com_ressalva"] and x["documentos_abertos"] == 0:
             lista.append({**base, "tipo": "DECISAO_SEM_CONFERENCIA", "impacto": round(x["custo_defesa"], 2),
                           "detalhe": "O motor pediu conferência e a decisão foi registrada sem abrir nenhum documento."})
-    lista.sort(key=lambda e: -(e["impacto"] or 0))
+    # Dinheiro perdido primeiro; "sem conferência" mede exposição, não perda, e vem por último.
+    ordem = {"ACORDO_ACIMA_WALK_AWAY": 0, "DIVERGENCIA_CARA": 1, "DECISAO_SEM_CONFERENCIA": 2}
+    lista.sort(key=lambda e: (ordem[e["tipo"]], -(e["impacto"] or 0)))
     contagem: dict[str, int] = defaultdict(int)
     for e in lista:
         contagem[e["tipo"]] += 1
@@ -485,11 +498,11 @@ def _recomendacoes(motivos: list[dict]) -> list[dict]:
                 cards.append({
                     "origem": "base_historica", "documento": d["nome"], "motivo": None,
                     "area": "Jurídico interno + TI", "casos": d["casos_sem"], "valor_em_jogo": d["valor_em_jogo"],
-                    "titulo": f"{d['nome']} falta em {d['ausente_pct']:.1%} dos processos",
+                    "titulo": f"{d['nome']} falta em {_pct(d['ausente_pct'])} dos processos",
                     "acao": "Registrar o motivo de cada ausência no painel para descobrir a causa e a área dona do problema.",
                     "indicador": f"% de processos sem {d['nome'].lower()}",
-                    "evidencia": (f"Na base de {base['casos']:,} sentenças, a derrota vai de {d['derrota_com']:.1%} com o documento "
-                                  f"para {d['derrota_sem']:.1%} sem ele.").replace(",", "."),
+                    "evidencia": (f"Na base de {base['casos']:,} sentenças".replace(",", ".")
+                                  + f", a derrota vai de {_pct(d['derrota_com'])} com o documento para {_pct(d['derrota_sem'])} sem ele."),
                 })
             elif not d["muda_resultado"] and d["tipo"] == "DOSSIE":
                 cards.append({
@@ -498,7 +511,7 @@ def _recomendacoes(motivos: list[dict]) -> list[dict]:
                     "titulo": "Dossiê de terceiro não muda o resultado do processo",
                     "acao": "Renegociar o escopo com a empresa terceira: pedir o dossiê focado na assinatura quando falta o contrato, que é quando ele decide entre recuperar e fazer acordo.",
                     "indicador": "Custo de dossiê por processo decidido",
-                    "evidencia": f"Derrota de {d['derrota_com']:.1%} com dossiê e {d['derrota_sem']:.1%} sem.",
+                    "evidencia": f"Derrota de {_pct(d['derrota_com'])} com dossiê e {_pct(d['derrota_sem'])} sem.",
                 })
     cards.sort(key=lambda c: (c["origem"] != "operacao", -c["valor_em_jogo"]))
     for i, card in enumerate(cards):

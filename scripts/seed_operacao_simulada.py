@@ -53,7 +53,7 @@ PERFIS = {
     "exemplar":    dict(segue=0.95, desvio="DEFESA", markup=0.00, abre_docs=0.95, minutos=7.0, carimbo=0.02),
     "consistente": dict(segue=0.88, desvio="DEFESA", markup=0.15, abre_docs=0.85, minutos=9.0, carimbo=0.05),
     "defensor":    dict(segue=0.66, desvio="DEFESA", markup=0.10, abre_docs=0.80, minutos=12.0, carimbo=0.04),
-    "generoso":    dict(segue=0.90, desvio="ACORDO", markup=0.80, abre_docs=0.60, minutos=5.0, carimbo=0.15),
+    "generoso":    dict(segue=0.90, desvio="ACORDO", markup=0.65, abre_docs=0.60, minutos=5.0, carimbo=0.15),
     "apressado":   dict(segue=0.84, desvio="ACORDO", markup=0.35, abre_docs=0.30, minutos=3.0, carimbo=0.45),
 }
 ADVOGADOS = (
