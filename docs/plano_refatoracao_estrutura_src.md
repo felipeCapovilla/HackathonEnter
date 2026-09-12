@@ -81,15 +81,17 @@ HackatonEnter/
 
 Quando for autorizada a execução da refatoração física, siga os passos ordenados abaixo:
 
-### Passo 1: Criar novas pastas com `mkdir`
+### Passo 1: Criar novas pastas de destino
+No PowerShell ou Bash:
 ```powershell
-mkdir -p src/interface/backend
-mkdir -p src/interface/frontend
-mkdir -p src/utils
+# PowerShell / Bash / Git Bash
+mkdir -Force src/interface/backend
+mkdir -Force src/interface/frontend
+mkdir -Force src/utils
 ```
 
 ### Passo 2: Mover arquivos preservando o histórico (`git mv`)
-```powershell
+```bash
 # 1. Mover backend app para src/interface/backend
 git mv backend/app/main.py src/interface/backend/
 git mv backend/app/database.py src/interface/backend/
@@ -107,12 +109,12 @@ git mv backend/app/rag src/utils/
 # 3. Mover serviço de política para src/policy
 git mv backend/app/policy_service.py src/policy/service.py
 
-# 4. Mover frontend para src/interface/frontend
-git mv frontend/* src/interface/frontend/
+# 4. Mover a aplicação frontend inteira para src/interface/frontend
+git mv frontend src/interface/frontend/
 
-# 5. Remover pasta backend vazia
-rmdir backend/app
-rmdir backend
+# 5. Remover pasta backend vazia (se houver sobras)
+rmdir /s /q backend  # Windows PowerShell/CMD
+# ou: rm -rf backend  # Linux / Git Bash
 ```
 
 ### Passo 3: Atualizar Referências e Imports Python

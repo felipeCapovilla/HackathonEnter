@@ -30,7 +30,7 @@ As branches devem seguir o formato `<tipo>/<descricao-kebab-case>`:
 | `feat/` | Novas funcionalidades | `feat/autenticacao-jwt` |
 | `docs/` | Alterações puras de documentação | `docs/pipeline-documentacao` |
 | `fix/` | Correção de bugs | `fix/validacao-ocr` |
-| `refactor/` | Refatoração de código sem alterar regra de negócio | `refactor/políticas-servico` |
+| `refactor/` | Refatoração de código sem alterar regra de negócio | `refactor/politicas-servico` |
 | `test/` | Adição ou alteração de testes | `test/cobertura-rag` |
 
 ### 2.2 Formato de Commits (Conventional Commits)
@@ -54,7 +54,7 @@ Se você possui uma branch no formato incorreto (como `(feat)_docs_pipeline`), s
 ### Passo 1: Renomear a Branch Localmente
 Renomeie a branch atual para o nome padronizado usando hífen e barra:
 ```bash
-git branch -m (feat)_docs_pipeline feat/docs-pipeline
+git branch -m "(feat)_docs_pipeline" feat/docs-pipeline
 ```
 
 ### Passo 2: Commitar ou Organizar Mudanças Pendentes
