@@ -17,6 +17,7 @@ def _settings(tmp_path: Path) -> Settings:
         document_dir=runtime / "documents",
         artifact_dir=Path(__file__).parents[1] / "artefatos",
         max_upload_bytes=1024 * 1024,
+        auth_required=False,
     )
 
 

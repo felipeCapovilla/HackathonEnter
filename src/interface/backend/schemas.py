@@ -15,6 +15,12 @@ class SourceParty(StrEnum):
     ADVOGADO_EXTERNO = "ADVOGADO_EXTERNO"
 
 
+class UserRole(StrEnum):
+    BANCO = "BANCO"
+    ADVOGADO_EXTERNO = "ADVOGADO_EXTERNO"
+    ADMIN_GLOBAL = "ADMIN_GLOBAL"
+
+
 class DocumentType(StrEnum):
     AUTOS = "AUTOS"
     CONTRATO = "CONTRATO"
@@ -67,6 +73,11 @@ class CaseCreate(BaseModel):
     value_of_claim: float | None = Field(default=None, ge=0)
     sub_subject: str | None = Field(default=None, max_length=120)
     dossie_status: str = "AUSENTE"
+    assigned_lawyer_id: str | None = None
+
+
+class CaseAssignment(BaseModel):
+    assigned_lawyer_id: str | None = None
 
 
 class CaseRecord(CaseCreate):
@@ -164,3 +175,46 @@ class MonitoringSummary(BaseModel):
     adherence_rate: float | None
     recommendations: dict[str, int]
     documentary_statuses: dict[str, int]
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class BankCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class BankRecord(BankCreate):
+    id: str
+    created_at: datetime
+
+
+class UserCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=15, max_length=128)
+    role: UserRole
+    bank_id: str | None = None
+
+
+class UserRecord(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: UserRole
+    bank_id: str | None
+    bank_name: str | None = None
+    is_active: bool
+    created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=15, max_length=128)
+
+
+class SessionUser(UserRecord):
+    csrf_token: str

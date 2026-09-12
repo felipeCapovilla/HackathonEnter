@@ -24,6 +24,7 @@ class Settings:
     artifact_dir: Path
     max_upload_bytes: int
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
+    auth_required: bool = True
 
 
 def get_settings() -> Settings:
@@ -42,4 +43,5 @@ def get_settings() -> Settings:
             for origin in os.getenv("ENTERAGREE_CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
             if origin.strip()
         ),
+        auth_required=os.getenv("ENTERAGREE_AUTH_REQUIRED", "true").lower() not in {"0", "false", "no"},
     )

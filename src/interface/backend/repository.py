@@ -38,19 +38,101 @@ class Repository:
     def __init__(self, database_path: Path) -> None:
         self.database_path = database_path
 
-    def create_case(self, payload: CaseCreate) -> dict:
+    def create_bank(self, name: str) -> dict:
+        record = {"id": str(uuid4()), "name": name.strip(), "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            try:
+                connection.execute("INSERT INTO banks (id, name, created_at) VALUES (:id, :name, :created_at)", record)
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Banco já cadastrado.") from exc
+        return record
+
+    def list_banks(self) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute("SELECT * FROM banks ORDER BY name").fetchall()
+        return [dict(row) for row in rows]
+
+    def get_bank(self, bank_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            return _row(connection.execute("SELECT * FROM banks WHERE id = ?", (bank_id,)).fetchone())
+
+    def create_user(self, record: dict) -> dict:
+        with connection_for(self.database_path) as connection:
+            try:
+                connection.execute("""INSERT INTO users (id, name, email, password_hash, role, bank_id, is_active, created_at)
+                VALUES (:id, :name, :email, :password_hash, :role, :bank_id, :is_active, :created_at)""", record)
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("E-mail já cadastrado ou banco inválido.") from exc
+        return self.get_user(record["id"]) or record
+
+    def get_user(self, user_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute("""SELECT users.id, users.name, users.email, users.password_hash, users.role,
+            users.bank_id, users.is_active, users.created_at, banks.name AS bank_name FROM users
+            LEFT JOIN banks ON banks.id = users.bank_id WHERE users.id = ?""", (user_id,)).fetchone()
+        return _row(row)
+
+    def get_user_by_email(self, email: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute("""SELECT users.id, users.name, users.email, users.password_hash, users.role,
+            users.bank_id, users.is_active, users.created_at, banks.name AS bank_name FROM users
+            LEFT JOIN banks ON banks.id = users.bank_id WHERE users.email = ?""", (email,)).fetchone()
+        return _row(row)
+
+    def list_users(self, bank_id: str | None = None) -> list[dict]:
+        query = """SELECT users.id, users.name, users.email, users.role, users.bank_id, users.is_active, users.created_at,
+        banks.name AS bank_name FROM users LEFT JOIN banks ON banks.id = users.bank_id"""
+        parameters: tuple = () if bank_id is None else (bank_id,)
+        if bank_id is not None:
+            query += " WHERE users.bank_id = ?"
+        query += " ORDER BY users.name"
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_user(self, user_id: str, changes: dict) -> dict | None:
+        if not changes:
+            return self.get_user(user_id)
+        columns = ", ".join(f"{key} = :{key}" for key in changes)
+        with connection_for(self.database_path) as connection:
+            connection.execute(f"UPDATE users SET {columns} WHERE id = :id", {"id": user_id, **changes})
+            if "password_hash" in changes or changes.get("is_active") is False:
+                connection.execute("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", (_now(), user_id))
+        return self.get_user(user_id)
+
+    def create_session(self, token_hash: str, user_id: str, csrf_token: str, expires_at: str) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.execute("INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)", (token_hash, user_id, csrf_token, expires_at))
+
+    def get_session_user(self, token_hash: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute("""SELECT users.id, users.name, users.email, users.role, users.bank_id,
+            users.is_active, users.created_at, banks.name AS bank_name, sessions.csrf_token FROM sessions
+            JOIN users ON users.id = sessions.user_id LEFT JOIN banks ON banks.id = users.bank_id
+            WHERE sessions.token_hash = ? AND sessions.revoked_at IS NULL AND sessions.expires_at > ? AND users.is_active = 1""",
+            (token_hash, _now())).fetchone()
+        return _row(row)
+
+    def revoke_session(self, token_hash: str) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.execute("UPDATE sessions SET revoked_at = ? WHERE token_hash = ?", (_now(), token_hash))
+
+    def create_case(self, payload: CaseCreate, bank_id: str = "banco-unicamp", created_by_user_id: str | None = None) -> dict:
         case_id = str(uuid4())
         record = {
             "id": case_id,
             **payload.model_dump(),
             "uf": payload.uf.upper(),
+            "bank_id": bank_id,
+            "created_by_user_id": created_by_user_id,
+            "assigned_lawyer_id": payload.assigned_lawyer_id,
             "created_at": _now(),
         }
         with connection_for(self.database_path) as connection:
             try:
                 connection.execute(
-                    """INSERT INTO cases (id, case_number, uf, value_of_claim, sub_subject, dossie_status, created_at)
-                    VALUES (:id, :case_number, :uf, :value_of_claim, :sub_subject, :dossie_status, :created_at)""",
+                    """INSERT INTO cases (id, case_number, uf, value_of_claim, sub_subject, dossie_status, bank_id, assigned_lawyer_id, created_by_user_id, created_at)
+                    VALUES (:id, :case_number, :uf, :value_of_claim, :sub_subject, :dossie_status, :bank_id, :assigned_lawyer_id, :created_by_user_id, :created_at)""",
                     record,
                 )
             except sqlite3.IntegrityError as exc:
@@ -61,10 +143,28 @@ class Repository:
         with connection_for(self.database_path) as connection:
             return _row(connection.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone())
 
-    def list_cases(self) -> list[dict]:
+    def list_cases(self, bank_id: str | None = None, lawyer_id: str | None = None) -> list[dict]:
+        where, parameters = "", []
+        if bank_id is not None:
+            where, parameters = " WHERE cases.bank_id = ?", [bank_id]
+        if lawyer_id is not None:
+            where += " AND" if where else " WHERE"
+            where += " cases.assigned_lawyer_id = ?"
+            parameters.append(lawyer_id)
         with connection_for(self.database_path) as connection:
-            rows = connection.execute("SELECT * FROM cases ORDER BY created_at DESC").fetchall()
+            rows = connection.execute(f"SELECT * FROM cases{where} ORDER BY created_at DESC", parameters).fetchall()
         return [dict(row) for row in rows]
+
+    def assign_lawyer(self, case_id: str, lawyer_id: str | None, bank_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            if lawyer_id:
+                valid = connection.execute("SELECT 1 FROM users WHERE id = ? AND role = 'ADVOGADO_EXTERNO' AND bank_id = ? AND is_active = 1", (lawyer_id, bank_id)).fetchone()
+                if valid is None:
+                    raise ValueError("Advogado ativo do banco não encontrado.")
+            cursor = connection.execute("UPDATE cases SET assigned_lawyer_id = ? WHERE id = ? AND bank_id = ?", (lawyer_id, case_id, bank_id))
+            if cursor.rowcount != 1:
+                return None
+        return self.get_case(case_id)
 
     def create_document(
         self,

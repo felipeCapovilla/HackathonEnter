@@ -21,6 +21,18 @@ npm run dev
 
 A API atende em `http://localhost:8000` e a interface usa `http://localhost:5173`.
 
+O primeiro acesso é criado localmente, sem senha padrão no repositório:
+
+```powershell
+python -m scripts.create_admin --name "Administrador" --email admin@empresa.com
+```
+
+Depois do login, o admin cadastra banco e advogados; o banco abre e atribui processos;
+o advogado acessa somente os processos atribuídos, executa a avaliação e registra a decisão.
+
+O fluxo de telas, os limites de acesso e os cuidados para implantação estão em
+`docs/fluxo_papeis_frontend.md`.
+
 ## Estrutura
 
 - `src/policy/`: motor de política e serviço que relaciona documentos com recomendações.
