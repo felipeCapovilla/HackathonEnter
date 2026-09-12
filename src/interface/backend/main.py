@@ -50,7 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="EnterAgree API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=list(app_settings.cors_origins),
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],

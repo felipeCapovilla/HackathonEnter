@@ -11,6 +11,15 @@ artefatos/y.pkl
 artefatos/dataset_completo.pkl
 node_modules/
 dist/
+.env
+*.pyc
+.DS_Store
+data/*.csv
+data/*.xlsx
+data/*.parquet
+data/processos/
 test-results/
 playwright-report/
-.env
+*.egg-info/
+build/
+src/interface/prototype/schema.json
