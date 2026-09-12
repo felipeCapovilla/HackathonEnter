@@ -11,4 +11,6 @@ artefatos/y.pkl
 artefatos/dataset_completo.pkl
 node_modules/
 dist/
+test-results/
+playwright-report/
 .env

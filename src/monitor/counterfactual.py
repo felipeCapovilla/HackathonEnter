@@ -21,12 +21,12 @@ import json
 import numpy as np
 import pandas as pd
 
-MOCK_ACORDO_PCT_CAUSA = 0.30
 from src.monitor.paths import CASOS_60K
 
 
 ACAO_ACORDO = "acordo"
 ACAO_DEFESA = "defesa"
+MOCK_ACORDO_PCT_CAUSA = 0.30
 
 # Assunção H2: limiar de subs_total para recomendar acordo no mock.
 MOCK_SUBS_LIMIAR = 3

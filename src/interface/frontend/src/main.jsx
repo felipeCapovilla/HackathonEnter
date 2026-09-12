@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
@@ -31,12 +31,16 @@ async function api(path, options = {}) {
   if (response.ok) return response.status === 204 ? null : response.json();
 
   let message = `Erro ${response.status}`;
-  try {
-    const body = await response.json();
-    message = body.detail || body.message || message;
-  } catch {
-    const text = await response.text();
-    if (text) message = text;
+  const body = await response.text();
+  if (body) {
+    try {
+      const parsed = JSON.parse(body);
+      const detail = parsed.detail || parsed.message;
+      if (Array.isArray(detail)) message = detail.map((item) => item.msg || JSON.stringify(item)).join("; ");
+      else if (detail) message = typeof detail === "string" ? detail : JSON.stringify(detail);
+    } catch {
+      message = body;
+    }
   }
   throw new Error(message);
 }
@@ -51,11 +55,20 @@ function App() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [connected, setConnected] = useState(null);
+  const detailRequest = useRef(0);
+  const selectedCase = useRef(null);
 
   const selectedAnalysis = useMemo(() => detail?.analyses?.[0] || null, [detail]);
 
   async function refreshCases() {
-    setCases(await api("/cases"));
+    try {
+      setCases(await api("/cases"));
+      setConnected(true);
+    } catch (requestError) {
+      setConnected(false);
+      throw requestError;
+    }
   }
 
   async function refreshMonitoring() {
@@ -63,19 +76,31 @@ function App() {
   }
 
   async function loadDetail(caseId) {
+    if (caseId !== selectedCase.current) return null;
+    const requestNumber = ++detailRequest.current;
     setLoadingDetail(true);
     try {
       const data = await api(`/cases/${encodeURIComponent(caseId)}`);
+      if (requestNumber !== detailRequest.current || caseId !== selectedCase.current) return null;
       setDetail(data);
-      setError("");
       return data;
     } catch (requestError) {
-      setDetail(null);
+      if (requestNumber !== detailRequest.current || caseId !== selectedCase.current) return null;
       setError(`Não foi possível carregar o caso: ${requestError.message}`);
       return null;
     } finally {
-      setLoadingDetail(false);
+      if (requestNumber === detailRequest.current) setLoadingDetail(false);
     }
+  }
+
+  function selectCase(caseId) {
+    if (caseId === selectedCase.current) return;
+    selectedCase.current = caseId;
+    detailRequest.current += 1;
+    setDetail(null);
+    setError("");
+    setNotice("");
+    setSelectedId(caseId);
   }
 
   useEffect(() => {
@@ -90,19 +115,21 @@ function App() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (!selectedId || !detail?.documents?.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status))) return undefined;
+    if (!selectedId || loadingDetail || !detail?.documents?.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status))) return undefined;
     const timer = window.setTimeout(() => loadDetail(selectedId), 2000);
     return () => window.clearTimeout(timer);
-  }, [selectedId, detail?.documents]);
+  }, [selectedId, detail, loadingDetail]);
 
   async function runMutation(action, successMessage) {
+    const mutationCaseId = selectedCase.current;
     setSubmitting(true);
     setError("");
+    setNotice("");
     try {
       await action();
-      if (selectedId) await loadDetail(selectedId);
+      if (mutationCaseId) await loadDetail(mutationCaseId);
       await Promise.all([refreshCases(), refreshMonitoring()]);
-      setNotice(successMessage);
+      if (mutationCaseId === selectedCase.current) setNotice(successMessage);
       return true;
     } catch (requestError) {
       setError(requestError.message);
@@ -114,7 +141,8 @@ function App() {
 
   async function createCase(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const payload = {
       case_number: form.get("case_number").trim(),
       uf: form.get("uf").trim().toUpperCase(),
@@ -127,8 +155,8 @@ function App() {
     try {
       const created = await api("/cases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       await Promise.all([refreshCases(), refreshMonitoring()]);
-      setSelectedId(created.id);
-      event.currentTarget.reset();
+      selectCase(created.id);
+      formElement.reset();
       setNotice("Caso criado e pronto para receber documentos.");
     } catch (requestError) {
       setError(`Não foi possível criar o caso: ${requestError.message}`);
@@ -140,7 +168,8 @@ function App() {
   async function uploadDocument(event) {
     event.preventDefault();
     if (!selectedId) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const file = form.get("file");
     if (!(file instanceof File) || !file.size) {
       setError("Selecione um PDF ou arquivo de texto.");
@@ -150,12 +179,13 @@ function App() {
       () => api(`/cases/${encodeURIComponent(selectedId)}/documents`, { method: "POST", body: form }),
       "Documento enviado. O processamento documental foi iniciado.",
     );
-    if (completed) event.currentTarget.reset();
+    if (completed) formElement.reset();
   }
 
   async function confirmDocumentType(documentId, event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const action = form.get("action");
     const payload = {
       action,
@@ -168,19 +198,18 @@ function App() {
       }),
       "Tratamento da divergência documental registrado.",
     );
-    if (completed) event.currentTarget.reset();
+    if (completed) formElement.reset();
   }
 
   async function createDocumentRequest(event) {
     event.preventDefault();
     if (!selectedId) return;
-    const form = new FormData(event.currentTarget);
-    const dueDate = form.get("due_date");
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const payload = {
       document_type: form.get("document_type"),
       hypothesis_key: form.get("hypothesis_key").trim(),
       reason: form.get("reason").trim(),
-      ...(dueDate ? { due_date: dueDate } : {}),
     };
     const completed = await runMutation(
       () => api(`/cases/${encodeURIComponent(selectedId)}/document-requests`, {
@@ -188,12 +217,13 @@ function App() {
       }),
       "Pedido de documento enviado ao banco.",
     );
-    if (completed) event.currentTarget.reset();
+    if (completed) formElement.reset();
   }
 
   async function respondDocumentRequest(requestId, event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const payload = { status: form.get("status"), reason: form.get("reason").trim() };
     const completed = await runMutation(
       () => api(`/document-requests/${encodeURIComponent(requestId)}/response`, {
@@ -201,7 +231,7 @@ function App() {
       }),
       "Resposta ao pedido de documento registrada.",
     );
-    if (completed) event.currentTarget.reset();
+    if (completed) formElement.reset();
   }
 
   async function analyzeCase() {
@@ -215,7 +245,8 @@ function App() {
   async function registerDecision(event) {
     event.preventDefault();
     if (!selectedId || !selectedAnalysis) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const payload = {
       action: form.get("action"),
       reason: form.get("reason").trim() || null,
@@ -227,7 +258,7 @@ function App() {
       }),
       "Decisão do advogado registrada para o monitoramento de aderência.",
     );
-    if (completed) event.currentTarget.reset();
+    if (completed) formElement.reset();
   }
 
   const documents = detail?.documents || [];
@@ -237,7 +268,7 @@ function App() {
   return <main className="shell">
     <header>
       <div><p className="eyebrow">BANCO UNICAMP · ENTEROS</p><h1>EnterAgree</h1><p>Política de acordos com evidências documentais.</p></div>
-      <span className="connection online">API FastAPI</span>
+      <span className={`connection ${connected ? "online" : "offline"}`}>{connected == null ? "Conectando à API…" : connected ? "API conectada" : "API indisponível"}</span>
     </header>
 
     {error && <div className="notice error" role="alert">{error}<button onClick={() => setError("")} aria-label="Fechar erro">×</button></div>}
@@ -256,19 +287,19 @@ function App() {
         <div className="cases">
           {loadingCases && <p className="muted">Carregando casos…</p>}
           {!loadingCases && cases.length === 0 && <p className="muted">Nenhum caso criado.</p>}
-          {cases.map((item) => <button key={item.id} className={`case-card ${item.id === selectedId ? "selected" : ""}`} onClick={() => setSelectedId(item.id)}><strong>{item.case_number}</strong><span>{item.uf} · {money(item.value_of_claim)}</span></button>)}
+          {cases.map((item) => <button key={item.id} className={`case-card ${item.id === selectedId ? "selected" : ""}`} onClick={() => selectCase(item.id)}><strong>{item.case_number}</strong><span>{item.uf} · {money(item.value_of_claim)}</span></button>)}
         </div>
       </aside>
 
       <section className="workspace">
-        {!selectedId ? <div className="empty"><h2>Selecione ou crie um caso</h2><p>Envie os subsídios, execute a análise e registre a decisão jurídica.</p></div> : loadingDetail || !detail ? <div className="empty"><h2>Carregando caso…</h2></div> : <>
+        {!selectedId ? <div className="empty"><h2>Selecione ou crie um caso</h2><p>Envie os subsídios, execute a análise e registre a decisão jurídica.</p></div> : !detail ? <div className="empty">{loadingDetail ? <h2>Carregando caso…</h2> : <><h2>Não foi possível carregar o caso</h2><button onClick={() => loadDetail(selectedId)}>Tentar novamente</button></>}</div> : <>
           <div className="case-title"><div><p className="eyebrow">PROCESSO</p><h2>{detail.case.case_number}</h2><p>{detail.case.uf} · {detail.case.sub_subject || "Sem subassunto"} · {money(detail.case.value_of_claim)}</p></div><button className="primary" onClick={analyzeCase} disabled={submitting}>Executar análise</button></div>
           <div className="cards">
-            <article className="panel"><h3>Documentos</h3><form className="upload" onSubmit={uploadDocument}><label>Origem<select name="source_party" defaultValue="BANCO"><option value="BANCO">Banco</option><option value="ADVOGADO_EXTERNO">Advogado externo</option></select></label><label>Tipo declarado<select name="declared_type" defaultValue="CONTRATO">{DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{labels[type]}</option>)}</select></label><label>Arquivo<input name="file" type="file" accept="application/pdf,text/plain,.txt" required /></label><button disabled={submitting}>Enviar documento</button></form><div className="document-list">{documents.length === 0 ? <p className="muted">Ainda não há documentos.</p> : documents.map((document) => <div key={document.id} className="document"><strong>{document.original_filename}</strong><span>{labels[document.declared_type] || document.declared_type} · {document.status} · {document.pages_extracted}/{document.page_count} páginas</span>{document.type_status === "MISMATCH" && <TypeConfirmationForm document={document} disabled={submitting} onSubmit={confirmDocumentType} />}</div>)}</div></article>
+            <article className="panel"><h3>Documentos</h3><DocumentUploadForm key={selectedId} requests={requests} disabled={submitting} onSubmit={uploadDocument} /><div className="document-list">{documents.length === 0 ? <p className="muted">Ainda não há documentos.</p> : documents.map((document) => <div key={document.id} className="document"><strong>{document.original_filename}</strong><span>{labels[document.declared_type] || document.declared_type} · {document.status} · {document.pages_extracted}/{document.page_count} páginas</span>{document.type_status === "MISMATCH" && <TypeConfirmationForm document={document} disabled={submitting} onSubmit={confirmDocumentType} />}</div>)}</div></article>
             <article className="panel analysis"><h3>Recomendação</h3>{!selectedAnalysis ? <p className="muted">A análise aparecerá aqui após a execução.</p> : <Analysis data={selectedAnalysis} />}</article>
           </div>
-          <article className="panel requests"><h3>Pedidos de documentos</h3><DocumentRequestForm disabled={submitting} onSubmit={createDocumentRequest} />{requests.length === 0 ? <p className="muted">Não há pedidos pendentes.</p> : <div className="document-list">{requests.map((request) => <div className="document" key={request.id}><strong>{labels[request.document_type] || request.document_type}</strong><span>{request.status} · {request.reason}</span>{["REQUESTED", "PENDING", "OVERDUE"].includes(request.status) && <DocumentRequestResponseForm request={request} disabled={submitting} onSubmit={respondDocumentRequest} />}</div>)}</div>}</article>
-          <article className="panel decision"><h3>Decisão do advogado</h3>{!selectedAnalysis ? <p className="muted">Execute uma análise para registrar uma decisão vinculada à recomendação.</p> : <form onSubmit={registerDecision}><div className="row"><label>Ação<select name="action" defaultValue={selectedAnalysis.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option></select></label><label>Valor proposto<input name="proposed_value" type="number" min="0" step="0.01" placeholder="Opcional" /></label></div><label>Justificativa<textarea name="reason" rows="3" placeholder="Obrigatória se divergir da recomendação." /></label><button disabled={submitting}>Registrar decisão</button></form>}{lawyerDecision && <p className="registered">Última decisão registrada: {labels[lawyerDecision.action] || lawyerDecision.action}</p>}</article>
+          <article className="panel requests"><h3>Pedidos de documentos</h3><DocumentRequestForm key={selectedId} disabled={submitting} onSubmit={createDocumentRequest} />{requests.length === 0 ? <p className="muted">Não há pedidos de documentos.</p> : <div className="document-list">{requests.map((request) => <div className="document" key={request.id}><strong>{labels[request.document_type] || request.document_type}</strong><span>{request.status} · {request.reason}</span>{request.status === "REQUESTED" && <DocumentRequestResponseForm request={request} disabled={submitting} onSubmit={respondDocumentRequest} />}</div>)}</div>}</article>
+          <article className="panel decision"><h3>Decisão do advogado</h3>{!selectedAnalysis ? <p className="muted">Execute uma análise para registrar uma decisão vinculada à recomendação.</p> : <form key={selectedAnalysis.id} onSubmit={registerDecision}><div className="row"><label>Ação<select name="action" defaultValue={selectedAnalysis.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option></select></label><label>Valor proposto<input name="proposed_value" type="number" min="0" step="0.01" placeholder="Opcional" /></label></div><label>Justificativa<textarea name="reason" rows="3" placeholder="Obrigatória se divergir da recomendação." /></label><button disabled={submitting}>Registrar decisão</button></form>}{lawyerDecision && <p className="registered">Última decisão registrada: {labels[lawyerDecision.action] || lawyerDecision.action}</p>}</article>
         </>}
       </section>
     </section>
@@ -278,7 +309,25 @@ function App() {
 
 function Analysis({ data }) {
   const targetValue = data.pricing?.target_value;
-  return <><div className={`recommendation ${data.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span>Recomendação</span><strong>{labels[data.recommendation] || data.recommendation}</strong></div><p><b>Status documental:</b> {data.documentary_status}</p>{targetValue != null && <p><b>Valor sugerido:</b> {money(targetValue)}</p>}<ul>{(data.reasons || []).map((reason, index) => <li key={index}>{reason}</li>)}</ul><small>Fonte: {data.policy_source} · Código: {data.decision_code}</small></>;
+  return <><div className={`recommendation ${data.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span>Recomendação</span><strong>{labels[data.recommendation] || data.recommendation}</strong></div><p><b>Status documental:</b> {data.documentary_status}</p>{targetValue != null && <p><b>Valor sugerido:</b> {money(targetValue)}</p>}<ul>{(data.reasons || []).map((reason, index) => <li key={index}>{reason}</li>)}</ul>
+  <small>Fonte: {data.policy_source} · Código: {data.decision_code}</small></>;
+}
+
+function DocumentUploadForm({ requests, disabled, onSubmit }) {
+  const [requestId, setRequestId] = useState("");
+  const [declaredType, setDeclaredType] = useState("CONTRATO");
+  const openRequests = requests.filter((request) => request.status === "REQUESTED");
+  const selectedRequest = openRequests.find((request) => request.id === requestId);
+  const selectedType = selectedRequest?.document_type || declaredType;
+
+  return <form className="upload" onSubmit={onSubmit} onReset={() => { setRequestId(""); setDeclaredType("CONTRATO"); }}>
+    <label>Origem<select name="source_party" defaultValue="BANCO"><option value="BANCO">Banco</option><option value="ADVOGADO_EXTERNO">Advogado externo</option></select></label>
+    <label>Pedido vinculado<select name="request_id" value={selectedRequest?.id || ""} onChange={(event) => setRequestId(event.target.value)}><option value="">Nenhum</option>{openRequests.map((request) => <option key={request.id} value={request.id}>{labels[request.document_type] || request.document_type} · {request.reason}</option>)}</select></label>
+    {selectedRequest && <input type="hidden" name="declared_type" value={selectedType} />}
+    <label>Tipo declarado<select name={selectedRequest ? undefined : "declared_type"} value={selectedType} onChange={(event) => setDeclaredType(event.target.value)} disabled={Boolean(selectedRequest)}>{DOCUMENT_TYPES.map((type) => <option key={type} value={type}>{labels[type]}</option>)}</select></label>
+    <label>Arquivo<input name="file" type="file" accept="application/pdf,text/plain,.txt" required /></label>
+    <button disabled={disabled}>Enviar documento</button>
+  </form>;
 }
 
 function TypeConfirmationForm({ document, disabled, onSubmit }) {
@@ -294,7 +343,7 @@ function TypeConfirmationForm({ document, disabled, onSubmit }) {
 function DocumentRequestForm({ disabled, onSubmit }) {
   return <form className="inline-form request-form" onSubmit={onSubmit}>
     <p className="muted">Solicite ao banco o subsídio necessário para sustentar ou revisar a análise.</p>
-    <div className="row"><label>Documento<select name="document_type" defaultValue="CONTRATO">{DOCUMENT_TYPES.filter((type) => type !== "OUTRO").map((type) => <option key={type} value={type}>{labels[type]}</option>)}</select></label><label>Prazo<input name="due_date" type="date" /></label></div>
+    <label>Documento<select name="document_type" defaultValue="CONTRATO">{DOCUMENT_TYPES.filter((type) => type !== "OUTRO").map((type) => <option key={type} value={type}>{labels[type]}</option>)}</select></label>
     <label>Hipótese<input name="hypothesis_key" required minLength="3" placeholder="Ex.: validacao_da_contratacao" /></label>
     <label>Motivo<textarea name="reason" rows="2" required minLength="3" placeholder="Explique por que este documento é necessário." /></label>
     <button disabled={disabled}>Solicitar documento</button>
