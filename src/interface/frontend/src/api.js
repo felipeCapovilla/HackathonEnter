@@ -1,6 +1,10 @@
 const API = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000/api`;
 export const SESSION_EXPIRED = "enteragree:session-expired";
 
+export function documentDownloadUrl(documentId) {
+  return `${API}/documents/${encodeURIComponent(documentId)}/file`;
+}
+
 export async function request(path, options = {}) {
   let response;
   try {

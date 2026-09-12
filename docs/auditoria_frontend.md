@@ -17,17 +17,40 @@
 
 ## Identidade visual
 
-- Logo fornecido em `src/assets/logo.png`, preservado; versões recortadas e otimizadas em WebP para wordmark e símbolo.
-- Paleta baseada na referência: azul escuro `#0B0F1A`, azul `#4F7BFF`, lilás `#B7C6FF` e cinza `#F4F5F7`.
+- Logo atualizado para a marca monocromática em maiúsculas do [site oficial da
+  Enter](https://www.getenter.ai/). Os vetores da navegação do site estão salvos
+  localmente em `src/assets/enter-wordmark.svg` e `src/assets/enter-symbol.svg`;
+  o favicon usa o mesmo símbolo, adaptado ao tema claro/escuro do navegador.
+  Versão branca sobre fundos escuros e preta sobre fundos claros. Os arquivos
+  anteriores, incluindo `src/assets/logo.png`, foram preservados sem uso na UI.
+- Cor primária atualizada para `#FFAE35`, conforme solicitado. Botões usam texto
+  escuro; links e destaques sobre fundo claro usam uma variação mais escura para
+  preservar legibilidade. Hover, foco, navegação e painéis seguem a mesma paleta.
+  O fundo escuro `#0B0F1A`, cinza `#F4F5F7` e as cores do logo foram preservados.
 - Fonte Inter servida localmente, navegação lateral por perfil, login em duas colunas e adaptação para celular.
 - Listas, contagens, recomendações e valores continuam usando a API. A interface não contém dados demonstrativos fixos.
 
 ## Validação desta revisão
 
-- 91 testes Python aprovados, incluindo status HTTP do logout, revogação do token, duplicidades e atribuição inválida.
-- Build de produção e 17 testes Playwright aprovados. Esses testes usam respostas controladas para simular também falhas, sessão expirada e requisições pendentes.
+- 97 testes Python aprovados, incluindo status HTTP do logout, revogação do token,
+  duplicidades, atribuição inválida e upload autenticado pelo banco com download
+  limitado aos usuários autorizados.
+- Build de produção e 24 testes Playwright aprovados. Esses testes usam respostas
+  controladas para simular também falhas, sessão expirada, requisições pendentes,
+  envio multipart, atualização do processamento, restrições do formulário e a
+  nova cor primária.
+- Título da aba atualizado para `ENTER | Política de acordos`; logo e favicon
+  servidos localmente e conferidos no login e nos três perfis.
+- Seed local explícito documentado no README, com `teste123` restrita às contas
+  demo. Testes cobrem idempotência, isolamento do banco da aplicação, recusa de
+  sobrescrita e redefinição explícita com revogação de sessões. Cadastro de
+  usuários normais continua exigindo 15 caracteres.
 - Jornada adicional com Playwright na aplicação local e API real: admin cadastra banco e usuários; banco cria processo com centavos e atribui advogado; advogado avalia e registra decisão; banco vê resultado e monitoramento. Login, recarga e logout foram exercitados, sem erros no console.
 - Capturas de desktop e celular inspecionadas. Os registros temporários da jornada real foram removidos após a verificação.
+- A jornada com API real também verificou envio de contrato TXT pelo banco,
+  extração concluída, persistência após recarga e download pelo navegador do
+  advogado responsável, com conferência do conteúdo original. Sem erros no
+  console, sem alteração nos processos do usuário e sem chamadas a LLM.
 
 Para repetir a suíte automatizada:
 

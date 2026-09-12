@@ -1,5 +1,5 @@
-import wordmark from "../../../assets/enter-wordmark.webp";
-import symbol from "../../../assets/enter-symbol.webp";
+import wordmark from "../../../assets/enter-wordmark.svg";
+import symbol from "../../../assets/enter-symbol.svg";
 
 export function Brand({ compact = false }) {
   return <img className={compact ? "brand-symbol" : "brand-wordmark"} src={compact ? symbol : wordmark} alt="Enter" />;

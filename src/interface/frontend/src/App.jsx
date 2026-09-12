@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, usePa
 import { request, sendJson, SESSION_EXPIRED } from "./api";
 import { useAction, useResource } from "./hooks";
 import { Brand, Icon } from "./Brand";
+import { DocumentPanel } from "./DocumentPanel";
 
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -149,6 +150,12 @@ function CaseDetail({ caseId, user }) {
   const recommendation = detail?.analyses?.[0];
   const decision = detail?.lawyer_decisions?.[0];
   const busy = action.pending || resource.loading;
+  const processingDocuments = detail?.documents.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status));
+  useEffect(() => {
+    if (!processingDocuments || resource.loading || resource.error) return;
+    const timer = window.setTimeout(resource.reload, 2000);
+    return () => window.clearTimeout(timer);
+  }, [processingDocuments, resource.loading, resource.error, resource.reload]);
   const assign = (event) => {
     const lawyerId = event.target.value || null;
     action.run(async () => {
@@ -190,9 +197,8 @@ function CaseDetail({ caseId, user }) {
         </select>
         <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
       </article>}
-      <div className="cards"><article className="panel"><h3>Documentos do processo</h3>
-        {detail.documents.length ? <ul>{detail.documents.map((document) => <li key={document.id}>{document.original_filename} · {document.declared_type} · {document.status}</li>)}</ul> : <p className="muted">Nenhum documento enviado.</p>}
-      </article><article className="panel analysis"><h3>Saída da ferramenta</h3>
+      <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} canUpload={user.role === "BANCO"} onUploaded={resource.reload} />
+      <article className="panel analysis"><h3>Saída da ferramenta</h3>
         {recommendation ? <>
           <div className={`recommendation ${recommendation.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation]}</strong></div>
           <p><b>Ação indicada:</b> {recommendation.recommendation === "ACORDO" ? "Propor acordo" : "Disputar a causa"}</p>

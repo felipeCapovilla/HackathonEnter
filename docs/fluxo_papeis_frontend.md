@@ -11,7 +11,7 @@ executar e registrar cada etapa.
 
 | Papel | Tela inicial | Permissões principais |
 | --- | --- | --- |
-| `BANCO` | `/banco` | Abre processos do próprio banco, atribui advogado, consulta documentos, análises, decisões e monitoramento. |
+| `BANCO` | `/banco` | Abre processos do próprio banco, atribui advogado, envia documentos, consulta análises, decisões e monitoramento. |
 | `ADVOGADO_EXTERNO` | `/advogado` | Vê somente processos a ele atribuídos, executa a análise e registra defesa ou acordo. |
 | `ADMIN_GLOBAL` | `/admin` | Cadastra bancos e usuários. Não acessa processos operacionais. |
 
@@ -25,7 +25,8 @@ recebe `404` para processo de outro responsável, evitando a enumeração de cas
 2. O administrador entra em `/login`, cadastra o banco e os usuários, incluindo
    advogados externos.
 3. Um usuário do banco entra em `/login`, abre o processo em `/banco` e atribui
-   um advogado no detalhe do caso.
+   um advogado no detalhe do caso. Na seção **Documentos do processo**, seleciona
+   o tipo, escolhe um PDF ou TXT e clica em **Enviar documento**.
 4. O advogado vê o caso atribuído em `/advogado`, abre-o e executa **Avaliar risco
    e recomendação**.
 5. Banco e advogado visualizam a mesma saída auditável: recomendação de acordo ou
@@ -50,10 +51,10 @@ recebe `404` para processo de outro responsável, evitando a enumeração de cas
 | --- | --- |
 | `/login` | Identificação por e-mail e senha. |
 | `/banco` | Abertura e lista de processos do banco. |
-| `/banco/casos/:caseId` | Atribuição e leitura da recomendação. |
+| `/banco/casos/:caseId` | Atribuição, envio de documentos e leitura da recomendação. |
 | `/banco/monitoramento` | Aderência e efetividade do banco. |
 | `/advogado` | Processos atribuídos ao advogado autenticado. |
-| `/advogado/casos/:caseId` | Execução da avaliação e registro de decisão. |
+| `/advogado/casos/:caseId` | Consulta e download dos documentos, execução da avaliação e registro de decisão. |
 | `/admin` | Cadastro simples de bancos e usuários. |
 
 ## Verificação
@@ -66,14 +67,35 @@ recebe `404` para processo de outro responsável, evitando a enumeração de cas
 As correções de formulários, logout, carregamento e identidade visual, incluindo
 a validação com API real, estão registradas em `auditoria_frontend.md`.
 
+## Envio de documentos pelo banco
+
+- O formulário fica no detalhe do processo, exclusivamente no perfil banco.
+  Envia um arquivo por vez pela API existente, sem conversão para Base64 e sem
+  carregar o arquivo inteiro em memória JavaScript. O limite de tamanho é
+  controlado pelo servidor (`ENTERAGREE_MAX_UPLOAD_BYTES`, padrão 512 MiB).
+- O tipo declarado é obrigatório. A API determina a origem pelo usuário
+  autenticado, independentemente do valor de `source_party` enviado pelo cliente.
+- Durante o envio, os controles ficam desabilitados. Falhas preservam os campos;
+  o formulário é limpo somente após a confirmação do servidor.
+- A lista é atualizada após o envio e consultada a cada dois segundos enquanto
+  houver documentos aguardando processamento ou em extração. O acompanhamento
+  para ao concluir, sair da tela ou falhar a consulta; nesse último caso, a tela
+  permite tentar novamente.
+- Banco e advogado responsável podem baixar o original pelo endpoint autenticado.
+  O link não transfere o arquivo para o estado React nem expõe o caminho em disco.
+- A tela mostra falhas, divergências de tipo, tipo não confirmado e texto
+  insuficiente. A validação de tipo continua determinística; não é chamada de LLM.
+  OCR não está implementado. Documentos sem tipo confirmado não ativam evidências
+  na política apenas por terem sido enviados.
+
 ## Limites conhecidos e próximos passos
 
 - O cadastro inicial é propositalmente por CLI; não há endpoint público de
   bootstrap.
 - Para produção, configurar HTTPS e endurecer o cookie como `Secure`; adicionar
   proteção CSRF para mutações autenticadas e limitação de tentativas no login.
-- A tela atual prioriza abertura, atribuição e decisão. A experiência completa de
-  envio de documentos e solicitações documentais deve ser reincorporada em uma
-  iteração específica, preservando as APIs já protegidas por papel.
+- Envio pelo banco, acompanhamento e download estão disponíveis. Telas de
+  solicitações documentais, reclassificação, remoção e confirmação com ressalva
+  ainda precisam ser reincorporadas, preservando as APIs protegidas por papel.
 - Auditoria de ações de usuário, redefinição de senha e gestão avançada de
   usuários permanecem próximos incrementos.

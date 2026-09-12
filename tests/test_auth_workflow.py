@@ -119,3 +119,37 @@ def test_invalid_assignment_returns_validation_error(tmp_path):
         response = client.patch(f"/api/cases/{case_id}/assignment", json={"assigned_lawyer_id": "missing"})
         assert response.status_code == 422
         assert "Advogado ativo" in response.json()["detail"]
+
+
+def test_bank_upload_is_available_only_to_scoped_users(tmp_path):
+    app = create_app(settings(tmp_path))
+    with TestClient(app) as bank_client, TestClient(app) as lawyer_client, TestClient(app) as other_client:
+        add_user(app, "BANCO", "docs-bank@unicamp.br")
+        lawyer = add_user(app, "ADVOGADO_EXTERNO", "docs-lawyer@unicamp.br")
+        add_user(app, "ADVOGADO_EXTERNO", "docs-other@unicamp.br")
+        login(bank_client, "docs-bank@unicamp.br")
+        login(lawyer_client, "docs-lawyer@unicamp.br")
+        login(other_client, "docs-other@unicamp.br")
+        created = bank_client.post("/api/cases", json={
+            "case_number": "upload-001", "uf": "SP", "assigned_lawyer_id": lawyer["id"],
+        })
+        assert created.status_code == 201
+        case_id = created.json()["id"]
+        content = "CONTRATO DE EMPRÉSTIMO. Cédula de crédito bancário. Valor contratado, parcelas e assinatura do contratante.".encode()
+        payload = {"declared_type": "CONTRATO", "source_party": "ADVOGADO_EXTERNO"}
+        files = {"file": ("contrato.txt", content, "text/plain")}
+        uploaded = bank_client.post(f"/api/cases/{case_id}/documents", data=payload, files=files)
+        assert uploaded.status_code == 201
+        document_id = uploaded.json()["id"]
+        assert uploaded.json()["source_party"] == "BANCO"
+        for client in (bank_client, lawyer_client):
+            document = client.get(f"/api/cases/{case_id}").json()["documents"][0]
+            assert document["id"] == document_id
+            assert document["status"] in {"COMPLETED", "COMPLETED_WITH_WARNINGS"}
+            assert document["page_count"] == 1
+            download = client.get(f"/api/documents/{document_id}/file")
+            assert download.status_code == 200
+            assert download.content == content
+        assert bank_client.post(f"/api/cases/{case_id}/documents", data=payload, files=files).status_code == 409
+        assert other_client.get(f"/api/documents/{document_id}/file").status_code == 404
+        assert other_client.post(f"/api/cases/{case_id}/documents", data=payload, files=files).status_code == 404
