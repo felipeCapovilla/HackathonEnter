@@ -90,4 +90,5 @@ class Recomendacao(BaseModel):
     recuperacao: Optional[PlanoRecuperacao] = None
 
     justificativa: list[str]
+    alertas: list[str] = []
     premissas_usadas: list[str]

@@ -9,6 +9,8 @@ Chave: (contrato, extrato, comprovante_credito, sub_assunto)
 """
 from __future__ import annotations
 
+import math
+
 # (contrato, extrato, comprovante) x sub_assunto -> (n, p_perda)
 TABELA: dict[tuple[int, int, int, str], tuple[int, float]] = {
     (0, 0, 0, "Generico"): (664, 0.9714),
@@ -29,10 +31,17 @@ TABELA: dict[tuple[int, int, int, str], tuple[int, float]] = {
     (1, 1, 1, "Golpe"): (16647, 0.0522),
 }
 
-# UF como cluster de 3 (26 UFs x 16 segmentos = 416 células, n medio 144: fino demais)
+# UF como cluster de 3. Cruzar 26 UFs x 16 segmentos daria 416 células com
+# n médio de 144 — fino demais para uma taxa estável.
 UF_ALTO = {"AM", "AP", "BA", "GO", "RJ", "RS"}
 UF_BAIXO = {"MA", "MS", "MT", "PI", "PR", "RN", "RO", "TO"}
-AJUSTE_UF = {"alto": 1.15, "medio": 1.00, "baixo": 0.85}
+
+# Ajuste em LOG-ODDS, não multiplicativo. Multiplicar probabilidade quebra nos
+# extremos: 0,9888 x 1,15 estouraria 1, e 0,9888 x 0,85 = 0,84 subestimaria
+# grosseiramente um segmento onde o banco perde quase sempre. Em log-odds o
+# deslocamento é uniforme e a probabilidade nunca sai de (0,1).
+# Offsets medidos na base: logit(P(perda) do cluster) - logit(P(perda) global).
+OFFSET_UF_LOGIT = {"alto": +0.4362, "medio": -0.0325, "baixo": -0.3252}
 
 
 def cluster_uf(uf: str) -> str:
@@ -50,8 +59,10 @@ def chave(contrato: bool, extrato: bool, comprovante: bool, sub_assunto: str) ->
 
 def p_perda(contrato: bool, extrato: bool, comprovante: bool, sub_assunto: str,
             uf: str | None = None) -> float:
-    """P(derrota) do segmento, com ajuste multiplicativo pelo cluster de UF."""
+    """P(derrota) do segmento, deslocada em log-odds pelo cluster de UF."""
     _, base = TABELA[(int(contrato), int(extrato), int(comprovante), sub_assunto)]
-    if uf:
-        base *= AJUSTE_UF[cluster_uf(uf)]
-    return min(0.99, max(0.01, base))
+    if not uf:
+        return base
+    base = min(0.9995, max(0.0005, base))
+    z = math.log(base / (1 - base)) + OFFSET_UF_LOGIT[cluster_uf(uf)]
+    return 1 / (1 + math.exp(-z))
