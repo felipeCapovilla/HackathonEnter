@@ -9,7 +9,4 @@ def text_converter(input_path):
     with open(caminho_md, "w", encoding="utf-8") as f:
         f.write(formated_text)
         
-    print(f"Arquivo salvo com sucesso em: {caminho_md}")
 
-
-text_converter("/home/felipe-capovilla/Documents/HackatonEnter/docs/05_Dossie_Veritas.pdf")
