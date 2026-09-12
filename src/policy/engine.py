@@ -13,7 +13,7 @@ from contracts.schema import CaseFeatures, ParametrosContrato, PlanoRecuperacao,
 from . import table
 from .constants import CUSTO_MENSAL_TEMPO, DURACAO_MESES, P4, P5, POLICY_VERSION, RATIO_CONDENACAO
 from .gate import avaliar_gate, contrato_efetivo
-from .valor_acordo import avaliar_acordo
+from .valor_acordo import avaliar_acordo, pct
 
 
 def _p_tabela(c: CaseFeatures, *, com_contrato: bool | None = None,
@@ -116,7 +116,7 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
     segmento = table.chave(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto)
     fonte = "fonte externa" if externa else "tabela de segmentos"
     just = [gate.motivo,
-            f"Segmento {segmento}: P(derrota) {p:.1%} ({fonte}); limiar deste caso {veredito.p_estrela:.1%}."]
+            f"Segmento {segmento}: P(derrota) {pct(p)} ({fonte}); limiar deste caso {pct(veredito.p_estrela)}."]
     premissas = [*veredito.premissas_usadas, CUSTO_MENSAL_TEMPO.id, DURACAO_MESES.id]
 
     if rec and rec.confianca == "alta":

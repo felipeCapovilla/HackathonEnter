@@ -51,7 +51,10 @@ from .schemas import (
     DocumentType,
     DocumentTypeStatus,
     DossieAnalysisRecord,
+    FAVORABLE_OUTCOMES,
     LawyerDecisionCreate,
+    LawyerDecisionOutcomeCreate,
+    LawyerPerformance,
     MonitoringSummary,
     SourceParty,
     UserRole,
@@ -140,6 +143,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if user["role"] != "SYSTEM" and not user.get("is_manager"):
             raise HTTPException(403, "Somente o gestor do banco altera o contrato.")
         return user
+
+    def require_open_case(case_id: str, acao: str) -> None:
+        """
+        Barra escrita em processo encerrado.
+
+        Depois do desfecho o caso é histórico: trocar documento, responsável ou
+        decisão reescreveria a prova em que a recomendação já emitida se apoiou.
+        O guarda mora aqui, e não só na tela, porque a API é chamável direto.
+        """
+        if repository().case_stage(case_id) == "ENCERRADO":
+            raise HTTPException(409, f"Processo encerrado: não é possível {acao}.")
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -345,6 +359,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "negotiation_outcomes": repository().list_negotiation_outcomes(case_id),
             "judicial_outcomes": repository().list_judicial_outcomes(case_id),
             "case": case,
+            # ABERTO | DECIDIDO | ENCERRADO — a tela habilita ações a partir disto.
+            "stage": repository().case_stage(case_id),
             "documents": documents,
             "document_requests": repository().list_document_requests(case_id),
             "analyses": repository().list_analyses(case_id),
@@ -355,6 +371,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.patch("/api/cases/{case_id}/assignment", response_model=CaseRecord)
     def assign_case(case_id: str, payload: CaseAssignment, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.BANCO)
+        require_case_access(repository(), case_id, user)
+        require_open_case(case_id, "trocar o advogado responsável")
         try:
             case = repository().assign_lawyer(case_id, payload.assigned_lawyer_id, user["bank_id"])
         except ValueError as exc:
@@ -375,6 +393,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> dict:
         user = current_user(request)
         require_case_access(repository(), case_id, user)
+        require_open_case(case_id, "enviar novos documentos")
         source_party = SourceParty.BANCO if user["role"] in {"SYSTEM", UserRole.BANCO.value} else SourceParty.ADVOGADO_EXTERNO
         request_id = request_id or None
         if request_id:
@@ -394,6 +413,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         background_tasks.add_task(document_service().process_document, document["id"])
         return document
 
+    @app.delete("/api/cases/{case_id}/documents/{document_id}", status_code=204)
+    def delete_document(case_id: str, document_id: str, request: Request) -> Response:
+        """
+        Exclusão LÓGICA de um documento enviado pelo banco.
+
+        A linha fica: análises já emitidas guardam este id em `feature_provenance`,
+        e sem ela não há como reproduzir por que a recomendação saiu daquele jeito.
+        O arquivo em disco é apagado — o conteúdo some, o rastro permanece.
+
+        O advogado não apaga documento do banco: o gate documental é do banco, e
+        deixar a outra parte remover prova seria conflito de interesse.
+        """
+        user = require_role(current_user(request), UserRole.BANCO)
+        require_case_access(repository(), case_id, user)
+        require_open_case(case_id, "excluir documentos")
+        document = repository().get_document(document_id)
+        if document is None or document["case_id"] != case_id:
+            raise HTTPException(404, "Documento não encontrado neste processo.")
+        if document["source_party"] != SourceParty.BANCO.value:
+            raise HTTPException(403, "Só é possível excluir documentos enviados pelo banco.")
+        internal = repository().get_document_internal(document_id)
+        file_path = repository().soft_delete_document(document_id, user["id"])
+        if file_path is None:
+            raise HTTPException(404, "Documento não encontrado neste processo.")
+        if internal:
+            Path(internal["file_path"]).unlink(missing_ok=True)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     @app.get("/api/documents/{document_id}/pages/{page_number}")
     def get_document_page(document_id: str, page_number: int, request: Request) -> dict:
         document = repository().get_document(document_id)
@@ -411,7 +458,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/documents/{document_id}/file")
     def download_document(document_id: str, request: Request) -> FileResponse:
         document = repository().get_document_internal(document_id)
-        if document is None:
+        # Excluído logicamente não existe para quem consulta: a linha só sobrevive
+        # para a auditoria das análises que já o usaram.
+        if document is None or document.get("deleted_at"):
             raise HTTPException(404, "Documento não encontrado.")
         user = current_user(request)
         require_case_access(repository(), document["case_id"], user)
@@ -487,6 +536,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def analyse_case(case_id: str, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         require_case(case_id, request)
+        require_open_case(case_id, "gerar nova avaliação")
         try:
             analysis = app.state.policy.evaluate(case_id)
             track(user, case_id, EngagementEventType.ANALYSIS_RUN)
@@ -529,6 +579,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_lawyer_decision(case_id: str, analysis_id: str, payload: LawyerDecisionCreate, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         case = require_case(case_id, request)
+        # Uma decisão por processo. A segunda não seria revisão: viraria um
+        # segundo registro competindo com o primeiro no cálculo de aderência,
+        # e o desfecho ficaria pendurado em qual dos dois?
+        estagio = repository().case_stage(case_id)
+        if estagio == "ENCERRADO":
+            raise HTTPException(409, "Processo encerrado: não é possível registrar nova decisão.")
+        if estagio == "DECIDIDO":
+            raise HTTPException(409, "Este processo já tem decisão registrada. Registre o desfecho.")
         analysis = repository().get_analysis(analysis_id)
         if analysis is None or analysis["case_id"] != case_id:
             raise HTTPException(422, "Análise inválida para este processo.")
@@ -541,6 +599,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_negotiation_outcome(case_id: str, payload: NegotiationOutcomeCreate, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         case = require_case(case_id, request)
+        require_open_case(case_id, "registrar resultado da negociação")
         lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
         try:
             outcome = repository().create_negotiation_outcome(case_id, payload, lawyer_id)
@@ -570,6 +629,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if user["role"] == UserRole.ADVOGADO_EXTERNO.value and (payload.active_seconds or payload.event_type == "DOCUMENT_OPENED"):
             repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id, payload.active_seconds)
         return Response(status_code=204)
+
+    @app.post("/api/cases/{case_id}/lawyer-decisions/{decision_id}/outcome", status_code=201)
+    def register_decision_outcome(
+        case_id: str, decision_id: str, payload: LawyerDecisionOutcomeCreate, request: Request
+    ) -> dict:
+        """Fecha o processo: como terminou de verdade. Só o advogado do caso registra."""
+        require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        require_case(case_id, request)
+        decision = repository().get_decision(decision_id)
+        if decision is None or decision["case_id"] != case_id:
+            raise HTTPException(404, "Decisão não encontrada para este processo.")
+        try:
+            updated = repository().register_outcome(
+                decision_id, payload.outcome.value, payload.outcome_note
+            )
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        if updated is None:
+            raise HTTPException(404, "Decisão não encontrada.")
+        return updated
+
+    @app.get("/api/lawyer/performance", response_model=LawyerPerformance)
+    def lawyer_performance(request: Request) -> dict:
+        """Números do próprio advogado. Êxito e aderência medem coisas diferentes."""
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        return repository().lawyer_performance(user["id"], frozenset(FAVORABLE_OUTCOMES))
 
     @app.get("/api/monitoring", response_model=MonitoringSummary)
     def monitoring(request: Request) -> dict:

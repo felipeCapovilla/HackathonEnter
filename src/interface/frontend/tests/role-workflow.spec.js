@@ -83,7 +83,10 @@ test("banco envia multipart, aguarda processamento e limpa formulário sem recar
   await expect(page.getByLabel("Arquivo do documento")).toHaveValue("");
   await expect(page.getByRole("status").filter({ hasText: "Documento enviado." })).toBeVisible();
   detail.documents = [uploadedDocument];
-  await expect(page.getByText("Processado · 1 página(s)", { exact: true })).toBeVisible();
+  // O status virou pílula e a contagem de páginas ficou na linha de metadados;
+  // as duas informações continuam na tela, agora em elementos separados.
+  await expect(page.locator(".document-list .pill").filter({ hasText: "Processado" })).toBeVisible();
+  await expect(page.locator(".document-list li").filter({ hasText: "1 página(s)" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Baixar contrato.txt" })).toHaveAttribute("href", /\/api\/documents\/document-1\/file$/);
   expect(uploads).toBe(1);
   await page.reload();
@@ -273,8 +276,11 @@ test("registro de decisão limpa formulário e exibe decisão salva", async ({ p
   await page.getByLabel("Justificativa").fill("Proposta conforme política.");
   await page.getByRole("button", { name: "Registrar decisão", exact: true }).click();
   await expect(page.getByText("Decisão registrada pelo advogado: Acordo")).toBeVisible();
-  await expect(page.getByLabel("Justificativa")).toHaveValue("");
-  await expect(page.getByLabel("Valor proposto")).toHaveValue("");
+  // A decisão é única por processo: registrada, o formulário sai de cena e o
+  // que resta ao advogado é registrar o desfecho. Uma segunda decisão não seria
+  // revisão — competiria com a primeira no cálculo de aderência.
+  await expect(page.getByRole("heading", { name: "Registrar decisão" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Registrar desfecho" })).toBeVisible();
   await expect(page.locator(".warning")).toHaveCount(0);
 });
 

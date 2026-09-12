@@ -42,6 +42,19 @@ class DocumentTypeStatus(StrEnum):
     REMOVED = "REMOVED"
 
 
+class DecisionOutcome(StrEnum):
+    """Como o processo terminou de verdade. É o que separa êxito de aderência."""
+
+    ACORDO_ACEITO = "ACORDO_ACEITO"
+    ACORDO_RECUSADO = "ACORDO_RECUSADO"
+    SENTENCA_FAVORAVEL = "SENTENCA_FAVORAVEL"
+    SENTENCA_DESFAVORAVEL = "SENTENCA_DESFAVORAVEL"
+
+
+#: Desfechos que contam como êxito do banco no numerador da taxa.
+FAVORABLE_OUTCOMES = frozenset({DecisionOutcome.ACORDO_ACEITO, DecisionOutcome.SENTENCA_FAVORAVEL})
+
+
 class DocumentStatus(StrEnum):
     UPLOADED = "UPLOADED"
     EXTRACTING = "EXTRACTING"
@@ -116,6 +129,11 @@ class CaseAssignment(BaseModel):
 class CaseRecord(CaseCreate):
     id: str
     created_at: datetime
+    # Derivados da última decisão: `cases` não tem coluna de status.
+    active: bool = True
+    decided: bool = False
+    outcome: DecisionOutcome | None = None
+    document_count: int = 0
 
 
 class DocumentRecord(BaseModel):
@@ -258,6 +276,30 @@ class EngagementEventCreate(BaseModel):
     event_type: Literal["DOCUMENT_OPENED", "ACTIVE_TIME"]
     document_id: str | None = Field(default=None, max_length=80)
     active_seconds: int = Field(default=0, ge=0, le=300, description="Tempo ativo desde o último aviso; no máximo 5 min")
+
+
+class LawyerDecisionOutcomeCreate(BaseModel):
+    outcome: DecisionOutcome
+    outcome_note: str | None = Field(default=None, max_length=2000)
+
+
+class LawyerPerformance(BaseModel):
+    """Painel do próprio advogado: êxito real e aderência à política, separados."""
+
+    total_cases: int
+    active_cases: int
+    closed_cases: int
+    decisions: int
+    outcomes_recorded: int
+    pending_outcome: int
+    success_rate: float | None = Field(
+        default=None, description="Desfechos favoráveis / desfechos registrados. None sem desfecho."
+    )
+    adherence_rate: float | None = Field(
+        default=None, description="Decisões que seguiram a recomendação / decisões comparáveis."
+    )
+    outcomes: dict[str, int]
+    actions: dict[str, int]
 
 
 class MonitoringSummary(BaseModel):

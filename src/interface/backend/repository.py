@@ -221,9 +221,22 @@ class Repository:
             where += " AND" if where else " WHERE"
             where += " cases.assigned_lawyer_id = ?"
             parameters.append(lawyer_id)
+        # `outcome`/`decided` vêm da última decisão do advogado e são o que separa
+        # processo ativo de encerrado — não existe coluna de status em `cases`.
         with connection_for(self.database_path) as connection:
-            rows = connection.execute(f"SELECT * FROM cases{where} ORDER BY created_at DESC", parameters).fetchall()
-        return [dict(row) for row in rows]
+            rows = connection.execute(
+                f"""SELECT cases.*,
+                       (SELECT decision.outcome FROM lawyer_decisions AS decision
+                         WHERE decision.case_id = cases.id AND decision.outcome IS NOT NULL
+                         ORDER BY decision.outcome_at DESC LIMIT 1) AS outcome,
+                       EXISTS(SELECT 1 FROM lawyer_decisions AS decision
+                               WHERE decision.case_id = cases.id) AS decided,
+                       (SELECT COUNT(*) FROM documents
+                         WHERE documents.case_id = cases.id AND documents.deleted_at IS NULL) AS document_count
+                   FROM cases{where} ORDER BY cases.created_at DESC""",
+                parameters,
+            ).fetchall()
+        return [{**dict(row), "decided": bool(row["decided"]), "active": row["outcome"] is None} for row in rows]
 
     def assign_lawyer(self, case_id: str, lawyer_id: str | None, bank_id: str) -> dict | None:
         with connection_for(self.database_path) as connection:
@@ -307,8 +320,11 @@ class Repository:
         return self.get_document(document_id) or record
 
     def get_document(self, document_id: str) -> dict | None:
+        """Leitura pública: documento excluído logicamente não existe mais."""
         with connection_for(self.database_path) as connection:
-            row = connection.execute("SELECT * FROM documents WHERE id = ?", (document_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM documents WHERE id = ? AND deleted_at IS NULL", (document_id,)
+            ).fetchone()
         return self._decode_document(_row(row))
 
     def get_document_internal(self, document_id: str) -> dict | None:
@@ -317,11 +333,33 @@ class Repository:
         return self._decode_document(_row(row), include_internal=True)
 
     def list_documents(self, case_id: str) -> list[dict]:
+        """Documentos vivos do processo. Excluídos logicamente não voltam."""
         with connection_for(self.database_path) as connection:
             rows = connection.execute(
-                "SELECT * FROM documents WHERE case_id = ? ORDER BY created_at", (case_id,)
+                "SELECT * FROM documents WHERE case_id = ? AND deleted_at IS NULL ORDER BY created_at",
+                (case_id,),
             ).fetchall()
         return [self._decode_document(dict(row)) for row in rows]
+
+    def soft_delete_document(self, document_id: str, user_id: str) -> str | None:
+        """
+        Marca o documento como removido e devolve o caminho do arquivo em disco.
+
+        A linha permanece: análises já emitidas referenciam este id em
+        `feature_provenance`, e apagá-la quebraria a reprodução da recomendação.
+        Quem apaga o arquivo é o chamador — o disco não faz parte da transação.
+        """
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT file_path FROM documents WHERE id = ? AND deleted_at IS NULL", (document_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                "UPDATE documents SET deleted_at = ?, deleted_by_user_id = ? WHERE id = ?",
+                (_now(), user_id, document_id),
+            )
+        return row["file_path"]
 
     def update_document_extraction(
         self,
@@ -661,6 +699,29 @@ class Repository:
                 raise ValueError("A solicitação documental já foi encerrada.")
         return self.get_document_request(request_id)
 
+    def case_stage(self, case_id: str) -> str:
+        """
+        Em que ponto do ciclo o processo está. Três estados, não dois.
+
+        ABERTO      sem decisão — tudo liberado
+        DECIDIDO    com decisão, sem desfecho — negociação correndo
+        ENCERRADO   com desfecho — nada mais se altera
+
+        Quem consulta isto são os guardas de escrita: depois de encerrado, mexer
+        em documento, responsável ou decisão reescreveria a história de um caso
+        que já acabou, e as análises emitidas deixariam de bater com a prova.
+        """
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                """SELECT COUNT(*) AS total,
+                          COUNT(outcome) AS com_desfecho
+                   FROM lawyer_decisions WHERE case_id = ?""",
+                (case_id,),
+            ).fetchone()
+        if row["com_desfecho"]:
+            return "ENCERRADO"
+        return "DECIDIDO" if row["total"] else "ABERTO"
+
     def create_lawyer_decision(
         self, case_id: str, analysis_id: str, payload: LawyerDecisionCreate, lawyer_id: str | None = None
     ) -> dict:
@@ -696,7 +757,16 @@ class Repository:
                 """INSERT INTO negotiation_outcomes (id, case_id, decision_id, lawyer_id, status, offered_value,
                 counter_value, closed_value, created_at) VALUES (:id, :case_id, :decision_id, :lawyer_id, :status,
                 :offered_value, :counter_value, :closed_value, :created_at)""", record)
+            if record["status"] == "ACEITO":
+                # Acordo aceito é desfecho: encerra o processo no ciclo de vida da decisão.
+                self._close_decision(connection, decision["id"], "ACORDO_ACEITO", record["created_at"])
         return record
+
+    @staticmethod
+    def _close_decision(connection: sqlite3.Connection, decision_id: str, outcome: str, when: str) -> None:
+        connection.execute(
+            "UPDATE lawyer_decisions SET outcome = ?, outcome_at = ? WHERE id = ? AND outcome IS NULL",
+            (outcome, when, decision_id))
 
     def list_negotiation_outcomes(self, case_id: str) -> list[dict]:
         with connection_for(self.database_path) as connection:
@@ -711,6 +781,11 @@ class Repository:
             connection.execute(
                 """INSERT INTO judicial_outcomes (id, case_id, lawyer_id, result, condemnation_value, created_at)
                 VALUES (:id, :case_id, :lawyer_id, :result, :condemnation_value, :created_at)""", record)
+            decision = connection.execute(
+                "SELECT id FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC LIMIT 1", (case_id,)).fetchone()
+            if decision is not None:
+                outcome = "SENTENCA_FAVORAVEL" if record["result"] == "EXITO" else "SENTENCA_DESFAVORAVEL"
+                self._close_decision(connection, decision["id"], outcome, record["created_at"])
         return record
 
     def list_judicial_outcomes(self, case_id: str) -> list[dict]:
@@ -733,6 +808,88 @@ class Repository:
                 "SELECT * FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC", (case_id,)
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def get_decision(self, decision_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT * FROM lawyer_decisions WHERE id = ?", (decision_id,)
+            ).fetchone()
+        return _row(row)
+
+    def register_outcome(self, decision_id: str, outcome: str, note: str | None) -> dict | None:
+        """Registra como o processo terminou. Só a primeira vez — desfecho não se reescreve."""
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT outcome FROM lawyer_decisions WHERE id = ?", (decision_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            if row["outcome"]:
+                raise ValueError("O desfecho deste processo já foi registrado.")
+            connection.execute(
+                "UPDATE lawyer_decisions SET outcome = ?, outcome_at = ?, outcome_note = ? WHERE id = ?",
+                (outcome, _now(), note, decision_id),
+            )
+            updated = connection.execute(
+                "SELECT * FROM lawyer_decisions WHERE id = ?", (decision_id,)
+            ).fetchone()
+        return dict(updated)
+
+    def lawyer_performance(self, lawyer_id: str, favorable: frozenset[str]) -> dict:
+        """
+        Números do próprio advogado.
+
+        Êxito e aderência são coisas diferentes e ficam separados de propósito:
+        aderência mede se ele seguiu a política, êxito mede se deu certo. Um
+        advogado que sempre acata tem aderência de 100% e pode ter êxito baixo.
+        """
+        with connection_for(self.database_path) as connection:
+            total_cases = int(connection.execute(
+                "SELECT COUNT(*) FROM cases WHERE assigned_lawyer_id = ?", (lawyer_id,)
+            ).fetchone()[0])
+            rows = connection.execute(
+                """SELECT decision.action AS action, decision.outcome AS outcome,
+                          analysis.recommendation AS recommendation
+                   FROM lawyer_decisions AS decision
+                   JOIN cases ON cases.id = decision.case_id
+                   LEFT JOIN analyses AS analysis ON analysis.id = decision.analysis_id
+                   WHERE cases.assigned_lawyer_id = ?""",
+                (lawyer_id,),
+            ).fetchall()
+            closed_cases = int(connection.execute(
+                """SELECT COUNT(DISTINCT decision.case_id) FROM lawyer_decisions AS decision
+                   JOIN cases ON cases.id = decision.case_id
+                   WHERE cases.assigned_lawyer_id = ? AND decision.outcome IS NOT NULL""",
+                (lawyer_id,),
+            ).fetchone()[0])
+
+        outcomes: dict[str, int] = {}
+        actions: dict[str, int] = {}
+        favoraveis = comparaveis = aderentes = 0
+        for row in rows:
+            actions[row["action"]] = actions.get(row["action"], 0) + 1
+            if row["outcome"]:
+                outcomes[row["outcome"]] = outcomes.get(row["outcome"], 0) + 1
+                if row["outcome"] in favorable:
+                    favoraveis += 1
+            if row["recommendation"] and row["action"]:
+                comparaveis += 1
+                if row["recommendation"].strip().upper() == row["action"].strip().upper():
+                    aderentes += 1
+
+        registrados = sum(outcomes.values())
+        return {
+            "total_cases": total_cases,
+            "active_cases": total_cases - closed_cases,
+            "closed_cases": closed_cases,
+            "decisions": len(rows),
+            "outcomes_recorded": registrados,
+            "pending_outcome": len(rows) - registrados,
+            "success_rate": round(favoraveis / registrados, 4) if registrados else None,
+            "adherence_rate": round(aderentes / comparaveis, 4) if comparaveis else None,
+            "outcomes": outcomes,
+            "actions": actions,
+        }
 
     @staticmethod
     def _decode_dossie_analysis(record: dict | None) -> dict | None:

@@ -133,6 +133,7 @@ def _flags(feature_vector: dict) -> dict[str, bool]:
 def _carregar_decisoes(connection: sqlite3.Connection) -> list[dict]:
     rows = connection.execute("""
         SELECT d.id AS decision_id, d.case_id, d.action, d.proposed_value, d.created_at AS decided_at,
+               d.outcome AS decision_outcome,
                COALESCE(d.lawyer_id, c.assigned_lawyer_id) AS lawyer_id,
                a.recommendation, a.policy_output, a.limitations, a.feature_vector,
                c.bank_id, c.case_number, c.uf, c.value_of_claim, c.sub_subject,
@@ -198,6 +199,18 @@ def _avaliar(d: dict, negociacao: dict | None, judicial: dict | None, engajament
     limitations = json.loads(d["limitations"]) if d["limitations"] else []
     acordo = po.get("acordo") or {}
     causa = float(d["value_of_claim"] or 0.0)
+    # Desfecho registrado só na decisão (sem os valores detalhados): o acordo aceito vale
+    # o valor proposto; a sentença desfavorável fica sem valor de condenação conhecido.
+    desfecho = d.get("decision_outcome")
+    if negociacao is None and d["action"] == "ACORDO" and desfecho in {"ACORDO_ACEITO", "ACORDO_RECUSADO"}:
+        valor = d["proposed_value"] if d["proposed_value"] is not None else acordo.get("alvo")
+        if desfecho == "ACORDO_RECUSADO":
+            negociacao = {"status": "RECUSADO", "closed_value": None}
+        elif valor is not None:
+            negociacao = {"status": "ACEITO", "closed_value": valor}
+    if judicial is None and desfecho in {"SENTENCA_FAVORAVEL", "SENTENCA_DESFAVORAVEL"}:
+        judicial = {"result": "EXITO" if desfecho == "SENTENCA_FAVORAVEL" else "NAO_EXITO",
+                    "condemnation_value": 0.0 if desfecho == "SENTENCA_FAVORAVEL" else None}
     rec, acao = d["recommendation"], d["action"]
     esperado_rec = _esperado(po, rec, causa, None)
     esperado_acao = _esperado(po, acao, causa, d["proposed_value"])
@@ -273,8 +286,9 @@ def _resumo(itens: list[dict]) -> dict:
 def _efetividade(itens: list[dict]) -> dict:
     resumo = _resumo(itens)
     defendidos = [x for x in itens if x["judicial"]]
-    condenacao_real = sum(float(x["judicial"]["condemnation_value"]) for x in defendidos)
-    condenacao_esperada = sum(x["p_perda"] * RATIO_CONDENACAO.valor * x["valor_causa"] for x in defendidos)
+    com_valor = [x for x in defendidos if x["judicial"]["condemnation_value"] is not None]
+    condenacao_real = sum(float(x["judicial"]["condemnation_value"]) for x in com_valor)
+    condenacao_esperada = sum(x["p_perda"] * RATIO_CONDENACAO.valor * x["valor_causa"] for x in com_valor)
     fechados = [x for x in itens if x["fechado"] is not None]
     semanas: dict[str, dict] = defaultdict(lambda: {"decisoes": 0, "aderentes": 0, "realizada": 0.0, "esperada": 0.0})
     for x in itens:

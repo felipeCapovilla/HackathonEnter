@@ -125,7 +125,10 @@ def test_outcomes_and_engagement_feed_bank_insights(tmp_path):
         assert fechado.status_code == 201 and fechado.json()["lawyer_id"] == lawyer["id"]
         assert advogado.post(f"/api/cases/{case_id}/judicial-outcomes",
                              json={"result": "EXITO", "condemnation_value": 10}).status_code == 422
-        assert advogado.get(f"/api/cases/{case_id}").json()["negotiation_outcomes"][0]["status"] == "ACEITO"
+        detalhe = advogado.get(f"/api/cases/{case_id}").json()
+        assert detalhe["negotiation_outcomes"][0]["status"] == "ACEITO"
+        assert detalhe["stage"] == "ENCERRADO"  # acordo aceito encerra o processo no ciclo de vida
+        assert advogado.post(f"/api/cases/{case_id}/negotiation-outcomes", json={"status": "RECUSADO"}).status_code == 409
 
         insights = banco.get("/api/bank/insights").json()
         efetividade = insights["efetividade"]
@@ -159,6 +162,26 @@ def test_unavailable_document_gets_structured_reason_and_infra_recommendation(tm
 
         cards = [c for c in banco.get("/api/bank/insights").json()["recomendacoes"] if c["origem"] == "operacao"]
         assert {c["area"] for c in cards} == {"Canais e correspondentes bancários", "Operações de crédito + TI"}
+
+
+def test_decision_outcome_without_values_still_feeds_the_panel(tmp_path):
+    """Desfecho registrado só no ciclo de vida (sem valor detalhado) conta como acordo fechado no valor proposto."""
+    app = create_app(_settings(tmp_path))
+    with TestClient(app) as banco, TestClient(app) as advogado:
+        _user(app, "BANCO", "banco@t.br")
+        lawyer = _user(app, "ADVOGADO_EXTERNO", "adv@t.br")
+        _login(banco, "banco@t.br")
+        _login(advogado, "adv@t.br")
+        case_id = _case(app, lawyer["id"])["id"]
+        analysis = advogado.post(f"/api/cases/{case_id}/analyses").json()
+        alvo = analysis["pricing"]["target_value"]
+        decision = advogado.post(f"/api/cases/{case_id}/lawyer-decisions?analysis_id={analysis['id']}",
+                                 json={"action": "ACORDO", "proposed_value": alvo}).json()
+        assert advogado.post(f"/api/cases/{case_id}/lawyer-decisions/{decision['id']}/outcome",
+                             json={"outcome": "ACORDO_ACEITO"}).status_code == 201
+        efetividade = banco.get("/api/bank/insights").json()["efetividade"]
+        assert efetividade["acordos_fechados"] == 1
+        assert efetividade["economia_realizada"] == pytest.approx(analysis["pricing"]["savings_at_target"], abs=0.01)
 
 
 @pytest.mark.parametrize(("texto", "motivo"), [

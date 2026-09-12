@@ -288,6 +288,7 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
         momento = min(momento, agora - timedelta(minutes=1))
         if rng.random() < p_aceita:
             _negociacao(connection, case_id, decision_id, user, "ACEITO", proposto, None, proposto, momento)
+            _encerrar(connection, decision_id, "ACORDO_ACEITO", momento)
         else:
             sorteio = rng.random()
             if sorteio < 0.25:
@@ -296,6 +297,7 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
                 momento = min(momento + timedelta(days=rng.uniform(1, 5)), agora - timedelta(seconds=30))
                 if perfil["markup"] >= 0.35:
                     _negociacao(connection, case_id, decision_id, user, "ACEITO", proposto, contra, contra, momento)
+                    _encerrar(connection, decision_id, "ACORDO_ACEITO", momento)
                 else:
                     _negociacao(connection, case_id, decision_id, user, "RECUSADO", proposto, contra, None, momento)
                     negociacao_falhou = True
@@ -313,6 +315,7 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
             VALUES (?, ?, ?, ?, ?, ?)""",
             (str(uuid4()), case_id, user, "EXITO" if linha["exito"] else "NAO_EXITO",
              0.0 if linha["exito"] else linha["condenacao"], _iso(momento)))
+        _encerrar(connection, decision_id, "SENTENCA_FAVORAVEL" if linha["exito"] else "SENTENCA_DESFAVORAVEL", momento)
         eventos.append(("OUTCOME_REGISTERED", None, 0, momento))
         contagem["desfechos"] += 1
 
@@ -342,6 +345,12 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
             VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (str(uuid4()), case_id, user, tipo, documento, segundos_evento, _iso(min(momento, agora))))
         contagem["eventos"] += 1
+
+
+def _encerrar(connection, decision_id, desfecho, momento) -> None:
+    """Desfecho final também no ciclo de vida da decisão (processo ENCERRADO)."""
+    connection.execute("UPDATE lawyer_decisions SET outcome = ?, outcome_at = ? WHERE id = ? AND outcome IS NULL",
+                       (desfecho, _iso(momento), decision_id))
 
 
 def _negociacao(connection, case_id, decision_id, user, status, oferta, contra, fechado, momento) -> None:
