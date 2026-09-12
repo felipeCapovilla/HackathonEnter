@@ -254,3 +254,25 @@ def test_relocated_api_can_load_xgboost_for_an_intermediate_case(tmp_path: Path)
         assert analysis.status_code == 201
         assert analysis.json()["policy_source"] == "MODEL"
         assert 0 <= analysis.json()["agreement_probability"] <= 1
+
+
+def test_frontend_preview_origin_can_access_the_api(tmp_path: Path) -> None:
+    app = create_app(_settings(tmp_path))
+    with TestClient(app) as client:
+        response = client.options(
+            "/api/cases",
+            headers={
+                "Origin": "http://localhost:4173",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://localhost:4173"
+        response = client.options(
+            "/api/cases",
+            headers={
+                "Origin": "https://unconfigured.example",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert response.status_code == 400

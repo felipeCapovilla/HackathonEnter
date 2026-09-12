@@ -4,6 +4,8 @@ Implementação enxuta da política híbrida do Grupo 9 para acordos de não rec
 
 ## Executar
 
+Requisitos: Python 3.11+ e Node.js 20.19+ (linha 20) ou 22.12+.
+
 ```powershell
 python -m pip install -r requirements.txt
 python -m uvicorn src.interface.backend.main:app --reload
@@ -26,11 +28,22 @@ A API atende em `http://localhost:8000` e a interface usa `http://localhost:5173
 - `src/interface/frontend/`: aplicação React/Vite conectada à API.
 - `src/utils/`: extração de documentos e verificação determinística de tipo.
 - `src/monitor/`: análises históricas e simulações offline.
+- `contracts/` e `src/tools/`: contratos e ponto de integração do analisador de dossiê trazidos da `main`; o analisador ainda é um stub.
+- `src/interface/prototype/`: desenho de tela da `main` com exemplos estáticos, separado da aplicação conectada à API.
 - `artefatos/`, `scripts/` e `tests/`: modelo treinado, preparação/treinamento e testes, respectivamente.
 
 O armazenamento continua em `.runtime/` na raiz do repositório. `ENTERAGREE_RUNTIME_DIR`,
 `ENTERAGREE_DATABASE_PATH` e `ENTERAGREE_MAX_UPLOAD_BYTES` mantêm os mesmos significados.
 O artefato XGBoost permanece em `artefatos/`; a migração de diretórios não exige retreinamento.
+
+`src.policy.engine.PolicyEngine` continua sendo o motor usado pela API documental.
+A função `src.policy.engine.decidir` preserva o contrato `CaseFeatures` da `main`
+e sua política por segmentos (`DEFENDER`, `ACORDAR`, `RECUPERAR`). As duas APIs
+mantêm suas regras e testes; esta migração não troca a política ativa silenciosamente.
+
+O CORS local permite `localhost` e `127.0.0.1`, nas portas 5173 (desenvolvimento)
+e 4173 (preview). Para outras origens, configure `ENTERAGREE_CORS_ORIGINS` com
+uma lista separada por vírgulas.
 
 ## Verificar
 
@@ -41,6 +54,23 @@ python -m pytest -q
 python -m compileall -q src scripts tests
 npm --prefix src/interface/frontend run build
 ```
+
+Os comandos `make setup`, `make test`, `make api`, `make frontend` e `make build`
+são atalhos opcionais. `make schema` (ou `python -m scripts.export_policy_schema`)
+gera `src/interface/prototype/schema.json` a partir dos contratos da política por segmentos.
+Esse JSON não substitui os contratos HTTP, disponíveis em `/openapi.json`.
+
+Testes de navegador, executando o bundle de produção:
+
+```powershell
+cd src/interface/frontend
+npx playwright install chromium
+npm run test:e2e
+```
+
+Veja o [guia Git](docs/guia_conformidade_git.md), o
+[plano de migração](docs/plano_refatoracao_estrutura_src.md) e o
+[comparativo de diretórios](docs/comparativo_e_reestruturacao_diretorios.md).
 
 ## Fluxo implementado
 

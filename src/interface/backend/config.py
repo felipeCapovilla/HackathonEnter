@@ -8,6 +8,12 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +23,7 @@ class Settings:
     document_dir: Path
     artifact_dir: Path
     max_upload_bytes: int
+    cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
 
 
 def get_settings() -> Settings:
@@ -30,4 +37,9 @@ def get_settings() -> Settings:
         document_dir=document_dir,
         artifact_dir=PROJECT_ROOT / "artefatos",
         max_upload_bytes=int(os.getenv("ENTERAGREE_MAX_UPLOAD_BYTES", str(512 * 1024 * 1024))),
+        cors_origins=tuple(
+            origin.strip()
+            for origin in os.getenv("ENTERAGREE_CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
+            if origin.strip()
+        ),
     )
