@@ -11,10 +11,10 @@ from fastapi.responses import FileResponse
 
 from .config import Settings, get_settings
 from .database import connection_for, initialize_database
-from .document_service import DocumentService
-from .document_type_validator import validate_document_type
+from src.utils.document_service import DocumentService
+from src.utils.document_type_validator import validate_document_type
 from .monitoring import build_monitoring_summary
-from .policy_service import PolicyService
+from src.policy.service import PolicyService
 from .repository import Repository
 from .schemas import (
     AnalysisRecord,
@@ -104,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request_id: str | None = Form(default=None),
     ) -> dict:
         require_case(case_id)
+        request_id = request_id or None
         if request_id:
             request = repository().get_document_request(request_id)
             if request is None or request["case_id"] != case_id:
@@ -190,7 +191,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             DocumentRequestStatus.CANCELLED,
         }:
             raise HTTPException(422, "Resposta documental inválida.")
-        response = repository().respond_to_document_request(request_id, payload.status, payload.reason)
+        try:
+            response = repository().respond_to_document_request(request_id, payload.status, payload.reason)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
         if response is None:
             raise HTTPException(404, "Solicitação documental não encontrada.")
         return response

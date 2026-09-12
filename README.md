@@ -6,18 +6,41 @@ Implementação enxuta da política híbrida do Grupo 9 para acordos de não rec
 
 ```powershell
 python -m pip install -r requirements.txt
-python -m uvicorn backend.app.main:app --reload
+python -m uvicorn src.interface.backend.main:app --reload
 ```
 
 Em outro terminal:
 
 ```powershell
-cd frontend
-npm install
+cd src/interface/frontend
+npm ci
 npm run dev
 ```
 
 A API atende em `http://localhost:8000` e a interface usa `http://localhost:5173`.
+
+## Estrutura
+
+- `src/policy/`: motor de política e serviço que relaciona documentos com recomendações.
+- `src/interface/backend/`: API FastAPI, contratos HTTP, configuração e persistência SQLite.
+- `src/interface/frontend/`: aplicação React/Vite conectada à API.
+- `src/utils/`: extração de documentos e verificação determinística de tipo.
+- `src/monitor/`: análises históricas e simulações offline.
+- `artefatos/`, `scripts/` e `tests/`: modelo treinado, preparação/treinamento e testes, respectivamente.
+
+O armazenamento continua em `.runtime/` na raiz do repositório. `ENTERAGREE_RUNTIME_DIR`,
+`ENTERAGREE_DATABASE_PATH` e `ENTERAGREE_MAX_UPLOAD_BYTES` mantêm os mesmos significados.
+O artefato XGBoost permanece em `artefatos/`; a migração de diretórios não exige retreinamento.
+
+## Verificar
+
+Execute a partir da raiz:
+
+```powershell
+python -m pytest -q
+python -m compileall -q src scripts tests
+npm --prefix src/interface/frontend run build
+```
 
 ## Fluxo implementado
 

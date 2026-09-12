@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from collections.abc import Iterable
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
 from pypdf import PdfReader
 
-from .config import Settings
+from src.interface.backend.config import Settings
 from .document_type_validator import validate_document_type
-from .repository import Repository
-from .schemas import DocumentStatus, DocumentType, DocumentTypeStatus, SourceParty
+from src.interface.backend.repository import Repository
+from src.interface.backend.schemas import DocumentStatus, DocumentType, DocumentTypeStatus, SourceParty
 
 
 CHUNK_SIZE = 1024 * 1024
 EXTRACTION_BATCH_SIZE = 100
 TYPE_VALIDATION_CHARACTERS = 100_000
 ALLOWED_SUFFIXES = {".pdf", ".txt"}
+logger = logging.getLogger(__name__)
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -48,7 +51,7 @@ class DocumentService:
         if suffix not in ALLOWED_SUFFIXES:
             raise HTTPException(415, "Envie um arquivo PDF ou TXT.")
 
-        temporary_path = self.settings.document_dir / f".upload-{hashlib.sha256(filename.encode()).hexdigest()}"
+        temporary_path = self.settings.document_dir / f".upload-{uuid4().hex}.part"
         digest = hashlib.sha256()
         total_bytes = 0
         first_chunk = b""
@@ -65,7 +68,9 @@ class DocumentService:
             if suffix == ".pdf" and not first_chunk.startswith(b"%PDF-"):
                 raise HTTPException(422, "O conteúdo enviado não corresponde a um PDF.")
 
-            document_path = self.settings.document_dir / f"{digest.hexdigest()}{suffix}"
+            case_directory = self.settings.document_dir / case_id
+            case_directory.mkdir(parents=True, exist_ok=True)
+            document_path = case_directory / f"{digest.hexdigest()}-{uuid4().hex}{suffix}"
             temporary_path.replace(document_path)
             try:
                 document = self.repository.create_document(
@@ -77,11 +82,9 @@ class DocumentService:
                     sha256=digest.hexdigest(),
                     request_id=request_id,
                 )
-            except ValueError:
+            except Exception:
                 document_path.unlink(missing_ok=True)
                 raise
-            if request_id:
-                self.repository.mark_request_submitted(request_id)
             return document
         except Exception:
             temporary_path.unlink(missing_ok=True)
@@ -145,6 +148,7 @@ class DocumentService:
                 type_status=validation.status,
             )
         except Exception as exc:
+            logger.exception("Document extraction failed for %s", document_id)
             self.repository.update_document_extraction(
                 document_id,
                 status=DocumentStatus.FAILED.value,

@@ -2,7 +2,7 @@
 
 ## Fonte única de decisão
 
-`src/policy` preserva o motor Grupo 9: regras para casos claros e XGBoost apenas na zona intermediária. `backend/app/policy_service.py` é o único adaptador entre documentos e motor. Um documento só torna uma feature verdadeira quando está com extração concluída e `CONFIRMED` ou `USER_CONFIRMED`; nome de arquivo e declaração do usuário não bastam.
+`src/policy` preserva o motor Grupo 9: regras para casos claros e XGBoost apenas na zona intermediária. `src/policy/service.py` é o adaptador entre documentos e esse motor. Um documento só torna uma feature verdadeira quando está com extração concluída e `CONFIRMED` ou `USER_CONFIRMED`; nome de arquivo e declaração do usuário não bastam.
 
 ## Documentos extensos
 

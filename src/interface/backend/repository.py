@@ -1,4 +1,4 @@
-"""Persistence operations for the EnterAgree API."""
+"""Persistence operations for the EnterAgree HTTP API."""
 
 from __future__ import annotations
 
@@ -91,6 +91,21 @@ class Repository:
             "created_at": _now(),
         }
         with connection_for(self.database_path) as connection:
+            if request_id:
+                request = connection.execute(
+                    "SELECT case_id, document_type, status FROM document_requests WHERE id = ?",
+                    (request_id,),
+                ).fetchone()
+                if request is None:
+                    raise ValueError("Solicitação documental não encontrada.")
+                if request["case_id"] != case_id:
+                    raise ValueError("A solicitação não pertence a este processo.")
+                if request["document_type"] != declared_type.value:
+                    raise ValueError("O tipo do documento não corresponde ao solicitado.")
+                if source_party != SourceParty.BANCO:
+                    raise ValueError("Apenas o banco pode atender uma solicitação documental.")
+                if request["status"] != DocumentRequestStatus.REQUESTED.value:
+                    raise ValueError("A solicitação documental já foi encerrada.")
             try:
                 connection.execute(
                     """INSERT INTO documents (
@@ -104,6 +119,19 @@ class Repository:
                 )
             except sqlite3.IntegrityError as exc:
                 raise ValueError("Este arquivo já foi enviado para o processo.") from exc
+            if request_id:
+                cursor = connection.execute(
+                    """UPDATE document_requests SET status = ?, responded_at = ?
+                    WHERE id = ? AND status = ?""",
+                    (
+                        DocumentRequestStatus.SUBMITTED.value,
+                        _now(),
+                        request_id,
+                        DocumentRequestStatus.REQUESTED.value,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError("A solicitação documental já foi encerrada.")
         return self.get_document(document_id) or record
 
     def get_document(self, document_id: str) -> dict | None:
@@ -193,19 +221,26 @@ class Repository:
             )
 
     def get_document_text_sample(self, document_id: str, maximum_characters: int = 100_000) -> str:
-        with connection_for(self.database_path) as connection:
-            rows = connection.execute(
-                "SELECT text_content FROM document_pages WHERE document_id = ? ORDER BY page_number",
-                (document_id,),
-            ).fetchall()
         chunks: list[str] = []
         remaining = maximum_characters
-        for row in rows:
-            text = row["text_content"]
-            chunks.append(text[:remaining])
-            remaining -= len(text)
-            if remaining <= 0:
-                break
+        page_offset = 0
+        page_batch_size = 100
+        with connection_for(self.database_path) as connection:
+            while remaining > 0:
+                rows = connection.execute(
+                    """SELECT text_content FROM document_pages WHERE document_id = ?
+                    ORDER BY page_number LIMIT ? OFFSET ?""",
+                    (document_id, page_batch_size, page_offset),
+                ).fetchall()
+                if not rows:
+                    break
+                for row in rows:
+                    text = row["text_content"]
+                    chunks.append(text[:remaining])
+                    remaining -= len(text)
+                    if remaining <= 0:
+                        break
+                page_offset += len(rows)
         return "\n".join(chunks)
 
     def get_page(self, document_id: str, page_number: int) -> dict | None:
@@ -271,6 +306,7 @@ class Repository:
             "id": str(uuid4()),
             "case_id": case_id,
             **payload.model_dump(mode="json"),
+            "due_date": None,
             "status": DocumentRequestStatus.REQUESTED.value,
             "created_at": _now(),
             "responded_at": None,
@@ -301,19 +337,19 @@ class Repository:
     ) -> dict | None:
         status_value = status.value if isinstance(status, DocumentRequestStatus) else str(status)
         with connection_for(self.database_path) as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """UPDATE document_requests SET status = ?, response_reason = ?, responded_at = ?
-                WHERE id = ?""",
-                (status_value, reason, _now(), request_id),
+                WHERE id = ? AND status = ?""",
+                (status_value, reason, _now(), request_id, DocumentRequestStatus.REQUESTED.value),
             )
+            if cursor.rowcount == 0:
+                exists = connection.execute(
+                    "SELECT 1 FROM document_requests WHERE id = ?", (request_id,)
+                ).fetchone()
+                if exists is None:
+                    return None
+                raise ValueError("A solicitação documental já foi encerrada.")
         return self.get_document_request(request_id)
-
-    def mark_request_submitted(self, request_id: str) -> None:
-        with connection_for(self.database_path) as connection:
-            connection.execute(
-                "UPDATE document_requests SET status = ?, responded_at = ? WHERE id = ?",
-                (DocumentRequestStatus.SUBMITTED.value, _now(), request_id),
-            )
 
     def create_lawyer_decision(
         self, case_id: str, analysis_id: str, payload: LawyerDecisionCreate

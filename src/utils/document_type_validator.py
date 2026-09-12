@@ -6,7 +6,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-from .schemas import DocumentType, DocumentTypeStatus
+from src.interface.backend.schemas import DocumentType, DocumentTypeStatus
 
 
 def _normalize(text: str) -> str:

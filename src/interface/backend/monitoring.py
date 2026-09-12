@@ -1,4 +1,4 @@
-"""SQLite-backed aggregates for policy adherence and documentary coverage."""
+"""SQLite-backed API aggregates for policy adherence and documentary coverage."""
 
 from __future__ import annotations
 

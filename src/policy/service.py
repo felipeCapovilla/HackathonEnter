@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from src.policy.engine import PolicyEngine
 
-from .repository import Repository
-from .schemas import DocumentaryStatus, DocumentStatus, DocumentTypeStatus
+from src.interface.backend.repository import Repository
+from src.interface.backend.schemas import DocumentaryStatus, DocumentStatus, DocumentTypeStatus
 
 
 TYPE_TO_FEATURE = {

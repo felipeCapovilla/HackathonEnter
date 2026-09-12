@@ -1,8 +1,8 @@
-"""Typed API contracts for cases, documents, analyses and decisions."""
+"""Typed HTTP contracts for cases, documents, analyses and decisions."""
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -56,8 +56,6 @@ class DocumentRequestStatus(StrEnum):
     REQUESTED = "REQUESTED"
     SUBMITTED = "SUBMITTED"
     DECLARED_UNAVAILABLE = "DECLARED_UNAVAILABLE"
-    PENDING = "PENDING"
-    OVERDUE = "OVERDUE"
     CANCELLED = "CANCELLED"
 
 
@@ -123,7 +121,6 @@ class DocumentRequestCreate(BaseModel):
     document_type: DocumentType
     hypothesis_key: str = Field(min_length=3, max_length=120)
     reason: str = Field(min_length=3, max_length=1000)
-    due_date: date | None = None
 
 
 class DocumentRequestRecord(DocumentRequestCreate):

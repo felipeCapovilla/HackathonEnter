@@ -7,7 +7,7 @@ Produz o insumo da métrica E02 (Economia Total vs Baseline).
 Assunções centrais (ver docs/DECISOES.md):
 - H1: prob_aceita = 0.40 (parametrizável)
 - H2: valor de acordo recomendado = 30% do valor da causa (mock)
-       Fonte única: gerar_sintetico.ACORDO_PCT_CAUSA (importado abaixo)
+       Valor fixo de simulação: 30% do valor da causa
 - H3: acordo se subs_total <= 3, senão defesa (mock)
 - H4: quando política recomenda defesa, custo esperado = valor_condenacao
   (a política não altera o resultado de uma defesa, só seleciona quais casos defender)
@@ -21,7 +21,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from src.monitor.gerar_sintetico import ACORDO_PCT_CAUSA as MOCK_ACORDO_PCT_CAUSA
+MOCK_ACORDO_PCT_CAUSA = 0.30
 from src.monitor.paths import CASOS_60K
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from backend.app.monitoring import build_monitoring_summary
+from src.interface.backend.monitoring import build_monitoring_summary
 
 
 def _connection() -> sqlite3.Connection:

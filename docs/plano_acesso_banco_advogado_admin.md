@@ -27,11 +27,11 @@ SSO, MFA, convite por e-mail, recuperação automática de senha, organizações
 
 | Evidência no código atual | Consequência | Mudança planejada |
 | --- | --- | --- |
-| `frontend/src/main.jsx` reúne todas as operações em `App` | A mesma pessoa pode solicitar e responder como banco | Separar layouts e ações por perfil autenticado |
+| `src/interface/frontend/src/main.jsx` reúne todas as operações em `App` | A mesma pessoa pode solicitar e responder como banco | Separar layouts e ações por perfil autenticado |
 | O formulário de upload envia `source_party` escolhido pelo usuário | A origem declarada não comprova quem enviou | Derivar origem e autoria a partir da sessão |
-| `backend/app/main.py` expõe as rotas sem dependência de autenticação | Qualquer cliente HTTP pode executar as ações | Proteger cada rota e verificar o caso relacionado |
-| `backend/app/database.py` não tem usuários, sessões nem banco do caso | Não existe isolamento ou atribuição | Acrescentar tabelas e vínculos mínimos |
-| `backend/app/monitoring.py` agrega todas as análises e decisões | O painel não está limitado ao banco | Aplicar filtro de banco na consulta e em todos os agregados |
+| `src/interface/backend/main.py` expõe as rotas sem dependência de autenticação | Qualquer cliente HTTP pode executar as ações | Proteger cada rota e verificar o caso relacionado |
+| `src/interface/backend/database.py` não tem usuários, sessões nem banco do caso | Não existe isolamento ou atribuição | Acrescentar tabelas e vínculos mínimos |
+| `src/interface/backend/monitoring.py` agrega todas as análises e decisões | O painel não está limitado ao banco | Aplicar filtro de banco na consulta e em todos os agregados |
 | Download e páginas recebem apenas o UUID do documento | Conhecer o identificador basta para acessar | Resolver documento → caso → permissão antes de retornar conteúdo |
 | Upload já aceita `request_id`, mas a interface não o seleciona | Um anexo não encerra necessariamente o pedido correspondente | Adicionar ação “Enviar documento solicitado” com vínculo automático |
 | `TypeConfirmation.reason` é recebido, mas não persistido | Falta autoria e justificativa da confirmação | Registrar evento com usuário, ação e motivo |
@@ -314,7 +314,7 @@ src/
 
 `AuthProvider` controla apenas identificação e estado de autenticação. `api/client.js` concentra base URL, cookie, CSRF e tratamento de erros. Componentes de domínio recebem dados e ações explicitamente; cada página busca apenas o que seu perfil pode acessar.
 
-Adicionar as duas dependências necessárias (`react-router-dom` no frontend e `pwdlib[argon2]` no backend), configurar explicitamente o proxy `/api` em `frontend/vite.config.js` e manter a base de requisições relativa. Na publicação, o servidor HTTP que entrega `frontend/dist` deve encaminhar `/api/*` para FastAPI e retornar `index.html` nas rotas de páginas; documentar essa configuração junto ao setup. O Vite de desenvolvimento já atende à navegação de páginas, mas não substitui essa configuração de publicação.
+Adicionar as duas dependências necessárias (`react-router-dom` no frontend e `pwdlib[argon2]` no backend), configurar explicitamente o proxy `/api` em `src/interface/frontend/vite.config.js` e manter a base de requisições relativa. Na publicação, o servidor HTTP que entrega `src/interface/frontend/dist` deve encaminhar `/api/*` para FastAPI e retornar `index.html` nas rotas de páginas; documentar essa configuração junto ao setup. O Vite de desenvolvimento já atende à navegação de páginas, mas não substitui essa configuração de publicação.
 
 Cuidados para preservar o fluxo:
 

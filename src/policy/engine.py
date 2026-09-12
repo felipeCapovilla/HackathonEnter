@@ -146,9 +146,9 @@ class PolicyEngine:
             decision = self._evaluate_model(case)
 
         if decision.recommendation == "ACORDO":
-            if case.value_of_claim is None:
+            if case.value_of_claim is None or case.value_of_claim <= 0:
                 reasons = decision.reasons + (
-                    "Valor da causa ausente; a faixa financeira do acordo não foi calculada.",
+                    "Valor da causa ausente ou inválido; a faixa financeira do acordo não foi calculada.",
                 )
                 decision = replace(decision, reasons=reasons)
             else:

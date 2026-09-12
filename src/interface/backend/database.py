@@ -1,4 +1,4 @@
-"""SQLite persistence used locally and behind the repository services."""
+"""SQLite persistence for the API repository services."""
 
 from __future__ import annotations
 
@@ -99,18 +99,30 @@ CREATE INDEX IF NOT EXISTS decisions_analysis_idx ON lawyer_decisions(analysis_i
 def initialize_database(database_path: Path) -> None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA busy_timeout = 5000")
         connection.executescript(SCHEMA)
         columns = {row[1] for row in connection.execute("PRAGMA table_info(analyses)")}
         if "pricing" not in columns:
             connection.execute("ALTER TABLE analyses ADD COLUMN pricing TEXT")
+        connection.execute(
+            "UPDATE document_requests SET status = 'REQUESTED' WHERE status IN ('PENDING', 'OVERDUE')"
+        )
 
 
 @contextmanager
 def connection_for(database_path: Path) -> Iterator[sqlite3.Connection]:
     connection = sqlite3.connect(database_path)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA busy_timeout = 5000")
     try:
         yield connection
+    except Exception:
+        connection.rollback()
+        raise
+    else:
         connection.commit()
     finally:
         connection.close()
