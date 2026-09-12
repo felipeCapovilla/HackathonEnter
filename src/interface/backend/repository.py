@@ -17,9 +17,15 @@ from .schemas import (
     DocumentRequestStatus,
     DocumentType,
     DocumentTypeStatus,
+    JudicialOutcomeCreate,
     LawyerDecisionCreate,
+    NegotiationOutcomeCreate,
     SourceParty,
 )
+
+USER_COLUMNS = """users.id, users.name, users.email, users.role, users.bank_id, users.is_active, users.created_at,
+users.law_firm_id, users.is_manager, banks.name AS bank_name, law_firms.name AS law_firm_name"""
+USER_JOINS = "LEFT JOIN banks ON banks.id = users.bank_id LEFT JOIN law_firms ON law_firms.id = users.law_firm_id"
 
 
 def _now() -> str:
@@ -56,8 +62,38 @@ class Repository:
         with connection_for(self.database_path) as connection:
             return _row(connection.execute("SELECT * FROM banks WHERE id = ?", (bank_id,)).fetchone())
 
-    def create_bank_contract(self, bank_id: str, parameters: dict, created_by_user_id: str | None) -> dict:
-        """Grava uma NOVA versão do contrato do banco. Versões anteriores ficam para auditoria."""
+    def create_law_firm(self, name: str) -> dict:
+        record = {"id": str(uuid4()), "name": name.strip(), "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            try:
+                connection.execute("INSERT INTO law_firms (id, name, created_at) VALUES (:id, :name, :created_at)", record)
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Escritório já cadastrado.") from exc
+        return record
+
+    def list_law_firms(self, bank_id: str | None = None) -> list[dict]:
+        """Sem banco: todos. Com banco: só os escritórios com advogado ativo naquele banco."""
+        with connection_for(self.database_path) as connection:
+            if bank_id is None:
+                rows = connection.execute("SELECT * FROM law_firms ORDER BY name").fetchall()
+            else:
+                rows = connection.execute(
+                    """SELECT DISTINCT law_firms.* FROM law_firms JOIN users ON users.law_firm_id = law_firms.id
+                    WHERE users.bank_id = ? AND users.role = 'ADVOGADO_EXTERNO' AND users.is_active = 1
+                    ORDER BY law_firms.name""", (bank_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_law_firm(self, law_firm_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            return _row(connection.execute("SELECT * FROM law_firms WHERE id = ?", (law_firm_id,)).fetchone())
+
+    def create_bank_contract(self, bank_id: str, parameters: dict, created_by_user_id: str | None,
+                             law_firm_id: str | None = None, justification: str | None = None) -> dict:
+        """Grava uma NOVA versão do contrato do banco (ou do banco com um escritório).
+
+        A numeração é única por banco, mesmo entre escritórios: `banco-v7` identifica
+        uma versão sem ambiguidade. Versões anteriores ficam para auditoria.
+        """
         with connection_for(self.database_path) as connection:
             connection.execute("BEGIN IMMEDIATE")
             current = connection.execute(
@@ -66,48 +102,57 @@ class Repository:
             record = {
                 "id": str(uuid4()), "bank_id": bank_id, "version": int(current) + 1,
                 "parameters": _json(parameters), "created_by_user_id": created_by_user_id, "created_at": _now(),
+                "law_firm_id": law_firm_id, "justification": justification,
             }
             connection.execute(
-                """INSERT INTO bank_contracts (id, bank_id, version, parameters, created_by_user_id, created_at)
-                VALUES (:id, :bank_id, :version, :parameters, :created_by_user_id, :created_at)""", record)
+                """INSERT INTO bank_contracts (id, bank_id, version, parameters, created_by_user_id, created_at, law_firm_id, justification)
+                VALUES (:id, :bank_id, :version, :parameters, :created_by_user_id, :created_at, :law_firm_id, :justification)""", record)
         return {**record, "parameters": parameters}
 
-    def get_active_bank_contract(self, bank_id: str) -> dict | None:
+    def get_active_bank_contract(self, bank_id: str, law_firm_id: str | None = None) -> dict | None:
+        """Última versão exatamente deste escopo: banco (law_firm_id None) ou banco com escritório."""
         with connection_for(self.database_path) as connection:
             row = connection.execute(
-                "SELECT * FROM bank_contracts WHERE bank_id = ? ORDER BY version DESC LIMIT 1", (bank_id,)
+                "SELECT * FROM bank_contracts WHERE bank_id = ? AND law_firm_id IS ? ORDER BY version DESC LIMIT 1",
+                (bank_id, law_firm_id),
             ).fetchone()
         record = _row(row)
         if record is not None:
             record["parameters"] = json.loads(record["parameters"])
         return record
 
+    def resolve_bank_contract(self, bank_id: str, law_firm_id: str | None) -> dict | None:
+        """Contrato que vale para o caso: o do escritório, se houver; senão o padrão do banco."""
+        if law_firm_id:
+            record = self.get_active_bank_contract(bank_id, law_firm_id)
+            if record is not None:
+                return record
+        return self.get_active_bank_contract(bank_id)
+
     def create_user(self, record: dict) -> dict:
+        record = {"law_firm_id": None, "is_manager": False, **record}
         with connection_for(self.database_path) as connection:
             try:
-                connection.execute("""INSERT INTO users (id, name, email, password_hash, role, bank_id, is_active, created_at)
-                VALUES (:id, :name, :email, :password_hash, :role, :bank_id, :is_active, :created_at)""", record)
+                connection.execute("""INSERT INTO users (id, name, email, password_hash, role, bank_id, is_active, created_at, law_firm_id, is_manager)
+                VALUES (:id, :name, :email, :password_hash, :role, :bank_id, :is_active, :created_at, :law_firm_id, :is_manager)""", record)
             except sqlite3.IntegrityError as exc:
                 raise ValueError("E-mail já cadastrado ou banco inválido.") from exc
         return self.get_user(record["id"]) or record
 
     def get_user(self, user_id: str) -> dict | None:
         with connection_for(self.database_path) as connection:
-            row = connection.execute("""SELECT users.id, users.name, users.email, users.password_hash, users.role,
-            users.bank_id, users.is_active, users.created_at, banks.name AS bank_name FROM users
-            LEFT JOIN banks ON banks.id = users.bank_id WHERE users.id = ?""", (user_id,)).fetchone()
+            row = connection.execute(f"""SELECT {USER_COLUMNS}, users.password_hash FROM users
+            {USER_JOINS} WHERE users.id = ?""", (user_id,)).fetchone()
         return _row(row)
 
     def get_user_by_email(self, email: str) -> dict | None:
         with connection_for(self.database_path) as connection:
-            row = connection.execute("""SELECT users.id, users.name, users.email, users.password_hash, users.role,
-            users.bank_id, users.is_active, users.created_at, banks.name AS bank_name FROM users
-            LEFT JOIN banks ON banks.id = users.bank_id WHERE users.email = ?""", (email,)).fetchone()
+            row = connection.execute(f"""SELECT {USER_COLUMNS}, users.password_hash FROM users
+            {USER_JOINS} WHERE users.email = ?""", (email,)).fetchone()
         return _row(row)
 
     def list_users(self, bank_id: str | None = None) -> list[dict]:
-        query = """SELECT users.id, users.name, users.email, users.role, users.bank_id, users.is_active, users.created_at,
-        banks.name AS bank_name FROM users LEFT JOIN banks ON banks.id = users.bank_id"""
+        query = f"SELECT {USER_COLUMNS} FROM users {USER_JOINS}"
         parameters: tuple = () if bank_id is None else (bank_id,)
         if bank_id is not None:
             query += " WHERE users.bank_id = ?"
@@ -132,9 +177,8 @@ class Repository:
 
     def get_session_user(self, token_hash: str) -> dict | None:
         with connection_for(self.database_path) as connection:
-            row = connection.execute("""SELECT users.id, users.name, users.email, users.role, users.bank_id,
-            users.is_active, users.created_at, banks.name AS bank_name, sessions.csrf_token FROM sessions
-            JOIN users ON users.id = sessions.user_id LEFT JOIN banks ON banks.id = users.bank_id
+            row = connection.execute(f"""SELECT {USER_COLUMNS}, sessions.csrf_token FROM sessions
+            JOIN users ON users.id = sessions.user_id {USER_JOINS}
             WHERE sessions.token_hash = ? AND sessions.revoked_at IS NULL AND sessions.expires_at > ? AND users.is_active = 1""",
             (token_hash, _now())).fetchone()
         return _row(row)
@@ -596,14 +640,17 @@ class Repository:
         return [dict(row) for row in rows]
 
     def respond_to_document_request(
-        self, request_id: str, status: DocumentRequestStatus, reason: str
+        self, request_id: str, status: DocumentRequestStatus, reason: str,
+        unavailability_reason: str | None = None, unavailability_reason_source: str | None = None,
     ) -> dict | None:
         status_value = status.value if isinstance(status, DocumentRequestStatus) else str(status)
         with connection_for(self.database_path) as connection:
             cursor = connection.execute(
-                """UPDATE document_requests SET status = ?, response_reason = ?, responded_at = ?
+                """UPDATE document_requests SET status = ?, response_reason = ?, responded_at = ?,
+                unavailability_reason = ?, unavailability_reason_source = ?
                 WHERE id = ? AND status = ?""",
-                (status_value, reason, _now(), request_id, DocumentRequestStatus.REQUESTED.value),
+                (status_value, reason, _now(), unavailability_reason, unavailability_reason_source,
+                 request_id, DocumentRequestStatus.REQUESTED.value),
             )
             if cursor.rowcount == 0:
                 exists = connection.execute(
@@ -615,23 +662,70 @@ class Repository:
         return self.get_document_request(request_id)
 
     def create_lawyer_decision(
-        self, case_id: str, analysis_id: str, payload: LawyerDecisionCreate
+        self, case_id: str, analysis_id: str, payload: LawyerDecisionCreate, lawyer_id: str | None = None
     ) -> dict:
         record = {
             "id": str(uuid4()),
             "case_id": case_id,
             "analysis_id": analysis_id,
             **payload.model_dump(),
+            "lawyer_id": lawyer_id,
             "created_at": _now(),
         }
         with connection_for(self.database_path) as connection:
             connection.execute(
                 """INSERT INTO lawyer_decisions (
-                    id, case_id, analysis_id, action, reason, proposed_value, created_at
-                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at)""",
+                    id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id
+                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at, :lawyer_id)""",
                 record,
             )
         return record
+
+    def create_negotiation_outcome(self, case_id: str, payload: NegotiationOutcomeCreate,
+                                   lawyer_id: str | None) -> dict:
+        """Liga o resultado à última decisão de ACORDO do processo."""
+        with connection_for(self.database_path) as connection:
+            decision = connection.execute(
+                """SELECT id FROM lawyer_decisions WHERE case_id = ? AND action = 'ACORDO'
+                ORDER BY created_at DESC LIMIT 1""", (case_id,)).fetchone()
+            if decision is None:
+                raise ValueError("Registre a decisão de propor acordo antes do resultado da negociação.")
+            record = {"id": str(uuid4()), "case_id": case_id, "decision_id": decision["id"], "lawyer_id": lawyer_id,
+                      **payload.model_dump(mode="json"), "created_at": _now()}
+            connection.execute(
+                """INSERT INTO negotiation_outcomes (id, case_id, decision_id, lawyer_id, status, offered_value,
+                counter_value, closed_value, created_at) VALUES (:id, :case_id, :decision_id, :lawyer_id, :status,
+                :offered_value, :counter_value, :closed_value, :created_at)""", record)
+        return record
+
+    def list_negotiation_outcomes(self, case_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM negotiation_outcomes WHERE case_id = ? ORDER BY created_at DESC", (case_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def create_judicial_outcome(self, case_id: str, payload: JudicialOutcomeCreate, lawyer_id: str | None) -> dict:
+        record = {"id": str(uuid4()), "case_id": case_id, "lawyer_id": lawyer_id,
+                  **payload.model_dump(mode="json"), "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            connection.execute(
+                """INSERT INTO judicial_outcomes (id, case_id, lawyer_id, result, condemnation_value, created_at)
+                VALUES (:id, :case_id, :lawyer_id, :result, :condemnation_value, :created_at)""", record)
+        return record
+
+    def list_judicial_outcomes(self, case_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                "SELECT * FROM judicial_outcomes WHERE case_id = ? ORDER BY created_at DESC", (case_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def record_engagement(self, case_id: str, user_id: str, event_type: str,
+                          document_id: str | None = None, active_seconds: int = 0) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.execute(
+                """INSERT INTO engagement_events (id, case_id, user_id, event_type, document_id, active_seconds, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (str(uuid4()), case_id, user_id, event_type, document_id, int(active_seconds), _now()))
 
     def list_lawyer_decisions(self, case_id: str) -> list[dict]:
         with connection_for(self.database_path) as connection:

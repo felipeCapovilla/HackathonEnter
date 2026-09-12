@@ -38,10 +38,11 @@ ACAO_PARA_API = {"ACORDAR": "ACORDO", "DEFENDER": "DEFESA", "RECUPERAR": "RECUPE
 USABLE_TYPE = {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value}
 USABLE_STATUS = {DocumentStatus.COMPLETED.value, DocumentStatus.COMPLETED_WITH_WARNINGS.value}
 
-ContractProvider = Callable[[str | None], ParametrosContrato]
+# (bank_id, law_firm_id) -> contrato vigente. O escritório vem do advogado atribuído ao caso.
+ContractProvider = Callable[[str | None, str | None], ParametrosContrato]
 
 
-def _contrato_padrao(_bank_id: str | None) -> ParametrosContrato:
+def _contrato_padrao(_bank_id: str | None, _law_firm_id: str | None = None) -> ParametrosContrato:
     return ParametrosContrato()
 
 
@@ -59,7 +60,7 @@ class PolicyService:
             raise LookupError("Processo não encontrado.")
         documents = self.repository.list_documents(case_id)
         features, provenance = self._build_features(case, documents)
-        contrato = self.contract_provider(case.get("bank_id"))
+        contrato = self.contract_provider(case.get("bank_id"), self._law_firm_of(case))
         recomendacao = decidir(features, contrato)
         documentary_status, limitations = self._documentary_status(documents, features)
         record = {
@@ -84,6 +85,10 @@ class PolicyService:
             "created_at": datetime.now(UTC).isoformat(),
         }
         return self.repository.create_analysis(record)
+
+    def _law_firm_of(self, case: dict) -> str | None:
+        lawyer = self.repository.get_user(case["assigned_lawyer_id"]) if case.get("assigned_lawyer_id") else None
+        return lawyer.get("law_firm_id") if lawyer else None
 
     def _build_features(self, case: dict, documents: list[dict]) -> tuple[CaseFeatures, list[dict]]:
         flags = {feature: False for feature in TYPE_TO_FEATURE.values()}

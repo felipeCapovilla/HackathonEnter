@@ -160,6 +160,45 @@ CREATE TABLE IF NOT EXISTS bank_contracts (
     UNIQUE(bank_id, version)
 );
 
+CREATE TABLE IF NOT EXISTS law_firms (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS negotiation_outcomes (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    decision_id TEXT REFERENCES lawyer_decisions(id),
+    lawyer_id TEXT,
+    status TEXT NOT NULL CHECK(status IN ('ACEITO', 'RECUSADO', 'CONTRAPROPOSTA', 'SEM_RESPOSTA')),
+    offered_value REAL,
+    counter_value REAL,
+    closed_value REAL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS judicial_outcomes (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    lawyer_id TEXT,
+    result TEXT NOT NULL CHECK(result IN ('EXITO', 'NAO_EXITO')),
+    condemnation_value REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS engagement_events (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK(event_type IN (
+        'CASE_OPENED', 'DOCUMENT_OPENED', 'ANALYSIS_RUN', 'DECISION_REGISTERED', 'OUTCOME_REGISTERED', 'ACTIVE_TIME'
+    )),
+    document_id TEXT,
+    active_seconds INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
 CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
@@ -171,7 +210,22 @@ CREATE INDEX IF NOT EXISTS decisions_analysis_idx ON lawyer_decisions(analysis_i
 CREATE INDEX IF NOT EXISTS users_bank_idx ON users(bank_id, role, is_active);
 CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id, expires_at);
 CREATE INDEX IF NOT EXISTS bank_contracts_bank_idx ON bank_contracts(bank_id, version);
+CREATE INDEX IF NOT EXISTS negotiation_case_idx ON negotiation_outcomes(case_id, created_at);
+CREATE INDEX IF NOT EXISTS judicial_case_idx ON judicial_outcomes(case_id, created_at);
+CREATE INDEX IF NOT EXISTS engagement_case_idx ON engagement_events(case_id, user_id, event_type);
 """
+
+# Colunas adicionadas depois da primeira versão do schema: (tabela, coluna, definição).
+MIGRATED_COLUMNS = (
+    ("users", "law_firm_id", "TEXT REFERENCES law_firms(id)"),
+    ("users", "is_manager", "INTEGER NOT NULL DEFAULT 0"),
+    ("bank_contracts", "law_firm_id", "TEXT REFERENCES law_firms(id)"),
+    ("bank_contracts", "justification", "TEXT"),
+    ("document_requests", "unavailability_reason", "TEXT"),
+    ("document_requests", "unavailability_reason_source", "TEXT"),
+    ("cases", "is_simulated", "INTEGER NOT NULL DEFAULT 0"),
+    ("lawyer_decisions", "lawyer_id", "TEXT"),
+)
 
 
 def initialize_database(database_path: Path) -> None:
@@ -197,6 +251,11 @@ def initialize_database(database_path: Path) -> None:
         connection.execute(
             "UPDATE document_requests SET status = 'REQUESTED' WHERE status IN ('PENDING', 'OVERDUE')"
         )
+        for table, name, definition in MIGRATED_COLUMNS:
+            if name not in {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+        connection.execute("CREATE INDEX IF NOT EXISTS cases_bank_lawyer_idx ON cases(bank_id, assigned_lawyer_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS users_firm_idx ON users(law_firm_id)")
 
 
 @contextmanager

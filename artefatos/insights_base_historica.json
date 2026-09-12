@@ -1,0 +1,80 @@
+{
+  "versao": "base-60000-0ea01a18c4",
+  "casos": 60000,
+  "pago_total": 192982862.07,
+  "documentos": [
+    {
+      "tipo": "CONTRATO",
+      "nome": "Contrato",
+      "casos_sem": 17017,
+      "ausente_pct": 0.2836,
+      "derrota_com": 0.1268,
+      "derrota_sem": 0.7531,
+      "pago_nos_casos_sem": 135706077.25,
+      "muda_resultado": true,
+      "valor_em_jogo": 56768240.53
+    },
+    {
+      "tipo": "EXTRATO",
+      "nome": "Extrato",
+      "casos_sem": 11105,
+      "ausente_pct": 0.1851,
+      "derrota_com": 0.1881,
+      "derrota_sem": 0.8169,
+      "pago_nos_casos_sem": 95942092.11,
+      "muda_resultado": true,
+      "valor_em_jogo": 31803696.63
+    },
+    {
+      "tipo": "COMPROVANTE_CREDITO",
+      "nome": "Comprovante de crédito",
+      "casos_sem": 23586,
+      "ausente_pct": 0.3931,
+      "derrota_com": 0.1989,
+      "derrota_sem": 0.4674,
+      "pago_nos_casos_sem": 116536096.09,
+      "muda_resultado": true,
+      "valor_em_jogo": 24068995.62
+    },
+    {
+      "tipo": "DEMONSTRATIVO_DIVIDA",
+      "nome": "Demonstrativo de evolução da dívida",
+      "casos_sem": 13785,
+      "ausente_pct": 0.2298,
+      "derrota_com": 0.2776,
+      "derrota_sem": 0.3944,
+      "pago_nos_casos_sem": 57725383.34,
+      "muda_resultado": true,
+      "valor_em_jogo": null
+    },
+    {
+      "tipo": "DOSSIE",
+      "nome": "Dossiê",
+      "casos_sem": 18014,
+      "ausente_pct": 0.3002,
+      "derrota_com": 0.3045,
+      "derrota_sem": 0.3043,
+      "pago_nos_casos_sem": 57945142.64,
+      "muda_resultado": false,
+      "valor_em_jogo": null
+    },
+    {
+      "tipo": "LAUDO_REFERENCIADO",
+      "nome": "Laudo referenciado",
+      "casos_sem": 11941,
+      "ausente_pct": 0.199,
+      "derrota_com": 0.3048,
+      "derrota_sem": 0.3029,
+      "pago_nos_casos_sem": 37923856.52,
+      "muda_resultado": false,
+      "valor_em_jogo": null
+    }
+  ],
+  "sem_contrato_e_extrato": {
+    "casos": 6493,
+    "pct": 0.1082,
+    "derrota": 0.973,
+    "pago": 67055414.38
+  },
+  "premissas": "Valor em jogo = (P(derrota) sem o documento − com ele) pela tabela de segmentos × condenação média (71.08% da causa) × chance de recuperar (70%). O valor pago nos casos sem o documento é correlação: parte deles é golpe real, sem documento que exista."
+}

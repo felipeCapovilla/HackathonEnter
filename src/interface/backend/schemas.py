@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from contracts.dossie import DossieReport
 from contracts.schema import ParametrosContrato
 
@@ -66,6 +66,38 @@ class DocumentRequestStatus(StrEnum):
     SUBMITTED = "SUBMITTED"
     DECLARED_UNAVAILABLE = "DECLARED_UNAVAILABLE"
     CANCELLED = "CANCELLED"
+
+
+class UnavailabilityReason(StrEnum):
+    """Por que o banco não entregou o documento. Alimenta as recomendações de infraestrutura."""
+    NAO_LOCALIZADO = "NAO_LOCALIZADO"
+    CONTRATO_FISICO_NAO_DIGITALIZADO = "CONTRATO_FISICO_NAO_DIGITALIZADO"
+    CORRESPONDENTE_NAO_ENVIOU = "CORRESPONDENTE_NAO_ENVIOU"
+    FORA_DO_PRAZO_DE_GUARDA = "FORA_DO_PRAZO_DE_GUARDA"
+    SISTEMA_SEM_EXPORTACAO = "SISTEMA_SEM_EXPORTACAO"
+    OPERACAO_INEXISTENTE = "OPERACAO_INEXISTENTE"
+    OUTRO = "OUTRO"
+
+
+class NegotiationStatus(StrEnum):
+    ACEITO = "ACEITO"
+    RECUSADO = "RECUSADO"
+    CONTRAPROPOSTA = "CONTRAPROPOSTA"
+    SEM_RESPOSTA = "SEM_RESPOSTA"
+
+
+class JudicialResult(StrEnum):
+    EXITO = "EXITO"
+    NAO_EXITO = "NAO_EXITO"
+
+
+class EngagementEventType(StrEnum):
+    CASE_OPENED = "CASE_OPENED"
+    DOCUMENT_OPENED = "DOCUMENT_OPENED"
+    ANALYSIS_RUN = "ANALYSIS_RUN"
+    DECISION_REGISTERED = "DECISION_REGISTERED"
+    OUTCOME_REGISTERED = "OUTCOME_REGISTERED"
+    ACTIVE_TIME = "ACTIVE_TIME"
 
 
 class CaseCreate(BaseModel):
@@ -158,6 +190,8 @@ class DocumentRequestRecord(DocumentRequestCreate):
     status: DocumentRequestStatus
     created_at: datetime
     responded_at: datetime | None = None
+    unavailability_reason: UnavailabilityReason | None = None
+    unavailability_reason_source: Literal["INFORMADO", "IA", "REGRA"] | None = None
 
 
 class DocumentRequestResponse(BaseModel):
@@ -165,12 +199,65 @@ class DocumentRequestResponse(BaseModel):
         pattern="^(DECLARED_UNAVAILABLE|CANCELLED)$"
     )
     reason: str = Field(min_length=3, max_length=1000)
+    unavailability_reason: UnavailabilityReason | None = Field(
+        default=None, description="Obrigatório no painel; se ausente, o texto livre é classificado (IA ou regra).")
 
 
 class LawyerDecisionCreate(BaseModel):
     action: str = Field(pattern="^(ACORDO|DEFESA|RECUPERAR)$")
     reason: str | None = Field(default=None, max_length=2000)
     proposed_value: float | None = Field(default=None, ge=0)
+
+
+class NegotiationOutcomeCreate(BaseModel):
+    """Passo 05 do fluxo: o advogado reporta o resultado da negociação do acordo."""
+    status: NegotiationStatus
+    offered_value: float | None = Field(default=None, ge=0)
+    counter_value: float | None = Field(default=None, ge=0)
+    closed_value: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _valores_coerentes(self) -> "NegotiationOutcomeCreate":
+        if self.status == NegotiationStatus.ACEITO and self.closed_value is None:
+            raise ValueError("Acordo aceito exige o valor fechado.")
+        if self.status == NegotiationStatus.CONTRAPROPOSTA and self.counter_value is None:
+            raise ValueError("Contraproposta exige o valor pedido pela parte autora.")
+        if self.status != NegotiationStatus.ACEITO and self.closed_value is not None:
+            raise ValueError("Só acordo aceito tem valor fechado.")
+        return self
+
+
+class NegotiationOutcomeRecord(NegotiationOutcomeCreate):
+    id: str
+    case_id: str
+    decision_id: str | None = None
+    lawyer_id: str | None = None
+    created_at: datetime
+
+
+class JudicialOutcomeCreate(BaseModel):
+    """Desfecho do processo defendido; chega meses depois da decisão."""
+    result: JudicialResult
+    condemnation_value: float = Field(default=0.0, ge=0)
+
+    @model_validator(mode="after")
+    def _exito_sem_condenacao(self) -> "JudicialOutcomeCreate":
+        if self.result == JudicialResult.EXITO and self.condemnation_value > 0:
+            raise ValueError("Processo com êxito não tem valor de condenação.")
+        return self
+
+
+class JudicialOutcomeRecord(JudicialOutcomeCreate):
+    id: str
+    case_id: str
+    lawyer_id: str | None = None
+    created_at: datetime
+
+
+class EngagementEventCreate(BaseModel):
+    event_type: Literal["DOCUMENT_OPENED", "ACTIVE_TIME"]
+    document_id: str | None = Field(default=None, max_length=80)
+    active_seconds: int = Field(default=0, ge=0, le=300, description="Tempo ativo desde o último aviso; no máximo 5 min")
 
 
 class MonitoringSummary(BaseModel):
@@ -201,6 +288,8 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=15, max_length=128)
     role: UserRole
     bank_id: str | None = None
+    law_firm_id: str | None = None
+    is_manager: bool = False
 
 
 class UserRecord(BaseModel):
@@ -210,6 +299,9 @@ class UserRecord(BaseModel):
     role: UserRole
     bank_id: str | None
     bank_name: str | None = None
+    law_firm_id: str | None = None
+    law_firm_name: str | None = None
+    is_manager: bool = False
     is_active: bool
     created_at: datetime
 
@@ -218,6 +310,17 @@ class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=15, max_length=128)
+    law_firm_id: str | None = None
+    is_manager: bool | None = None
+
+
+class LawFirmCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class LawFirmRecord(LawFirmCreate):
+    id: str
+    created_at: datetime
 
 
 class SessionUser(UserRecord):
@@ -229,8 +332,17 @@ class BankContractRecord(BaseModel):
     bank_id: str
     version: int = Field(description="0 = contrato padrão, nenhuma versão cadastrada")
     parameters: ParametrosContrato
+    law_firm_id: str | None = Field(default=None, description="None = contrato padrão do banco")
+    inherited_from_bank: bool = Field(default=False, description="Escritório sem contrato próprio: vale o do banco")
+    justification: str | None = None
     created_by_user_id: str | None = None
     created_at: datetime | None = None
+
+
+class BankContractUpdate(BaseModel):
+    """Q40: o gestor do banco só grava uma versão nova com justificativa."""
+    parametros: ParametrosContrato
+    justificativa: str = Field(min_length=10, max_length=1000)
 
 
 class ContractPreviewResult(BaseModel):
