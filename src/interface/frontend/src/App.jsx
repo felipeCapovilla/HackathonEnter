@@ -238,6 +238,90 @@ function Metric({ label, value }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong></div>;
 }
 
+const HONORARIOS = [
+  ["honorario_defesa_ganha", "Honorário se a defesa ganhar"],
+  ["honorario_defesa_perdida", "Honorário se a defesa perder"],
+  ["honorario_acordo", "Honorário por acordo fechado"],
+];
+const TIPOS_HONORARIO = [["fixo", "R$ fixo"], ["percentual_valor_causa", "% do valor da causa"], ["percentual_condenacao", "% da condenação"]];
+const percent = (value) => value == null ? "" : Number((value * 100).toFixed(4));
+
+function readContractForm(form) {
+  const honorario = (key) => {
+    const tipo = form.get(`${key}.tipo`);
+    const bruto = Number(form.get(`${key}.valor`) || 0);
+    return { tipo, valor: tipo === "fixo" ? bruto : bruto / 100 };
+  };
+  const teto = form.get("teto_alcada_fator");
+  return {
+    honorario_defesa_ganha: honorario("honorario_defesa_ganha"),
+    honorario_defesa_perdida: honorario("honorario_defesa_perdida"),
+    honorario_acordo: honorario("honorario_acordo"),
+    custo_mensal_tempo: Number(form.get("custo_mensal_tempo") || 0) / 100,
+    duracao_meses: Number(form.get("duracao_meses") || 0),
+    teto_alcada_fator: teto ? Number(teto) / 100 : null,
+  };
+}
+
+function ContractPanel({ banks }) {
+  const [bankId, setBankId] = useState("");
+  const selected = bankId || banks?.[0]?.id || "";
+  const contract = useResource(selected ? `/admin/banks/${encodeURIComponent(selected)}/contract` : null);
+  const save = useAction();
+  const simulate = useAction();
+  const [preview, setPreview] = useState(null);
+  const parameters = contract.data?.parameters;
+  const onSimulate = (event) => {
+    const form = new FormData(event.currentTarget.form);
+    simulate.run(async () => setPreview(await sendJson(`/admin/banks/${encodeURIComponent(selected)}/contract/preview`, readContractForm(form))));
+  };
+  const onSave = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    save.run(async () => {
+      await sendJson(`/admin/banks/${encodeURIComponent(selected)}/contract`, readContractForm(form));
+      setPreview(null);
+      contract.reload();
+    });
+  };
+  const initialValue = (honorario) => honorario.tipo === "fixo" ? honorario.valor : percent(honorario.valor);
+  const pct = (value) => `${(value * 100).toFixed(1)}%`;
+  return <article className="panel contract-panel"><h2>Contrato banco–escritório</h2>
+    <p className="muted">Só entram termos que mudam o custo entre acordar e defender. Mensalidade e valor fixo por caso novo são pagos em qualquer desfecho e não afetam a decisão.</p>
+    <label>Banco<select aria-label="Banco do contrato" value={selected} onChange={(event) => { setBankId(event.target.value); setPreview(null); }}>
+      {(banks || []).map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+    </select></label>
+    <ErrorNotice message={contract.error} onRetry={contract.reload} />
+    <ErrorNotice message={save.error} />
+    <ErrorNotice message={simulate.error} />
+    {contract.loading && <p role="status">Carregando contrato…</p>}
+    {parameters && <form key={`${selected}-${contract.data.version}`} onSubmit={onSave}><fieldset className="form-fields" disabled={save.pending || simulate.pending}>
+      <p className="eyebrow">{contract.data.version === 0 ? "CONTRATO PADRÃO · NENHUMA VERSÃO CADASTRADA" : `VERSÃO VIGENTE · V${contract.data.version}`}</p>
+      {HONORARIOS.map(([key, label]) => <div className="contract-row" key={key}>
+        <label>{label}<select name={`${key}.tipo`} defaultValue={parameters[key].tipo}>{TIPOS_HONORARIO.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>
+        <label>Valor (R$ ou %)<input name={`${key}.valor`} type="number" min="0" step="0.01" defaultValue={initialValue(parameters[key])} /></label>
+      </div>)}
+      <div className="contract-row">
+        <label>Custo do tempo (% ao mês)<input name="custo_mensal_tempo" type="number" min="0" max="10" step="0.1" defaultValue={percent(parameters.custo_mensal_tempo)} /></label>
+        <label>Duração esperada (meses)<input name="duracao_meses" type="number" min="0" max="120" step="1" defaultValue={parameters.duracao_meses} /></label>
+      </div>
+      <label>Teto de alçada (% do valor da causa, opcional)<input name="teto_alcada_fator" type="number" min="1" max="100" step="1" defaultValue={percent(parameters.teto_alcada_fator)} /></label>
+      <div className="contract-row">
+        <button type="button" onClick={onSimulate}>{simulate.pending ? "Simulando…" : "Simular impacto na carteira"}</button>
+        <button>{save.pending ? "Salvando…" : "Salvar nova versão"}</button>
+      </div>
+    </fieldset></form>}
+    {preview && <div className="contract-preview">
+      <div className="monitor">
+        <Metric label="Decisões que mudam" value={`${preview.decisoes_alteradas.toLocaleString("pt-BR")} de ${preview.casos.toLocaleString("pt-BR")}`} />
+        <Metric label="Economia · contrato vigente" value={pct(preview.contrato_vigente.economia_percentual)} />
+        <Metric label="Economia · contrato proposto" value={pct(preview.contrato_proposto.economia_percentual)} />
+      </div>
+      <p className="muted">{preview.premissas}</p>
+    </div>}
+  </article>;
+}
+
 function Admin() {
   const banks = useResource("/admin/banks");
   const users = useResource("/admin/users");
@@ -293,7 +377,7 @@ function Admin() {
     </fieldset></form>
     {users.loading && <p role="status">Carregando usuários…</p>}
     <ul>{(users.data || []).map((user) => <li key={user.id}>{user.name} · {labels[user.role]} · {user.is_active ? "ativo" : "inativo"}</li>)}</ul>
-  </article></section>;
+  </article><ContractPanel banks={banks.data} /></section>;
 }
 
 export default function App() {
