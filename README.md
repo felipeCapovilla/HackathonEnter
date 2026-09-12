@@ -40,6 +40,10 @@ O artefato XGBoost permanece em `artefatos/`; a migração de diretórios não e
 A função `src.policy.engine.decidir` preserva o contrato `CaseFeatures` da `main`
 e sua política por segmentos (`DEFENDER`, `ACORDAR`, `RECUPERAR`). As duas APIs
 mantêm suas regras e testes; esta migração não troca a política ativa silenciosamente.
+Os módulos `src/policy/backtest.py` e `src/policy/learning.py` também são preservados
+da `main` como ferramentas offline, sem integração automática ao fluxo documental.
+O cenário de extração do backtest assume sinais a partir das flags; não executa IA
+nos documentos nem comprova resultados financeiros de produção.
 
 O CORS local permite `localhost` e `127.0.0.1`, nas portas 5173 (desenvolvimento)
 e 4173 (preview). Para outras origens, configure `ENTERAGREE_CORS_ORIGINS` com

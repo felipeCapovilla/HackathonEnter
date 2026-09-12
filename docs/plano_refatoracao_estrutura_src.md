@@ -2,7 +2,7 @@
 
 A execução deste plano foi solicitada para preparar a integração com main. A escolha é mover fisicamente a implementação para `src/policy`, `src/utils` e `src/interface`, preservando contratos e comportamento. Não basta criar módulos que reexportem a aplicação dos diretórios antigos.
 
-O plano foi revisado contra a implementação documental e `origin/main` em `07de512b`. A árvore remota contém `contracts/`, `src/policy/`, `src/tools/`, `web/` e testes, mas não exige esta organização de API e React. O alinhamento é uma decisão desta entrega. Os itens abaixo são critérios de execução, não uma declaração de testes concluídos.
+O plano foi revisado contra a implementação documental e `origin/main`, inicialmente em `07de512b` e posteriormente em `1ab771bc`, após atualização do histórico remoto. Ambas as referências foram integradas. A árvore remota contém `contracts/`, `src/policy/`, `src/tools/`, `web/` e testes, mas não exige esta organização de API e React. O alinhamento é uma decisão desta entrega. O roteiro define os critérios; a seção final registra as verificações concluídas.
 
 ## Mapeamento
 
@@ -18,7 +18,7 @@ O plano foi revisado contra a implementação documental e `origin/main` em `07d
 | `frontend/` | `src/interface/frontend/` | React/Vite, incluindo package-lock e entradas HTML/JSX |
 | `src/monitor/` | Mesmo caminho | Análises offline e métricas |
 | `artefatos/`, `scripts/`, `tests/` | Mesmos caminhos na raiz | Modelo, treinamento e testes |
-| `contracts/`, `src/tools/`, `src/policy/{gate,table}.py` de main | Mesmos caminhos | Contratos e componentes remotos preservados |
+| `contracts/`, `src/tools/`, `src/policy/{gate,table,backtest,learning}.py` de main | Mesmos caminhos | Contratos, componentes remotos e ferramentas offline preservados |
 | `web/` de main | `src/interface/prototype/` | Demonstrador com dados simulados, documentado e separado do frontend ativo |
 
 `engine.py` não é o destino do serviço: substituir o motor pelo antigo `policy_service.py` apagaria suas responsabilidades. `artefatos/modelo_xgboost.pkl`, `features.json` e métricas permanecem na raiz, sem copiar nem retreinar o modelo.
@@ -42,6 +42,8 @@ HackatonEnter/
 │   │   ├── normalization.py
 │   │   ├── pricing.py
 │   │   ├── gate.py
+│   │   ├── backtest.py
+│   │   ├── learning.py
 │   │   └── table.py
 │   ├── utils/
 │   │   ├── __init__.py
@@ -187,20 +189,24 @@ Revisar diff, documentação e resultados. Registrar migração e integração c
 
 ## Evidências desta execução — 12/09/2026
 
-Os seis passos foram executados. A integração preserva `origin/main` em `07de512b`
-e os commits da branch de documentação. O resultado está publicado em
+Os seis passos foram executados. A integração preserva a referência inicial
+`07de512b`, a atualização remota `1ab771bc` e os commits da branch de documentação.
+As mudanças posteriores de gate, ajuste de UF em log-odds, alertas, backtest e
+aprendizado de aceitação foram conciliadas sem substituir o motor ativo do Grupo 9.
+O resultado está publicado em
 `feat/docs-pipeline`, no [PR #3](https://github.com/felipeCapovilla/HackatonEnter/pull/3).
 
 | Verificação | Resultado observado |
 | --- | --- |
-| `python -m pytest -q` | 22 testes passaram, incluindo os seis testes originais de main |
+| `python -m pytest -q` | 24 testes passaram, incluindo os oito testes da main atualizada |
 | `python -m compileall -q src contracts scripts tests` | Sem erros |
-| Importação de módulos | 30 módulos Python de `src`/`contracts` importados; monitor offline carrega o artefato real |
+| Importação de módulos | 34 módulos Python de `src`/`contracts` importados; monitor offline carrega o artefato real |
 | Instalação editável | `python -m pip install --no-deps --no-build-isolation -e .` passou no ambiente com dependências instaladas |
 | Schema | `python -m scripts.export_policy_schema` gerou os contratos do protótipo no destino correto |
 | API real | Uvicorn pelo novo entrypoint; saúde 200; processo criado, dois uploads e análise com `policy_source=MODEL` |
 | Compatibilidade HTTP | 13 pares método/rota anteriores preservados; OpenAPI publica 12 caminhos |
-| Regras da main | AST das três funções de decisão preservado; contratos e testes mantidos |
+| Regras da main | AST das quatro funções de decisão idêntico a `1ab771bc`; contratos e testes mantidos |
+| Ferramentas offline da main | Backtest e atualização Beta-Binomial importados e exercitados com exemplos isolados; sem reexecutar a base histórica |
 | Frontend | Build passou; cinco regressões Playwright no Chrome executaram o bundle de produção com API interceptada apenas nos testes |
 | Fluxo integrado real | Chrome + Vite + FastAPI em portas isoladas: criação, solicitação, envio vinculado, dois documentos, XGBoost e decisão persistida; zero erros de página |
 | Protótipo | Build separado passou; exemplos estáticos identificados no README |
@@ -215,3 +221,5 @@ no README; `make` não estava instalado no ambiente Windows desta validação.
 A verificação é da refatoração e dos fluxos atuais. Não inclui validação de OCR,
 extração semântica, autenticação, desempenho de 600 páginas/s ou eficácia jurídica
 em produção, que permanecem fora desta entrega.
+O backtest de main simula sinais de dossiê a partir de flags; preservá-lo e
+executar exemplos não valida extração por IA nem comprova economia financeira.

@@ -4,7 +4,7 @@ A decisão desta entrega é migrar fisicamente API, frontend e serviços documen
 
 ## 1. Fontes e estado observado
 
-A revisão usa a implementação documental originada em `(feat)_docs_pipeline`, com correções locais, e `origin/main` em `07de512b`. A referência remota foi atualizada durante a revisão. Não existe `README.md` em origin/main; portanto, não há ali uma árvore publicada que exija `src/interface/` ou `src/utils/`.
+A revisão usa a implementação documental originada em `(feat)_docs_pipeline`, com correções locais, e `origin/main`, inicialmente em `07de512b` e depois em `1ab771bc`. A atualização do histórico remoto foi integrada preservando as novas correções do motor. Não existe `README.md` nessas referências; portanto, não há ali uma árvore publicada que exija `src/interface/` ou `src/utils/`.
 
 Árvore resumida da referência remota:
 
@@ -47,6 +47,7 @@ HackatonEnter/
 | Decisão por regras e modelo | `src/policy/engine.py` | Mesmo caminho | Preservar `PolicyEngine` e a API remota `decidir(CaseFeatures)` |
 | Composição e persistência da análise | `backend/app/policy_service.py` | `src/policy/service.py` | Serviço separado do motor, consumindo `PolicyEngine` |
 | Atributos, normalização e valores | `src/policy/{constants,normalization,pricing}.py` | Mesmos caminhos | Conciliar sobreposições e preservar `gate.py` e `table.py` |
+| Backtest e aprendizado de aceitação remotos | Ausentes antes da atualização de main | `src/policy/{backtest,learning}.py` | Ferramentas offline preservadas; não conectadas automaticamente à API documental |
 | Upload e extração PDF/TXT | `backend/app/document_service.py` | `src/utils/document_service.py` | Preservar streaming e lotes |
 | Conferência de tipo | `backend/app/document_type_validator.py` | `src/utils/document_type_validator.py` | Preservar confirmação e incompatibilidades determinísticas |
 | API e persistência | `backend/app/{main,config,database,repository,schemas,monitoring}.py` | `src/interface/backend/` | Preservar schemas e integrar contratos sem regressão |
