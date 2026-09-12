@@ -32,8 +32,9 @@ não medidas calculadas pelo nosso sistema nem comprovação independente de aut
 
 1. Usuário envia PDF/TXT manualmente, declarado como `DOSSIE`.
 2. O processamento existente extrai texto e verifica tipo por regras, sem LLM.
-3. Ao clicar em **Analisar dossiê com IA**, o texto é enviado à OpenAI; o aviso
-   de envio aparece antes do botão. Não há análise paga automática no upload.
+3. Quando a extração de um dossiê termina e `OPENAI_API_KEY` está configurada, o
+   texto é enviado à OpenAI automaticamente (desligável com `ENTERAGREE_DOSSIE_AUTO=false`);
+   o aviso de envio aparece no upload e o botão **Analisar dossiê com IA** permite repetir.
 4. O extrator coleta parecer, exame de assinatura contratual, número de contrato,
    itens de validação e índices. Cada afirmação utilizada exige trecho e página.
 5. A consolidação compara os trechos. Informações conflitantes, páginas ilegíveis

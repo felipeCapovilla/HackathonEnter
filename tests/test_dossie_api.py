@@ -430,3 +430,30 @@ def test_dossier_that_examined_the_contract_signature_turns_settlement_into_reco
                            json={"action": "RECUPERAR"})
     assert decision.status_code == 201
     assert client.get("/api/monitoring").json()["adherence_rate"] == 1.0
+
+
+def _upload_dossier(client, case_id: str):
+    return client.post(
+        f"/api/cases/{case_id}/documents",
+        data={"declared_type": "DOSSIE", "source_party": "BANCO"},
+        files={"file": ("dossie.txt", "Dossiê de validação documental. Parecer grafotécnico da assinatura.", "text/plain")},
+    )
+
+
+def test_dossier_is_analyzed_automatically_when_extraction_finishes(application, monkeypatch) -> None:
+    app, client = application
+    monkeypatch.setenv("OPENAI_API_KEY", "chave-de-teste-sem-rede")
+    app.state.dossie.analyzer = ConformingAnalyzer()
+    case = app.state.repository.create_case(CaseCreate(case_number=str(uuid4()), uf="AM", value_of_claim=15000))
+    assert _upload_dossier(client, case["id"]).status_code == 201
+    analyses = client.get(f"/api/cases/{case['id']}").json()["dossie_analyses"]
+    assert len(analyses) == 1 and analyses[0]["status"] == "COMPLETED"
+
+
+def test_without_openai_key_the_dossier_waits_for_manual_analysis(application, monkeypatch) -> None:
+    app, client = application
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    app.state.dossie.analyzer = ConformingAnalyzer()
+    case = app.state.repository.create_case(CaseCreate(case_number=str(uuid4()), uf="AM", value_of_claim=15000))
+    assert _upload_dossier(client, case["id"]).status_code == 201
+    assert client.get(f"/api/cases/{case['id']}").json()["dossie_analyses"] == []

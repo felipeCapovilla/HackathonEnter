@@ -95,7 +95,7 @@ export default function DossieAnalysis({ document, record, disabled, request, ap
 
   return <section className="dossie-analysis" aria-label={`Análise de dossiê: ${document.original_filename}`} aria-busy={pending || evidencePending}>
     <h4>Análise auxiliar do dossiê</h4>
-    <p>Ao clicar em Analisar dossiê com IA, o texto extraído deste documento será enviado à OpenAI. A classificação do tipo documental continua determinística, sem LLM.</p>
+    <p>A análise com IA roda automaticamente quando o processamento do dossiê termina, se a chave da OpenAI estiver configurada no servidor. Use o botão para analisar agora ou tentar de novo; o texto extraído é enviado à OpenAI.</p>
     <button type="button" onClick={analyze} disabled={disabled || pending || evidencePending || !extractionReady || typeBlocked}>
       {pending ? "Analisando dossiê…" : "Analisar dossiê com IA"}
     </button>

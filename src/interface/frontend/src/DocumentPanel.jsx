@@ -55,7 +55,7 @@ export function DocumentPanel({ caseId, documents, canUpload, onUploaded }) {
   return <article className="panel documents-panel">
     <h3>Documentos do processo</h3>
     {canUpload && <form className="document-upload" onSubmit={upload}>
-      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio.</p>
+      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
       <fieldset className="form-fields" disabled={action.pending}>
         <label>Tipo de documento<select name="declared_type" required defaultValue="">
           <option value="">Selecione o tipo</option>

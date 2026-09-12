@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from uuid import uuid4
 
@@ -32,9 +32,11 @@ def _safe_filename(filename: str | None) -> str:
 
 
 class DocumentService:
-    def __init__(self, repository: Repository, settings: Settings) -> None:
+    def __init__(self, repository: Repository, settings: Settings,
+                 on_extraction_completed: Callable[[str], None] | None = None) -> None:
         self.repository = repository
         self.settings = settings
+        self.on_extraction_completed = on_extraction_completed
         self.settings.document_dir.mkdir(parents=True, exist_ok=True)
 
     async def store_upload(
@@ -147,7 +149,9 @@ class DocumentService:
                 detected_type=validation.detected_type,
                 type_status=validation.status,
             )
+            completed = True
         except Exception as exc:
+            completed = False
             logger.exception("Document extraction failed for %s", document_id)
             self.repository.update_document_extraction(
                 document_id,
@@ -158,6 +162,12 @@ class DocumentService:
                 detected_type=None,
                 type_status=DocumentTypeStatus(document["type_status"]),
             )
+        # Fora do try da extração: uma falha no passo seguinte não marca o documento como falho.
+        if completed and self.on_extraction_completed is not None:
+            try:
+                self.on_extraction_completed(document_id)
+            except Exception:
+                logger.exception("Post-extraction step failed for %s", document_id)
 
     def _iter_pages(self, path: Path) -> Iterable[dict]:
         if path.suffix.lower() == ".txt":
