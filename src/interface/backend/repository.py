@@ -56,6 +56,32 @@ class Repository:
         with connection_for(self.database_path) as connection:
             return _row(connection.execute("SELECT * FROM banks WHERE id = ?", (bank_id,)).fetchone())
 
+    def create_bank_contract(self, bank_id: str, parameters: dict, created_by_user_id: str | None) -> dict:
+        """Grava uma NOVA versão do contrato do banco. Versões anteriores ficam para auditoria."""
+        with connection_for(self.database_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                "SELECT COALESCE(MAX(version), 0) FROM bank_contracts WHERE bank_id = ?", (bank_id,)
+            ).fetchone()[0]
+            record = {
+                "id": str(uuid4()), "bank_id": bank_id, "version": int(current) + 1,
+                "parameters": _json(parameters), "created_by_user_id": created_by_user_id, "created_at": _now(),
+            }
+            connection.execute(
+                """INSERT INTO bank_contracts (id, bank_id, version, parameters, created_by_user_id, created_at)
+                VALUES (:id, :bank_id, :version, :parameters, :created_by_user_id, :created_at)""", record)
+        return {**record, "parameters": parameters}
+
+    def get_active_bank_contract(self, bank_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT * FROM bank_contracts WHERE bank_id = ? ORDER BY version DESC LIMIT 1", (bank_id,)
+            ).fetchone()
+        record = _row(row)
+        if record is not None:
+            record["parameters"] = json.loads(record["parameters"])
+        return record
+
     def create_user(self, record: dict) -> dict:
         with connection_for(self.database_path) as connection:
             try:

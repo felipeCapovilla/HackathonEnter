@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 from contracts.dossie import DossieReport
+from contracts.schema import ParametrosContrato
 
 
 class SourceParty(StrEnum):
@@ -221,3 +222,29 @@ class UserUpdate(BaseModel):
 
 class SessionUser(UserRecord):
     csrf_token: str
+
+
+class BankContractRecord(BaseModel):
+    id: str | None = None
+    bank_id: str
+    version: int = Field(description="0 = contrato padrão, nenhuma versão cadastrada")
+    parameters: ParametrosContrato
+    created_by_user_id: str | None = None
+    created_at: datetime | None = None
+
+
+class ContractPreviewResult(BaseModel):
+    economia: float
+    economia_percentual: float
+    custo_sem_politica: float
+    custo_com_politica: float
+    acoes: dict[str, int]
+
+
+class ContractPreview(BaseModel):
+    casos: int
+    pago_historico: float
+    contrato_vigente: ContractPreviewResult
+    contrato_proposto: ContractPreviewResult
+    decisoes_alteradas: int
+    premissas: str

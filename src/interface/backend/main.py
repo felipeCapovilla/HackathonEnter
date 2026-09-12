@@ -21,9 +21,12 @@ from src.utils.dossie_service import DossieService, DossieUnavailableError
 from src.utils.document_type_validator import validate_document_type
 from .monitoring import build_monitoring_summary
 from src.policy.service import PolicyService
+from contracts.schema import ParametrosContrato
 from .repository import Repository
 from .schemas import (
     AnalysisRecord,
+    BankContractRecord,
+    ContractPreview,
     CaseCreate,
     CaseAssignment,
     CaseRecord,
@@ -59,9 +62,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.repository = Repository(app_settings.database_path)
         app.state.documents = DocumentService(app.state.repository, app_settings)
         app.state.dossie = DossieService(app.state.repository)
-        app.state.policy = PolicyService(
-            app.state.repository, str(app_settings.artifact_dir / "modelo_xgboost.pkl")
-        )
+        def contrato_do_banco(bank_id: str | None) -> ParametrosContrato:
+            record = app.state.repository.get_active_bank_contract(bank_id) if bank_id else None
+            if record is None:
+                return ParametrosContrato()
+            return ParametrosContrato.model_validate({**record["parameters"], "versao": f"{bank_id}-v{record['version']}"})
+
+        app.state.contract_provider = contrato_do_banco
+        app.state.policy = PolicyService(app.state.repository, contract_provider=contrato_do_banco)
         yield
 
     app = FastAPI(title="EnterAgree API", version="0.1.0", lifespan=lifespan)
@@ -162,6 +170,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if user is None:
             raise HTTPException(404, "Usuário não encontrado.")
         return user
+
+    def contract_record(bank_id: str) -> dict:
+        record = repository().get_active_bank_contract(bank_id)
+        if record is None:
+            return {"bank_id": bank_id, "version": 0, "parameters": ParametrosContrato().model_dump()}
+        return {**record, "parameters": {**record["parameters"], "versao": f"{bank_id}-v{record['version']}"}}
+
+    def require_bank(bank_id: str) -> None:
+        if repository().get_bank(bank_id) is None:
+            raise HTTPException(404, "Banco não encontrado.")
+
+    @app.get("/api/admin/banks/{bank_id}/contract", response_model=BankContractRecord)
+    def admin_bank_contract(bank_id: str, request: Request) -> dict:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        require_bank(bank_id)
+        return contract_record(bank_id)
+
+    @app.post("/api/admin/banks/{bank_id}/contract", response_model=BankContractRecord, status_code=201)
+    def save_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        require_bank(bank_id)
+        repository().create_bank_contract(bank_id, payload.model_dump(exclude={"versao"}), user.get("id"))
+        return contract_record(bank_id)
+
+    @app.post("/api/admin/banks/{bank_id}/contract/preview", response_model=ContractPreview)
+    def preview_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request) -> dict:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        require_bank(bank_id)
+        from src.policy.preview import simular
+        try:
+            return simular(app.state.contract_provider(bank_id), payload)
+        except FileNotFoundError as exc:
+            raise HTTPException(503, "Base histórica indisponível para a prévia.") from exc
+
+    @app.get("/api/bank/contract", response_model=BankContractRecord)
+    def bank_contract(request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.BANCO)
+        return contract_record(user["bank_id"])
 
     @app.get("/api/bank/lawyers", response_model=list[UserRecord])
     def bank_lawyers(request: Request) -> list[dict]:

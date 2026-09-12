@@ -150,6 +150,16 @@ CREATE TABLE IF NOT EXISTS audit_events (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS bank_contracts (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL REFERENCES banks(id),
+    version INTEGER NOT NULL,
+    parameters TEXT NOT NULL,
+    created_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(bank_id, version)
+);
+
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
 CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
@@ -160,6 +170,7 @@ CREATE INDEX IF NOT EXISTS requests_case_idx ON document_requests(case_id, statu
 CREATE INDEX IF NOT EXISTS decisions_analysis_idx ON lawyer_decisions(analysis_id);
 CREATE INDEX IF NOT EXISTS users_bank_idx ON users(bank_id, role, is_active);
 CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id, expires_at);
+CREATE INDEX IF NOT EXISTS bank_contracts_bank_idx ON bank_contracts(bank_id, version);
 """
 
 

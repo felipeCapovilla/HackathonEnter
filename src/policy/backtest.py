@@ -3,7 +3,8 @@ Backtest da política sobre as 60.000 sentenças reais.
 
 METODOLOGIA — leia antes de citar qualquer número destes:
 
-  baseline  = o que o banco EFETIVAMENTE pagou (R$ 192.982.862,07 observados)
+  baseline  = o que o banco EFETIVAMENTE pagou (R$ 192.982.862,07 observados),
+              mais os honorários do desfecho quando um contrato é informado
   política  = custo por caso sob a ação recomendada, onde:
               DEFENDER  -> condenação OBSERVADA (defender foi o que de fato
                            aconteceu, então o desfecho real vale)
@@ -75,23 +76,44 @@ class Resultado:
         return self.economia / self.baseline if self.baseline else 0.0
 
 
+def _honorario_do_desfecho(c: CaseFeatures, condenacao: float, contrato: ParametrosContrato | None) -> float:
+    if contrato is None:
+        return 0.0
+    if condenacao > 0:
+        return contrato.honorario_defesa_perdida.em_reais(c.valor_causa, condenacao)
+    return contrato.honorario_defesa_ganha.em_reais(c.valor_causa, K.P1.valor * c.valor_causa)
+
+
+def custo_sem_politica(c: CaseFeatures, condenacao: float, contrato: ParametrosContrato | None = None) -> float:
+    """Status quo: o caso é defendido e o banco paga a condenação e o honorário do desfecho."""
+    return condenacao + _honorario_do_desfecho(c, condenacao, contrato)
+
+
+def custo_realizado(c: CaseFeatures, condenacao: float, r, p_aceita: float, p_recupera: float,
+                    contrato: ParametrosContrato | None = None) -> float:
+    """Custo de um caso sob a recomendação `r`, com os honorários do contrato."""
+    defesa = custo_sem_politica(c, condenacao, contrato)
+    honorario_acordo = (contrato.honorario_acordo.em_reais(c.valor_causa, K.P1.valor * c.valor_causa)
+                        if contrato else 0.0)
+    acordo_hoje = (p_aceita * (r.acordo.alvo + honorario_acordo) + (1 - p_aceita) * defesa) if r.acordo else defesa
+    if r.acao == "DEFENDER":
+        return defesa
+    if r.acao == "ACORDAR":
+        return acordo_hoje
+    esperado_recuperado = r.recuperacao.p_perda_se_recuperado * K.P1.valor * c.valor_causa
+    recuperado = (min(esperado_recuperado, r.acordo.abertura + honorario_acordo)
+                  if r.acordo else esperado_recuperado)
+    return p_recupera * recuperado + (1 - p_recupera) * acordo_hoje
+
+
 def rodar(casos, p_aceita: float, p_recupera: float, contrato: ParametrosContrato | None = None) -> Resultado:
     baseline = total = 0.0
     por_acao: dict[str, int] = defaultdict(int)
     for c, condenacao in casos:
-        baseline += condenacao
+        baseline += custo_sem_politica(c, condenacao, contrato)
         r = decidir(c, contrato)
         por_acao[r.acao] += 1
-        acordo_hoje = (p_aceita * r.acordo.alvo + (1 - p_aceita) * condenacao) if r.acordo else condenacao
-        if r.acao == "DEFENDER":
-            custo = condenacao
-        elif r.acao == "ACORDAR":
-            custo = acordo_hoje
-        else:
-            esperado_recuperado = r.recuperacao.p_perda_se_recuperado * K.P1.valor * c.valor_causa
-            recuperado = min(esperado_recuperado, r.acordo.abertura) if r.acordo else esperado_recuperado
-            custo = p_recupera * recuperado + (1 - p_recupera) * acordo_hoje
-        total += custo
+        total += custo_realizado(c, condenacao, r, p_aceita, p_recupera, contrato)
     return Resultado(len(casos), baseline, total, dict(por_acao))
 
 
