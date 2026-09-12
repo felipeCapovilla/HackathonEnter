@@ -18,17 +18,20 @@ def features(**overrides):
     return CaseFeatures(**{**values, **overrides})
 
 
-def test_graph_requires_human_review_and_does_not_invent_a_recommendation():
-    graph = build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
-    result = graph.invoke({"dossie_texto": TEXT, "features": features()})
-    assert result["encaminhamento"] == "REVISAO_MANUAL"
-    assert result["recomendacao"] is None
+def graph_with_conforming_dossier():
+    return build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
 
 
-def test_reviewed_signature_evidence_allows_existing_recovery_policy_without_faking_contract():
-    graph = build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
+def test_graph_always_calculates_and_flags_unreviewed_analysis():
+    result = graph_with_conforming_dossier().invoke({"dossie_texto": TEXT, "features": features()})
+    assert result["encaminhamento"] == "POLITICA_COM_RESSALVA"
+    assert result["recomendacao"] is not None
+    assert any("não revisada" in alerta for alerta in result["recomendacao"].alertas)
+
+
+def test_reviewed_signature_evidence_allows_recovery_without_faking_contract():
     case = features(extrato=True)
-    extracted = graph.invoke({"dossie_texto": TEXT, "features": case})
+    extracted = graph_with_conforming_dossier().invoke({"dossie_texto": TEXT, "features": case})
     result = node_verificar_parecer({**extracted, "analise_revisada": True})
     assert result["encaminhamento"] == "POLITICA_CALCULADA"
     assert result["recomendacao"].acao == "RECUPERAR"
@@ -49,22 +52,33 @@ def test_negative_verdict_uses_main_policy_instead_of_forcing_settlement():
     assert result["recomendacao"].acao == "DEFENDER"
 
 
-def test_missing_or_unconfirmed_dossier_never_reaches_policy(tmp_path):
-    graph = build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
-    result = graph.invoke({"caminho_pdf": str(tmp_path / "missing.pdf"), "features": features(), "analise_revisada": True})
-    assert result["encaminhamento"] == "AUSENTE"
-    assert result["recomendacao"] is None
-    result = graph.invoke({"dossie_texto": TEXT, "features": features(dossie=False), "analise_revisada": True})
+def test_missing_dossier_file_still_gets_a_recommendation(tmp_path):
+    result = graph_with_conforming_dossier().invoke(
+        {"caminho_pdf": str(tmp_path / "missing.pdf"), "features": features()})
+    assert result["encaminhamento"] == "POLITICA_COM_RESSALVA"
+    assert result["recomendacao"].acao == "ACORDAR"
+    assert any("nenhum arquivo" in alerta for alerta in result["recomendacao"].alertas)
+
+
+def test_case_without_dossier_is_decided_from_flags_alone():
+    case = features(dossie=False, contrato=True, extrato=True, uf="MA", sub_assunto="Generico")
+    result = graph_with_conforming_dossier().invoke({"features": case})
+    assert result["encaminhamento"] == "POLITICA_CALCULADA"
+    assert result["recomendacao"].acao == "DEFENDER"
+
+
+def test_without_case_features_nothing_is_invented():
+    result = graph_with_conforming_dossier().invoke({"dossie_texto": TEXT})
     assert result["encaminhamento"] == "REVISAO_MANUAL"
     assert result["recomendacao"] is None
 
 
-def test_graph_does_not_reuse_a_previous_recommendation():
-    graph = build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
-    first = graph.invoke({"dossie_texto": TEXT, "features": features()})
+def test_new_extraction_resets_review_and_recalculates():
+    graph = graph_with_conforming_dossier()
+    first = graph.invoke({"dossie_texto": TEXT, "features": features(extrato=True)})
     reviewed = {**first, **node_verificar_parecer({**first, "analise_revisada": True}), "analise_revisada": True}
-    assert reviewed["recomendacao"] is not None
+    assert reviewed["encaminhamento"] == "POLITICA_CALCULADA"
     second = graph.invoke({**reviewed, "dossie_texto": TEXT})
-    assert second["recomendacao"] is None
-    assert second["encaminhamento"] == "REVISAO_MANUAL"
     assert second["analise_revisada"] is False
+    assert second["encaminhamento"] == "POLITICA_COM_RESSALVA"
+    assert second["recomendacao"] is not None
