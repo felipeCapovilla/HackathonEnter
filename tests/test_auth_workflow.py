@@ -34,6 +34,7 @@ def test_login_roles_and_case_assignment_scope(tmp_path):
         add_user(app, "BANCO", "banco@unicamp.br")
         lawyer = add_user(app, "ADVOGADO_EXTERNO", "advogado@unicamp.br")
         add_user(app, "ADVOGADO_EXTERNO", "outro@unicamp.br")
+        assert bank_client.get("/api/auth/me").json() is None
         assert bank_client.get("/api/cases").status_code == 401
         login(bank_client, "BANCO@UNICAMP.BR")
         login(lawyer_client, "advogado@unicamp.br")

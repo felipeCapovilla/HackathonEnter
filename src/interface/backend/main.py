@@ -102,10 +102,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         return {**user, "csrf_token": csrf}
 
-    @app.get("/api/auth/me", response_model=SessionUser)
-    def me(request: Request, response: Response) -> dict:
+    @app.get("/api/auth/me", response_model=SessionUser | None)
+    def me(request: Request, response: Response) -> dict | None:
         response.headers["Cache-Control"] = "no-store"
-        return current_user(request)
+        try:
+            return current_user(request)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                return None
+            raise
 
     @app.post("/api/auth/logout", status_code=204)
     def logout(request: Request, response: Response) -> Response:
