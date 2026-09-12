@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import "./styles.css";
 
-const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const API = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000/api`;
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
