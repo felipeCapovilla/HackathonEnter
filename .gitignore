@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+node_modules/
+web/dist/
+data/*.csv
+data/*.xlsx
+data/*.parquet
+data/processos/
+artefatos/*.pkl
+.pytest_cache/
