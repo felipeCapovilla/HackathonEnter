@@ -1,0 +1,186 @@
+{
+  "versao": "base-60000-0ea01a18c4",
+  "n_processos": 60000,
+  "p_perda_global": 0.3044,
+  "segmentos": [
+    {
+      "contrato": 0,
+      "extrato": 0,
+      "comprovante": 0,
+      "sub_assunto": "Generico",
+      "n": 664,
+      "p_perda": 0.9714
+    },
+    {
+      "contrato": 0,
+      "extrato": 0,
+      "comprovante": 0,
+      "sub_assunto": "Golpe",
+      "n": 3216,
+      "p_perda": 0.9888
+    },
+    {
+      "contrato": 0,
+      "extrato": 0,
+      "comprovante": 1,
+      "sub_assunto": "Generico",
+      "n": 455,
+      "p_perda": 0.9033
+    },
+    {
+      "contrato": 0,
+      "extrato": 0,
+      "comprovante": 1,
+      "sub_assunto": "Golpe",
+      "n": 2158,
+      "p_perda": 0.9648
+    },
+    {
+      "contrato": 0,
+      "extrato": 1,
+      "comprovante": 0,
+      "sub_assunto": "Generico",
+      "n": 1149,
+      "p_perda": 0.6075
+    },
+    {
+      "contrato": 0,
+      "extrato": 1,
+      "comprovante": 0,
+      "sub_assunto": "Golpe",
+      "n": 3964,
+      "p_perda": 0.8151
+    },
+    {
+      "contrato": 0,
+      "extrato": 1,
+      "comprovante": 1,
+      "sub_assunto": "Generico",
+      "n": 1454,
+      "p_perda": 0.2895
+    },
+    {
+      "contrato": 0,
+      "extrato": 1,
+      "comprovante": 1,
+      "sub_assunto": "Golpe",
+      "n": 3957,
+      "p_perda": 0.5428
+    },
+    {
+      "contrato": 1,
+      "extrato": 0,
+      "comprovante": 0,
+      "sub_assunto": "Generico",
+      "n": 472,
+      "p_perda": 0.6123
+    },
+    {
+      "contrato": 1,
+      "extrato": 0,
+      "comprovante": 0,
+      "sub_assunto": "Golpe",
+      "n": 1748,
+      "p_perda": 0.7735
+    },
+    {
+      "contrato": 1,
+      "extrato": 0,
+      "comprovante": 1,
+      "sub_assunto": "Generico",
+      "n": 650,
+      "p_perda": 0.3092
+    },
+    {
+      "contrato": 1,
+      "extrato": 0,
+      "comprovante": 1,
+      "sub_assunto": "Golpe",
+      "n": 1742,
+      "p_perda": 0.5235
+    },
+    {
+      "contrato": 1,
+      "extrato": 1,
+      "comprovante": 0,
+      "sub_assunto": "Generico",
+      "n": 4177,
+      "p_perda": 0.0642
+    },
+    {
+      "contrato": 1,
+      "extrato": 1,
+      "comprovante": 0,
+      "sub_assunto": "Golpe",
+      "n": 8196,
+      "p_perda": 0.1661
+    },
+    {
+      "contrato": 1,
+      "extrato": 1,
+      "comprovante": 1,
+      "sub_assunto": "Generico",
+      "n": 9351,
+      "p_perda": 0.0213
+    },
+    {
+      "contrato": 1,
+      "extrato": 1,
+      "comprovante": 1,
+      "sub_assunto": "Golpe",
+      "n": 16647,
+      "p_perda": 0.0522
+    }
+  ],
+  "uf": {
+    "regra": "6 maiores taxas de derrota = alto; 8 menores = baixo; demais = medio",
+    "clusters": {
+      "AC": "medio",
+      "AL": "medio",
+      "AM": "alto",
+      "AP": "alto",
+      "BA": "alto",
+      "CE": "medio",
+      "DF": "medio",
+      "ES": "medio",
+      "GO": "alto",
+      "MA": "baixo",
+      "MG": "medio",
+      "MS": "baixo",
+      "MT": "baixo",
+      "PA": "medio",
+      "PB": "medio",
+      "PE": "medio",
+      "PI": "baixo",
+      "PR": "baixo",
+      "RJ": "alto",
+      "RN": "baixo",
+      "RO": "baixo",
+      "RS": "alto",
+      "SC": "medio",
+      "SE": "medio",
+      "SP": "medio",
+      "TO": "baixo"
+    },
+    "offset_logit": {
+      "alto": 0.4362,
+      "medio": -0.0325,
+      "baixo": -0.3252
+    }
+  },
+  "condenacao_sobre_causa_se_perde": {
+    "n": 17987,
+    "media": 0.7108,
+    "procedencia": 0.8995,
+    "parcial_procedencia": 0.6224
+  },
+  "acordo_sobre_causa": {
+    "n": 280,
+    "media": 0.2978,
+    "p25": 0.25,
+    "mediana": 0.29,
+    "p75": 0.35,
+    "p90": 0.39
+  },
+  "gerado_em": "2026-09-12T20:02:58+00:00"
+}
