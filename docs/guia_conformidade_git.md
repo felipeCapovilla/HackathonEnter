@@ -4,7 +4,7 @@ Este guia registra a convenção adotada para publicar a reorganização em `fea
 
 ## 1. Evidência e convenção escolhida
 
-Na revisão, `origin/main` aponta para `07de512b`. Sua raiz contém `contracts/`, `src/`, `tests/`, `web/`, `pyproject.toml` e `Makefile`. Não existe `README.md` nessa referência; `git show origin/main:README.md` não fornece uma regra de contribuição. O histórico contém mensagens como `Estrutura inicial: contrato de tipos, motor de política e teste de fumaça`, sem Conventional Commits. Não foi identificada uma exigência de Git Flow ou Conventional Commits em main.
+Na revisão inicial, `origin/main` apontava para `07de512b`; antes da publicação final, o remoto reescreveu seu histórico e passou a `1ab771bc`, também integrado nesta entrega. Sua raiz contém `contracts/`, `src/`, `tests/`, `web/`, `pyproject.toml` e `Makefile`. Não existe `README.md` nessa referência; `git show origin/main:README.md` não fornece uma regra de contribuição. O histórico contém mensagens como `Estrutura inicial: contrato de tipos, motor de política e teste de fumaça`, sem Conventional Commits. Não foi identificada uma exigência de Git Flow ou Conventional Commits em main.
 
 `(feat)_docs_pipeline` é um nome aceito pelo Git. Caracteres especiais exigem cuidado com aspas em comandos, mas não tornam o nome inválido. Para esta entrega, a convenção escolhida é `tipo/descricao-kebab-case`, usando `feat/docs-pipeline`.
 
@@ -102,3 +102,8 @@ O [PR #3 para main](https://github.com/felipeCapovilla/HackatonEnter/pull/3)
 foi aberto pela API do GitHub autenticada, equivalente aos comandos `gh` acima
 (o GitHub CLI não estava instalado neste ambiente). O PR #1 já estava encerrado;
 a branch antiga foi preservada. Nenhum PR foi mesclado nesta execução.
+
+A atualização remota para `1ab771bc` foi conciliada por um novo merge, preservando
+as correções de política e os testes recebidos. A branch desta entrega não sofreu
+force push nem reescrita dos commits publicados. Commits históricos herdados
+mantêm suas mensagens originais; a convenção aplica-se aos novos commits da entrega.
