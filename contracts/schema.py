@@ -102,6 +102,8 @@ class ParametrosContrato(BaseModel):
     duracao_meses: float = Field(default=24.0, ge=0, le=120)
     teto_alcada_fator: Optional[float] = Field(default=None, gt=0, le=1,
         description="Maior oferta autorizada pelo banco, como fração do valor da causa")
+    concessao: float = Field(default=0.0, ge=0, le=1,
+        description="Fração do espaço entre abertura e walk-away cedida no alvo da negociação")
 
     @property
     def fator_tempo(self) -> float:

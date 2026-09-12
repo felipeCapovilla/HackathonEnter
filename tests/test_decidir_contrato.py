@@ -2,7 +2,7 @@
 import pytest
 
 from contracts.schema import CaseFeatures, Honorario, ParametrosContrato
-from src.policy.constants import CUSTO_MENSAL_TEMPO, DURACAO_MESES
+from src.policy.constants import CONCESSAO, CUSTO_MENSAL_TEMPO, DURACAO_MESES
 from src.policy.engine import decidir
 
 
@@ -17,6 +17,7 @@ def test_contrato_padrao_espelha_as_premissas_de_tempo():
     padrao = ParametrosContrato()
     assert padrao.custo_mensal_tempo == CUSTO_MENSAL_TEMPO.valor
     assert padrao.duracao_meses == DURACAO_MESES.valor
+    assert padrao.concessao == CONCESSAO.valor
 
 
 def test_quantidade_de_subsidios_nao_decide():
@@ -90,3 +91,12 @@ def test_toda_recomendacao_carrega_versoes():
     r = decidir(caso())
     assert r.versao_politica.startswith("politica-") and "+base-" in r.versao_politica
     assert r.versao_contrato == "padrao"
+
+
+def test_concessao_do_contrato_sobe_o_alvo_sem_mudar_a_decisao():
+    c = caso(sub_assunto="Golpe", contrato=False, extrato=False, comprovante_credito=False)
+    firme, cedente = decidir(c), decidir(c, ParametrosContrato(concessao=0.5))
+    assert firme.acao == cedente.acao == "ACORDAR"
+    assert firme.acordo.alvo == pytest.approx(firme.acordo.abertura)
+    assert cedente.acordo.alvo > firme.acordo.alvo
+    assert cedente.acordo.walk_away == firme.acordo.walk_away

@@ -87,7 +87,7 @@ DURACAO_MESES = Premissa(
 TODAS_VALOR_ACORDO = [RATIO_CONDENACAO, RATIO_ABERTURA, CONCESSAO, AMPLITUDE_MIN_REL,
                       CUSTO_MENSAL_TEMPO, DURACAO_MESES]
 
-POLICY_VERSION = "politica-2026.09.12-v2"
+POLICY_VERSION = "politica-2026.09.12-v3"
 
 # Limiar de indiferença sem custas, honorários nem tempo. DERIVADO, nunca
 # literal: se uma premissa mudar, ele muda junto. O limiar é econômico, não 0,5.

@@ -29,6 +29,25 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
+### macOS e Linux
+
+Na raiz do repositório:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt openai
+python -m scripts.seed_demo --confirm-demo
+export ENTERAGREE_RUNTIME_DIR="$PWD/.runtime/demo"
+export ENTERAGREE_DATABASE_PATH="$ENTERAGREE_RUNTIME_DIR/enteragree.db"
+export ENTERAGREE_AUTH_REQUIRED=true
+python -m uvicorn src.interface.backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Para a análise automática do dossiê, exporte `OPENAI_API_KEY` no mesmo terminal antes de iniciar a API.
+Para a prévia de contrato do admin, gere os CSVs da base uma vez:
+`python -m scripts.exportar_base_csv --xlsx caminho/Hackaton_Enter_Base_Candidatos.xlsx`.
+O frontend roda com os mesmos comandos `npm` acima.
+
 Acesse **http://127.0.0.1:5173**. A API atende em `http://127.0.0.1:8000` e expõe
 documentação em `/docs`. O frontend escolhe o mesmo hostname da página para a API.
 Não misture `localhost` e `127.0.0.1` ao configurar `VITE_API_BASE_URL`, pois a

@@ -260,6 +260,7 @@ function readContractForm(form) {
     custo_mensal_tempo: Number(form.get("custo_mensal_tempo") || 0) / 100,
     duracao_meses: Number(form.get("duracao_meses") || 0),
     teto_alcada_fator: teto ? Number(teto) / 100 : null,
+    concessao: Number(form.get("concessao") || 0) / 100,
   };
 }
 
@@ -306,6 +307,7 @@ function ContractPanel({ banks }) {
         <label>Duração esperada (meses)<input name="duracao_meses" type="number" min="0" max="120" step="1" defaultValue={parameters.duracao_meses} /></label>
       </div>
       <label>Teto de alçada (% do valor da causa, opcional)<input name="teto_alcada_fator" type="number" min="1" max="100" step="1" defaultValue={percent(parameters.teto_alcada_fator)} /></label>
+      <label>Concessão na negociação (% do espaço entre abertura e walk-away)<input name="concessao" type="number" min="0" max="100" step="1" defaultValue={percent(parameters.concessao)} /></label>
       <div className="contract-row">
         <button type="button" onClick={onSimulate}>{simulate.pending ? "Simulando…" : "Simular impacto na carteira"}</button>
         <button>{save.pending ? "Salvando…" : "Salvar nova versão"}</button>
