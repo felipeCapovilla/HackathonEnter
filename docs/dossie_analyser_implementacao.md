@@ -142,15 +142,14 @@ O grafo começa sem aprovação; cada nova extração reseta `analise_revisada` 
 qualquer recomendação anterior. Documento ausente termina em `AUSENTE`; relatório
 existente segue a `REVISAO_MANUAL`. Não há acordo/defesa inferido por substring.
 
-Para consumidores Python, `node_verificar_parecer` aceita o estado **após** revisão
-do resultado, com `analise_revisada=True` e `CaseFeatures` completos. Só então chama
-`decidir` da main, preservando as flags originais. Inconclusivo/cobertura incompleta
-ou ausência de dossiê nas features não avança para a política. Esse passo é um
-contrato programático, não uma nova tela de aprovação nem autenticação do revisor.
+O grafo LangGraph sempre calcula a política com `decidir()` quando há dados do caso.
+Análise ainda não revisada, extração incompleta, veredito inconclusivo ou dossiê indicado
+sem arquivo viram ressalvas nos alertas da recomendação (encaminhamento
+`POLITICA_COM_RESSALVA`); só a falta dos dados do caso impede a decisão.
 
-A main atual invalida o contrato probatoriamente diante de parecer negativo e
-recalcula custos; não força sempre acordo. A API documental continua utilizando
-`PolicyEngine` do Grupo 9. Nenhum dos dois motores foi retreinado ou substituído.
+A política invalida o contrato como prova diante de parecer negativo e recalcula
+custos; não força acordo. A API e o grafo usam `decidir()`, e a análise concluída
+do dossiê alimenta a recomendação.
 
 ## Validação e próximos passos
 

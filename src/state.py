@@ -14,4 +14,4 @@ class GraphState(TypedDict, total=False):
     dossie_resultado: DossieReport
     analise_dossie: AnaliseDossie
     recomendacao: Recomendacao | None
-    encaminhamento: Literal["AUSENTE", "REVISAO_MANUAL", "POLITICA_CALCULADA"]
+    encaminhamento: Literal["AUSENTE", "REVISAO_MANUAL", "POLITICA_CALCULADA", "POLITICA_COM_RESSALVA"]

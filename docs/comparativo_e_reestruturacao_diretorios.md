@@ -1,5 +1,8 @@
 # Comparativo e decisão de reestruturação — EnterAgree
 
+> **Nota (12/09):** documento histórico do plano de migração. O `PolicyEngine`, o modelo XGBoost
+> e seus artefatos foram removidos depois; a política ativa é `src/policy/engine.decidir`.
+
 A decisão desta entrega é migrar fisicamente API, frontend e serviços documentais para `src/`, mantendo motor e artefatos nos locais apropriados. Este documento compara fontes verificadas; a organização proposta não é uma imposição presumida de main.
 
 ## 1. Fontes e estado observado

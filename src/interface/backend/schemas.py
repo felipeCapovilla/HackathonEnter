@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 from contracts.dossie import DossieReport
+from contracts.schema import ParametrosContrato
 
 
 class SourceParty(StrEnum):
@@ -139,6 +140,9 @@ class AnalysisRecord(BaseModel):
     feature_provenance: list[FeatureProvenance]
     pricing: dict[str, object] | None = None
     limitations: list[str] = Field(default_factory=list)
+    policy_output: dict[str, object] | None = None
+    policy_version: str | None = None
+    contract_version: str | None = None
     created_at: datetime
 
 
@@ -164,7 +168,7 @@ class DocumentRequestResponse(BaseModel):
 
 
 class LawyerDecisionCreate(BaseModel):
-    action: str = Field(pattern="^(ACORDO|DEFESA)$")
+    action: str = Field(pattern="^(ACORDO|DEFESA|RECUPERAR)$")
     reason: str | None = Field(default=None, max_length=2000)
     proposed_value: float | None = Field(default=None, ge=0)
 
@@ -218,3 +222,29 @@ class UserUpdate(BaseModel):
 
 class SessionUser(UserRecord):
     csrf_token: str
+
+
+class BankContractRecord(BaseModel):
+    id: str | None = None
+    bank_id: str
+    version: int = Field(description="0 = contrato padrão, nenhuma versão cadastrada")
+    parameters: ParametrosContrato
+    created_by_user_id: str | None = None
+    created_at: datetime | None = None
+
+
+class ContractPreviewResult(BaseModel):
+    economia: float
+    economia_percentual: float
+    custo_sem_politica: float
+    custo_com_politica: float
+    acoes: dict[str, int]
+
+
+class ContractPreview(BaseModel):
+    casos: int
+    pago_historico: float
+    contrato_vigente: ContractPreviewResult
+    contrato_proposto: ContractPreviewResult
+    decisoes_alteradas: int
+    premissas: str

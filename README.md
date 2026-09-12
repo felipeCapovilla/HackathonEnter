@@ -1,9 +1,11 @@
 # ENTER | Política de acordos
 
 EnterAgree é a aplicação de política de acordos para casos de não reconhecimento
-de empréstimo. Combina a política híbrida do Grupo 9, regras determinísticas,
-XGBoost e evidência documental auditável. Banco, advogado e administrador têm
-áreas separadas, com autenticação e controle de acesso no backend.
+de empréstimo. Para cada caso, recomenda defender, acordar ou recuperar o documento
+que falta, a partir de uma tabela de segmentos medida na base histórica, do preço
+derivado do custo esperado da defesa e de evidência documental auditável. Banco,
+advogado e administrador têm áreas separadas, com autenticação e controle de acesso
+no backend.
 
 ## Executar a demonstração local
 
@@ -97,22 +99,21 @@ O fluxo de telas, os limites de acesso e os cuidados para implantação estão e
 - `src/utils/`: extração de documentos e verificação determinística de tipo.
 - `src/monitor/`: análises históricas e simulações offline.
 - `contracts/` e `src/tools/`: contratos e analisador de dossiê com extração estruturada e evidências por página.
-- `src/graph.py`: workflow LangGraph opcional para extração e revisão, separado da política ativa da API.
+- `src/graph.py`: workflow LangGraph que extrai o dossiê e sempre calcula a política com `decidir()`; revisão pendente vira ressalva.
 - `src/interface/prototype/`: desenho de tela da `main` com exemplos estáticos, separado da aplicação conectada à API.
-- `artefatos/`, `scripts/` e `tests/`: modelo treinado, preparação/treinamento e testes, respectivamente.
+- `artefatos/`, `scripts/` e `tests/`: tabela da política gerada da base, scripts de geração e demonstração, e testes.
 
 O armazenamento continua em `.runtime/` na raiz do repositório. `ENTERAGREE_RUNTIME_DIR`,
 `ENTERAGREE_DATABASE_PATH` e `ENTERAGREE_MAX_UPLOAD_BYTES` mantêm os mesmos significados.
-O artefato XGBoost permanece em `artefatos/`; a migração de diretórios não exige retreinamento.
+A tabela da política fica em `artefatos/politica_segmentos.json` e é regenerada por `python scripts/gerar_tabela_politica.py`.
 
-`src.policy.engine.PolicyEngine` continua sendo o motor usado pela API documental.
-A função `src.policy.engine.decidir` preserva o contrato `CaseFeatures` da `main`
-e sua política por segmentos (`DEFENDER`, `ACORDAR`, `RECUPERAR`). As duas APIs
-mantêm suas regras e testes; esta migração não troca a política ativa silenciosamente.
-Os módulos `src/policy/backtest.py` e `src/policy/learning.py` também são preservados
-da `main` como ferramentas offline, sem integração automática ao fluxo documental.
-O cenário de extração do backtest assume sinais a partir das flags; não executa IA
-nos documentos nem comprova resultados financeiros de produção.
+`src.policy.engine.decidir` é o único ponto de decisão: a API, o grafo do dossiê, o
+backtest e a prévia de contrato chamam a mesma função. Ela compõe o gate de prova, a
+probabilidade de derrota (tabela de segmentos ou fonte externa), o preço de
+`src/policy/valor_acordo.py` e a recomendação de recuperar documento, usando os termos
+do contrato vigente do banco. `src/policy/backtest.py` e `src/policy/learning.py` são
+ferramentas offline; o cenário "com leitura do dossiê" do backtest assume que todo
+dossiê presente periciou o contrato e não comprova resultados de produção.
 
 O CORS local permite `localhost` e `127.0.0.1`, nas portas 5173 (desenvolvimento)
 e 4173 (preview). Para outras origens, configure `ENTERAGREE_CORS_ORIGINS` com
@@ -180,22 +181,28 @@ por perfil. A resposta contém parecer do perito, exame da assinatura contratual
 índices, contrato referenciado e citações. Informação ausente permanece
 desconhecida, não zero.
 O resultado é auxiliar: não autentica documentos, não ativa a presença de contrato
-e não altera automaticamente a política G9. A falta de chave retorna erro explícito,
+e, quando concluída, alimenta a política (veredito e perícia da assinatura do contrato). A falta de chave retorna erro explícito,
 sem impedir os demais fluxos da aplicação. Arquivos `.env` não são carregados automaticamente.
 
 Consulte [implementação e auditoria do analisador](docs/dossie_analyser_implementacao.md)
 para limites, cache, endpoints, revisão humana e testes.
 
-## Modelo e dados
+## Tabela da política e dados
 
-`artefatos/modelo_xgboost.pkl` foi reproduzido pelos scripts originais do Grupo 9 a partir da base recebida. Para gerar novamente, disponibilize a planilha e execute:
+`artefatos/politica_segmentos.json` é gerado da base histórica de 60 mil sentenças:
+probabilidade de derrota dos 16 segmentos (contrato × extrato × comprovante ×
+golpe/genérico), ajuste por grupo de UF em log-odds, condenação média quando o banco
+perde e quantis dos acordos observados. Com a base em `data/`:
 
 ```powershell
-python scripts/01_prepare_data.py --input ..\Hackaton_Enter_Base_Candidatos.xlsx --output artefatos
-python scripts/02_train_model.py --input artefatos
+python scripts/gerar_tabela_politica.py
+python -m src.policy.backtest
 ```
 
-Na reprodução local: AUC de validação cruzada `0.9079 ± 0.0013`, AUC de teste `0.9045` e Brier `0.1027`. Esses números são retrospectivos e não constituem validação de produção.
+Retrospectivamente: erro máximo de calibração de 0,62 ponto entre risco previsto e
+observado por segmento; economia estimada de 15,3% só com as flags e 27,7% no teto em
+que todo dossiê periciou o contrato (aceitação 40%, recuperação 70%). Esses números não
+constituem validação de produção.
 
 ## Limites e evolução
 

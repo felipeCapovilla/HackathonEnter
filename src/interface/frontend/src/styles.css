@@ -197,3 +197,10 @@ p { line-height: 1.65; }
   .login-page { grid-template-columns: 1fr; }.login-story { display: none; }.login-form-area { min-height: 100vh; padding: 45px 28px 80px; }.login-card { max-width: 390px; }.login-card h1 { font-size: 2rem; }.login-card .brand-symbol { width: 42px; margin-bottom: 35px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+
+.recommendation.recover { border-color: #4fb3a5; background: rgba(79, 179, 165, .10); }
+.price-block small { display: block; margin-top: .25rem; opacity: .75; }
+.contract-panel { grid-column: 1 / -1; }
+.contract-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.contract-preview { margin-top: 8px; }
+@media (max-width: 720px) { .contract-row { grid-template-columns: 1fr; } }
