@@ -29,6 +29,10 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
+> **Depois de um `git pull`, rode `npm ci` de novo antes do `npm run dev`.** As
+> fontes vêm do npm; sem instalar, o Vite falha com
+> `Rollup failed to resolve import "@fontsource-variable/newsreader"`.
+
 ### macOS e Linux
 
 Na raiz do repositório:
