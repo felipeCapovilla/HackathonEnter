@@ -27,7 +27,7 @@ def test_graph_requires_human_review_and_does_not_invent_a_recommendation():
 
 def test_reviewed_signature_evidence_allows_existing_recovery_policy_without_faking_contract():
     graph = build_graph(DossieAnalyzer(extractor=lambda pages: conforming()))
-    case = features()
+    case = features(extrato=True)
     extracted = graph.invoke({"dossie_texto": TEXT, "features": case})
     result = node_verificar_parecer({**extracted, "analise_revisada": True})
     assert result["encaminhamento"] == "POLITICA_CALCULADA"

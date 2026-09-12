@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Acao = Literal["DEFENDER", "ACORDAR", "RECUPERAR"]
 SubAssunto = Literal["Golpe", "Generico"]
@@ -73,6 +73,48 @@ class PlanoRecuperacao(BaseModel):
     p_perda_se_recuperado: float
 
 
+class Honorario(BaseModel):
+    """Um honorário do contrato banco–escritório que depende do desfecho."""
+
+    tipo: Literal["fixo", "percentual_valor_causa", "percentual_condenacao"] = "fixo"
+    valor: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _percentual_entre_zero_e_um(self) -> "Honorario":
+        if self.tipo != "fixo" and self.valor > 1:
+            raise ValueError("percentual deve estar entre 0 e 1 (0,10 = 10%)")
+        return self
+
+    def em_reais(self, valor_causa: float, condenacao_esperada: float) -> float:
+        if self.tipo == "fixo":
+            return self.valor
+        base = valor_causa if self.tipo == "percentual_valor_causa" else condenacao_esperada
+        return self.valor * base
+
+
+class ParametrosContrato(BaseModel):
+    """
+    Termos do contrato vigente que mudam o custo entre acordar e defender.
+
+    Mensalidade e valor fixo por caso novo não estão aqui de propósito: são
+    pagos em qualquer desfecho e não mudam a decisão. Os defaults de tempo
+    espelham T1 e T2 de src/policy/constants.py.
+    """
+
+    versao: str = "padrao"
+    honorario_defesa_ganha: Honorario = Field(default_factory=Honorario)
+    honorario_defesa_perdida: Honorario = Field(default_factory=Honorario)
+    honorario_acordo: Honorario = Field(default_factory=Honorario)
+    custo_mensal_tempo: float = Field(default=0.01, ge=0, le=0.10)
+    duracao_meses: float = Field(default=24.0, ge=0, le=120)
+    teto_alcada_fator: Optional[float] = Field(default=None, gt=0, le=1,
+        description="Maior oferta autorizada pelo banco, como fração do valor da causa")
+
+    @property
+    def fator_tempo(self) -> float:
+        return 1 + self.custo_mensal_tempo * self.duracao_meses
+
+
 class Recomendacao(BaseModel):
     """Saída do motor. É isto que o front renderiza e o log de auditoria grava."""
 
@@ -84,14 +126,19 @@ class Recomendacao(BaseModel):
 
     segmento: str
     p_perda: float
+    fonte_probabilidade: Literal["tabela", "externa"] = "tabela"
+    p_estrela: float
     custo_esperado_defesa: float
 
-    acordo: Optional[FaixaAcordo] = None
+    acordo: Optional["FaixaNegociacao"] = None
+    economia_no_alvo: float = 0.0
     recuperacao: Optional[PlanoRecuperacao] = None
 
     justificativa: list[str]
     alertas: list[str] = []
     premissas_usadas: list[str]
+    versao_politica: str
+    versao_contrato: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -142,3 +189,6 @@ class VereditoAcordo(BaseModel):
     motivo: str = Field(description="Linguagem jurídica, para a tela do advogado")
     premissas_usadas: list[str] = Field(default_factory=list)
     policy_version: str
+
+
+Recomendacao.model_rebuild()

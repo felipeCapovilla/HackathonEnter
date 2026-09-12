@@ -9,12 +9,12 @@ from typing import Any, Mapping
 import joblib
 import pandas as pd
 
-from contracts.schema import CaseFeatures, PlanoRecuperacao, Recomendacao
+from contracts.schema import CaseFeatures, ParametrosContrato, PlanoRecuperacao, Recomendacao, VereditoAcordo
 
 from . import table
 from .gate import avaliar_gate, contrato_efetivo
 from .constants import (
-    P1, P3, P4, P5, P6,
+    P4, P5, RATIO_CONDENACAO, CUSTO_MENSAL_TEMPO, DURACAO_MESES, POLICY_VERSION,
     DEFAULT_MODEL_THRESHOLD,
     DOSSIE_STATUS_NAO_CONFORME,
     FEATURE_COLUMNS,
@@ -24,7 +24,8 @@ from .constants import (
     SUBSIDY_FIELD_MAP,
 )
 from .normalization import cluster_for_uf, coerce_bool, is_golpe_sub_assunto, normalize_dossie_status
-from .pricing import PricingResult, calcular_faixa, calculate_agreement_pricing
+from .pricing import PricingResult, calculate_agreement_pricing
+from .valor_acordo import avaliar_acordo
 
 
 FIELD_ALIASES = {
@@ -349,13 +350,16 @@ def evaluate_case(
     return engine.evaluate(case_data)
 
 
-def custo_esperado_defesa(valor_causa: float, p_perda: float) -> float:
-    """P(derrota) x quanto se paga ao perder (P1) x valor da causa, + sucumbência (P6)."""
-    return p_perda * P1.valor * valor_causa * (1 + P6.valor)
+# ─── decidir(): a política por segmentos ──────────────────────────────────────
+#
+#     gate (a defesa é possível?) -> probabilidade (tabela ou fonte externa)
+#       -> preço (valor_acordo.avaliar_acordo) -> recuperar o documento compensa?
+#
+# ÚNICO ponto de decisão da política. O PolicyEngine acima é legado e sai.
 
 
-def _p_perda(c: CaseFeatures, *, com_contrato: bool | None = None,
-             com_extrato: bool | None = None) -> float:
+def _p_tabela(c: CaseFeatures, *, com_contrato: bool | None = None,
+              com_extrato: bool | None = None) -> float:
     return table.p_perda(
         contrato=contrato_efetivo(c) if com_contrato is None else com_contrato,
         extrato=c.extrato if com_extrato is None else com_extrato,
@@ -365,16 +369,37 @@ def _p_perda(c: CaseFeatures, *, com_contrato: bool | None = None,
     )
 
 
-def _plano_recuperacao(c: CaseFeatures, p_atual: float) -> PlanoRecuperacao | None:
+def _avaliar(valor_causa: float, p: float, contrato: ParametrosContrato) -> VereditoAcordo:
+    condenacao = RATIO_CONDENACAO.valor * valor_causa
+    return avaliar_acordo(
+        valor_causa, p,
+        fator_tempo=contrato.fator_tempo,
+        honorario_perda=contrato.honorario_defesa_perdida.em_reais(valor_causa, condenacao),
+        honorario_ganho=contrato.honorario_defesa_ganha.em_reais(valor_causa, condenacao),
+        honorario_acordo=contrato.honorario_acordo.em_reais(valor_causa, condenacao),
+        teto_alcada=contrato.teto_alcada_fator * valor_causa if contrato.teto_alcada_fator else None,
+    )
+
+
+def _custo_do_melhor_caminho(v: VereditoAcordo, valor_causa: float, contrato: ParametrosContrato) -> float:
+    """Custo esperado da melhor opção disponível: defender, ou acordar na abertura."""
+    if v.faixa is None:
+        return v.custo_defesa
+    condenacao = RATIO_CONDENACAO.valor * valor_causa
+    return v.faixa.abertura + contrato.honorario_acordo.em_reais(valor_causa, condenacao)
+
+
+def _plano_recuperacao(c: CaseFeatures, valor_causa: float, contrato: ParametrosContrato,
+                       custo_atual: float) -> PlanoRecuperacao | None:
     """
-    A TERCEIRA VIA.
+    A TERCEIRA VIA — só quando o documento muda a melhor opção.
 
     Dossiê que periciou assinatura em contrato => o contrato existiu.
     Laudo que descreve liberação de crédito    => o extrato daquela conta existiu.
-    São 17.194 casos na base (28,7%), concentrando 69,7% da exposição.
 
-    Só o item 'analisou_assinatura_contrato' autoriza confiança alta: um dossiê
-    que validou apenas RG e liveness não prova que o contrato existe.
+    O ganho compara a melhor opção HOJE com a melhor opção se o documento vier.
+    Recuperar só o contrato num caso também sem extrato raramente compensa:
+    a defesa continua mais cara que acordar, e o banco acordaria de qualquer jeito.
     """
     if not c.contrato and c.dossie:
         forte = bool(c.analise_dossie and c.analise_dossie.analisou_assinatura_contrato)
@@ -382,63 +407,86 @@ def _plano_recuperacao(c: CaseFeatures, p_atual: float) -> PlanoRecuperacao | No
         fund = ("O dossiê periciou a assinatura aposta no instrumento contratual: "
                 "o contrato existe e não foi juntado." if forte else
                 "Dossiê presente; confirmar se periciou assinatura em contrato.")
-        novo = _p_perda(c, com_contrato=True)
+        p_novo = _p_tabela(c, com_contrato=True)
     elif not c.extrato and c.laudo:
         doc, conf = "extrato", "media"
         fund = "O laudo descreve a liberação do crédito em conta: o extrato daquela conta existe."
-        novo = _p_perda(c, com_extrato=True)
-    elif not contrato_efetivo(c) or not c.extrato:
-        doc = "contrato" if not contrato_efetivo(c) else "extrato"
-        conf, fund = "baixa", "Documento ausente, sem sinal interno de que exista."
-        novo = _p_perda(c, com_contrato=True) if doc == "contrato" else _p_perda(c, com_extrato=True)
+        p_novo = _p_tabela(c, com_extrato=True)
+    elif not c.extrato:
+        doc, conf, fund = "extrato", "baixa", "Extrato ausente, sem sinal interno de que exista."
+        p_novo = _p_tabela(c, com_extrato=True)
+    elif not c.contrato:
+        doc, conf, fund = "contrato", "baixa", "Contrato ausente, sem sinal interno de que exista."
+        p_novo = _p_tabela(c, com_contrato=True)
     else:
         return None
 
+    custo_novo = _custo_do_melhor_caminho(_avaliar(valor_causa, p_novo, contrato), valor_causa, contrato)
     prob = P4.valor if conf == "alta" else P5.valor
-    ganho = (custo_esperado_defesa(c.valor_causa, p_atual)
-             - custo_esperado_defesa(c.valor_causa, novo)) * prob
+    ganho = prob * (custo_atual - custo_novo)
+    if ganho <= 0:
+        return None
     return PlanoRecuperacao(documento=doc, confianca=conf, fundamento=fund,
-                            ganho_estimado=round(ganho, 2), p_perda_se_recuperado=round(novo, 4))
+                            ganho_estimado=round(ganho, 2), p_perda_se_recuperado=round(p_novo, 4))
 
 
-def decidir(c: CaseFeatures) -> Recomendacao:
+def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
+            p_perda: float | None = None) -> Recomendacao:
+    """
+    Recomendação para um caso.
+
+    `contrato` traz os termos do contrato vigente banco–escritório (honorários
+    por desfecho, alçada, custo do tempo); sem ele valem os defaults.
+    `p_perda` substitui a tabela de segmentos por uma fonte externa (um modelo),
+    mantendo gate, preço e terceira via.
+    """
+    contrato = contrato or ParametrosContrato()
     gate = avaliar_gate(c)
-    p = _p_perda(c)
-    custo_defesa = custo_esperado_defesa(c.valor_causa, p)
-
-    nao_conforme = bool(c.analise_dossie and c.analise_dossie.veredito == "nao_conforme")
-    faixa = calcular_faixa(c.valor_causa, p, c.uf, nao_conforme)
-    rec = _plano_recuperacao(c, p)
-
-    # se aceitar, paga o alvo; se recusar, o caso volta para a defesa
-    custo_acordo = P3.valor * faixa.alvo + (1 - P3.valor) * custo_defesa
-
-    segmento = table.chave(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto)
-    just = [gate.motivo, f"Segmento {segmento}: P(derrota) {p:.1%}."]
-    premissas = [P1.id, P6.id, P3.id]
+    externa = p_perda is not None
+    p = p_perda if externa else _p_tabela(c)
     alertas = [gate.alerta] if gate.alerta else []
 
-    if rec and rec.confianca == "alta" and rec.ganho_estimado > 0:
+    valor_informado = c.valor_causa > 0
+    valor_causa = c.valor_causa if valor_informado else 1.0
+    if not valor_informado:
+        alertas.append("Valor da causa ausente: decisão calculada em proporção, sem valor de acordo sugerido.")
+
+    veredito = _avaliar(valor_causa, p, contrato)
+    rec = _plano_recuperacao(c, valor_causa, contrato, _custo_do_melhor_caminho(veredito, valor_causa, contrato))
+
+    segmento = table.chave(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto)
+    fonte = "fonte externa" if externa else "tabela de segmentos"
+    just = [gate.motivo,
+            f"Segmento {segmento}: P(derrota) {p:.1%} ({fonte}); limiar deste caso {veredito.p_estrela:.1%}."]
+    premissas = [*veredito.premissas_usadas, CUSTO_MENSAL_TEMPO.id, DURACAO_MESES.id]
+
+    if rec and rec.confianca == "alta":
         acao = "RECUPERAR"
-        just.append(f"{rec.fundamento} Ganho esperado R$ {rec.ganho_estimado:,.2f}.")
+        just.append(f"{rec.fundamento} Ganho esperado de R$ {rec.ganho_estimado:,.2f} sobre a melhor opção atual.")
+        just.append(f"Se o documento não vier: {veredito.motivo}")
         premissas.append(P4.id)
-    elif custo_acordo < custo_defesa:
+    elif veredito.decisao == "ACORDO":
         acao = "ACORDAR"
-        just.append(f"Custo esperado: acordo R$ {custo_acordo:,.2f} vs defesa R$ {custo_defesa:,.2f}.")
+        just.append(veredito.motivo)
     else:
         acao = "DEFENDER"
-        just.append(f"Defesa é o caminho mais barato: R$ {custo_defesa:,.2f} vs acordo R$ {custo_acordo:,.2f}.")
+        just.append(veredito.motivo)
         if not gate.defesa_disponivel:
             alertas.append("Gate fechado: defender aqui exige justificativa registrada.")
+    if rec and rec.confianca != "alta":
+        premissas.append(P5.id)
 
-    if c.contradicoes:
-        just.extend(c.contradicoes)
+    just.extend(c.contradicoes)
 
     return Recomendacao(
         numero_processo=c.numero_processo, acao=acao,
         gate_defesa_disponivel=gate.defesa_disponivel, gate_motivo=gate.motivo,
-        segmento=segmento, p_perda=round(p, 4), custo_esperado_defesa=round(custo_defesa, 2),
-        acordo=faixa if acao == "ACORDAR" else None,
-        recuperacao=rec if acao == "RECUPERAR" else None,
-        justificativa=just, alertas=alertas, premissas_usadas=premissas,
+        segmento=segmento, p_perda=round(p, 4), fonte_probabilidade="externa" if externa else "tabela",
+        p_estrela=veredito.p_estrela, custo_esperado_defesa=veredito.custo_defesa,
+        acordo=veredito.faixa if valor_informado else None,
+        economia_no_alvo=veredito.economia_no_alvo if valor_informado else 0.0,
+        recuperacao=rec,
+        justificativa=just, alertas=alertas, premissas_usadas=list(dict.fromkeys(premissas)),
+        versao_politica=f"{POLICY_VERSION}+{table._ARTEFATO['versao']}",
+        versao_contrato=contrato.versao,
     )

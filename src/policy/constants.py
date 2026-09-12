@@ -101,7 +101,7 @@ P2_PISO = Premissa("P2a", "Abertura da negociação (P25 dos acordos)", _ACORDO[
                    f"MEDIDO: {_ACORDO['n']} acordos da base")
 P2_ALVO = Premissa("P2", "Alvo do acordo (mediana dos acordos)", _ACORDO["mediana"],
                    f"MEDIDO: {_ACORDO['n']} acordos da base")
-P2_MAXIMO = Premissa("P2c", "Máximo aceitável (P75 dos acordos)", _ACORDO["p75"],
+P2_MAXIMO = Premissa("P2d", "Máximo aceitável (P75 dos acordos)", _ACORDO["p75"],
                      f"MEDIDO: {_ACORDO['n']} acordos da base")
 P2_TETO = Premissa("P2b", "Teto absoluto (P90 dos acordos)", _ACORDO["p90"],
                    f"MEDIDO: {_ACORDO['n']} acordos da base")
@@ -121,72 +121,49 @@ GATE_P_VITORIA_OBSERVADA = 0.027  # C0/E0: 2,7% de vitória em 6.493 casos
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# POLÍTICA VIGENTE DE VALOR DE ACORDO  (documento de 13/09 + correção)
+# POLÍTICA DE VALOR DE ACORDO (motor de preço em valor_acordo.py)
 #
-# Substitui P1/P2_* quando `engine.py` migrar. Até lá os dois conjuntos
-# coexistem: `pricing.calcular_faixa` continua na banda ancorada nos 280
-# acordos, e `valor_acordo.avaliar_acordo` usa os números abaixo.
-#
-# DIVERGÊNCIA CONHECIDA: P1 = 0,72 (derivado pelo time como 2/3 x 0,63 +
-# 1/3 x 0,90) vs RATIO_CONDENACAO = 0,74 (razão mediana medida na base).
-# São estimativas do mesmo número por caminhos diferentes. `valor_acordo`
-# usa 0,74 porque é a medição direta e é o que o documento apresenta.
+# A condenação esperada usa a MÉDIA medida (P1), não a mediana. Custo esperado
+# é média por definição: com 0,7108 a soma prevista nas derrotas reproduz o
+# total pago (R$ 192,86M previstos x R$ 192,98M reais); a mediana 0,74
+# superestimava em R$ 9,6M. Nenhuma decisão muda entre as duas — o limiar cai
+# numa região da tabela sem segmentos — mas o custo e a economia sim.
 # ─────────────────────────────────────────────────────────────────────────────
 
 RATIO_CONDENACAO = Premissa(
-    "P8", "E[condenação | derrota] como fração do valor da causa", 0.74,
-    "OBSERVADO: razão mediana condenação/valor da causa, correlação 0,749, base 60k")
+    "P1", "Condenação esperada como fração do valor da causa, dado que perdeu", P1.valor, P1.fonte)
 
 RATIO_ABERTURA = Premissa(
-    "P2c", "Fator da oferta de abertura", 0.29,
-    "OBSERVADO: mediana dos 280 acordos reais (R$ 4.362 / R$ 15.026)")
+    "P2", "Fator da oferta de abertura (mediana dos acordos)", P2_ALVO.valor, P2_ALVO.fonte)
 
-# SUCUMBÊNCIA FORA DO CÁLCULO — decisão de 13/09.
-#
-# A política anterior multiplicava o custo de defesa por (1 + 0,15) a título de
-# honorários sucumbenciais. Não há honorário nenhum na base: o 0,15 era praxe do
-# art. 85 §2º do CPC (faixa de 10%-20%), ou seja, premissa pura sobre o meio da
-# faixa. Foi retirado.
-#
-# CONSEQUÊNCIA, e é grande: o P* sem custas sobe de 34,1% para 39,2%, porque o
-# custo de litigar encolhe 15%. O bucket de 4 subsídios (P = 35,9%) passa a ficar
-# ABAIXO do limiar puro de 39,2%, e sai da política.
-#
-# P6 continua existindo e vale 0,15: `engine.py` ainda o usa na política antiga.
-# Não é esquecimento — é o escopo desta branch.
+# Sucumbência e custas ficam fora do custo por default: não existem na base.
+# Custas reais por UF entram por parâmetro em avaliar_acordo(custas_uf=...).
 
-MARGEM = Premissa(
-    "P10", "Meta de negociação: desconto perseguido sobre o walk-away", 0.20,
-    "ASSUMIDO: partida 20-25%, calibrar pela taxa de aceitação observada. "
-    "NÃO entra na viabilidade — ver correção de 13/09")
+CONCESSAO = Premissa(
+    "P10", "Fração do excedente (walk-away - abertura) cedida no alvo da negociação", 0.0,
+    "MEDIDO: nos 280 acordos reais o valor fechado não sobe com o risco do caso "
+    "(correlação -0,105; 29-32% da causa em todas as faixas de risco). O mercado fecha "
+    "na abertura; mirar perto do walk-away pagaria o excedente ao autor. Não entra na viabilidade")
 
 AMPLITUDE_MIN_REL = Premissa(
     "P11", "Amplitude mínima para a faixa ser negociável, como fração da abertura", 0.05,
-    "ASSUMIDO: abaixo disso não há espaço de negociação e o motor entrega um "
-    "valor único (o walk-away) em vez de uma faixa. NÃO afeta a decisão")
+    "ASSUMIDO: abaixo disso o motor entrega um valor único (o walk-away) em vez de "
+    "uma faixa. Regra de apresentação: não afeta a decisão")
 
-# CUSTAS PROCESSUAIS FORA DO CÁLCULO — decisão de 13/09.
-#
-# Uma premissa anterior (`P9`) fixava R$ 600 por processo. Não havia embasamento
-# nenhum: não há custas na base, e o número era invenção pura decidindo o desfecho
-# de 15.719 processos. Retirada.
-#
-# `avaliar_acordo(..., custas_uf=...)` continua aceitando o valor: quando o banco
-# fornecer as custas reais por UF, é só passar. O default é 0,0 — e 0,0 também é
-# premissa, só que uma que não finge conhecimento que não temos.
+CUSTO_MENSAL_TEMPO = Premissa(
+    "T1", "Custo mensal de manter o processo aberto (juros de mora e capital provisionado)", 0.01,
+    "ASSUMIDO: 1% a.m. Decisões idênticas para qualquer duração entre 12 e 36 meses no backtest")
 
-TODAS_VALOR_ACORDO = [RATIO_CONDENACAO, RATIO_ABERTURA,
-                      MARGEM, AMPLITUDE_MIN_REL]
+DURACAO_MESES = Premissa(
+    "T2", "Duração esperada do processo até a condenação, em meses", 24.0,
+    "ASSUMIDO: varia muito por juízo; 24 meses é o meio da faixa em que a decisão é robusta")
 
-POLICY_VERSION = "acordo-2026.09.13-v1"
+TODAS_VALOR_ACORDO = [RATIO_CONDENACAO, RATIO_ABERTURA, CONCESSAO, AMPLITUDE_MIN_REL,
+                      CUSTO_MENSAL_TEMPO, DURACAO_MESES]
 
-# Limiar de indiferença SEM custas. DERIVADO das premissas acima — nunca
-# literal. Se alguma constante mudar, ele muda junto. A armadilha nº 1 do
-# projeto é escrever `if p > 0.5`: o limiar é econômico, não estatístico.
+POLICY_VERSION = "politica-2026.09.12-v2"
+
+# Limiar de indiferença sem custas, honorários nem tempo. DERIVADO, nunca
+# literal: se uma premissa mudar, ele muda junto. O limiar é econômico, não 0,5.
 P_ESTRELA_SEM_CUSTAS = RATIO_ABERTURA.valor / RATIO_CONDENACAO.valor
-
-assert abs(P_ESTRELA_SEM_CUSTAS - 0.3919) < 5e-4, (
-    f"P* derivado ({P_ESTRELA_SEM_CUSTAS:.4f}) divergiu dos 39,2% da linha "
-    "'sem custas nem sucumbência' do documento. Alguma premissa mudou sem o "
-    "documento ser atualizado."
-)
+assert 0.0 < P_ESTRELA_SEM_CUSTAS < 0.5, f"P* sem custas fora do esperado: {P_ESTRELA_SEM_CUSTAS:.4f}"

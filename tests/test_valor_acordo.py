@@ -1,16 +1,16 @@
 """
 Testes do motor de valor de acordo.
 
-O teste que mais importa aqui é `test_margem_nao_move_a_decisao`. Ele existe
-para impedir que a margem volte a governar a viabilidade — o bug que a correção
-de 13/09 consertou e que custava 15.719 processos decididos errado.
+O teste que mais importa aqui é `test_concessao_nao_move_a_decisao`. Ele existe
+para impedir que a meta de negociação volte a governar a viabilidade: se ela
+entrar no walk-away, a agressividade de negociação passa a mudar o escopo.
 """
 
 import pytest
 
 from src.policy.constants import (
     AMPLITUDE_MIN_REL,
-    MARGEM,
+    CONCESSAO,
     POLICY_VERSION,
     P_ESTRELA_SEM_CUSTAS,
     RATIO_ABERTURA,
@@ -36,41 +36,49 @@ def faixa_de(v: VereditoAcordo) -> FaixaNegociacao:
 
 C = 15026.0  # valor da causa mediano da base
 
-# P(Não Êxito) por quantidade de subsídios presentes — tabela do §3 dos documentos
+# Pontos de probabilidade usados como amostra nos testes. São médias por QUANTIDADE
+# de subsídios e não servem para decidir: a decisão depende de QUAIS documentos.
 BUCKETS = {0: 1.000, 1: 0.970, 2: 0.871, 3: 0.662, 4: 0.359, 5: 0.129, 6: 0.038}
 
 
 # ── A correção de 13/09 ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("p", list(BUCKETS.values()))
-def test_margem_nao_move_a_decisao(p):
+def test_concessao_nao_move_a_decisao(p):
     """
-    REGRESSÃO DA CORREÇÃO. A margem é meta de negociação, não restrição de
-    viabilidade. Se este teste quebrar, alguém devolveu a margem para dentro
-    do walk-away e o P* voltou a derivar com ela.
+    REGRESSÃO. A concessão é meta de negociação, não restrição de viabilidade.
+    Se este teste quebrar, alguém devolveu a meta para dentro do walk-away.
     """
-    decisoes = {avaliar_acordo(C, p, margem=m).decisao
-                for m in (0.0, 0.05, 0.10, 0.20, 0.35, 0.50)}
-    assert len(decisoes) == 1, f"margem mudou a decisão em p={p}: {decisoes}"
+    decisoes = {avaliar_acordo(C, p, concessao=k).decisao
+                for k in (0.0, 0.05, 0.10, 0.20, 0.35, 0.50, 1.0)}
+    assert len(decisoes) == 1, f"concessão mudou a decisão em p={p}: {decisoes}"
 
 
-def test_margem_move_o_alvo_mas_nunca_o_walk_away():
-    """A margem tem que fazer alguma coisa — só não a viabilidade."""
-    frouxa = avaliar_acordo(C, 0.662, margem=0.05)
-    apertada = avaliar_acordo(C, 0.662, margem=0.35)
+def test_concessao_move_o_alvo_mas_nunca_o_walk_away():
+    """A concessão tem que fazer alguma coisa — só não a viabilidade."""
+    firme = avaliar_acordo(C, 0.662, concessao=0.0)
+    cedente = avaliar_acordo(C, 0.662, concessao=0.35)
 
-    assert faixa_de(frouxa).walk_away == faixa_de(apertada).walk_away
-    assert faixa_de(frouxa).abertura == faixa_de(apertada).abertura
-    assert faixa_de(apertada).alvo < faixa_de(frouxa).alvo
+    assert faixa_de(firme).walk_away == faixa_de(cedente).walk_away
+    assert faixa_de(firme).abertura == faixa_de(cedente).abertura
+    assert faixa_de(firme).alvo < faixa_de(cedente).alvo
+
+
+def test_alvo_padrao_e_o_preco_de_mercado():
+    """Os acordos reais fecham na abertura qualquer que seja o risco; o alvo padrão fica nela."""
+    assert CONCESSAO.valor == 0.0
+    for p in (0.45, 0.662, 0.871, 1.0):
+        f = faixa_de(avaliar_acordo(C, p))
+        assert f.alvo == pytest.approx(f.abertura, abs=0.01)
 
 
 # ── P* derivado ──────────────────────────────────────────────────────────────
 
-def test_p_estrela_sem_custas_bate_com_o_documento():
-    """Sem sucumbência, o limiar puro é a linha de 39,2% da tabela do §5.2."""
-    assert P_ESTRELA_SEM_CUSTAS == pytest.approx(0.392, abs=5e-4)
+def test_p_estrela_sem_custas_e_derivado_das_premissas_medidas():
+    """Sem custas nem tempo, o limiar puro é abertura / condenação média (0,29 / 0,7108)."""
     esperado = RATIO_ABERTURA.valor / RATIO_CONDENACAO.valor
     assert P_ESTRELA_SEM_CUSTAS == pytest.approx(esperado)
+    assert P_ESTRELA_SEM_CUSTAS == pytest.approx(0.408, abs=1e-3)
 
 
 def test_sucumbencia_nao_entra_no_custo():
@@ -99,49 +107,8 @@ def test_custas_derrubam_o_limiar():
     é 0,0 e o valor real entra por parâmetro quando o banco fornecer.
     """
     assert p_estrela(C, custas_uf=600.0) < p_estrela(C)
-    assert p_estrela(C) == pytest.approx(0.392, abs=1e-3)
-    assert p_estrela(C, custas_uf=600.0) == pytest.approx(0.338, abs=1e-3)
-
-
-# ── Tabela dos 7 buckets (§5.3) ──────────────────────────────────────────────
-
-@pytest.mark.parametrize("n_subsidios,esperado", [
-    (0, "ACORDO"), (1, "ACORDO"), (2, "ACORDO"), (3, "ACORDO"),
-    (4, "DEFESA"),            # 15.719 processos — ver o teste abaixo
-    (5, "DEFESA"), (6, "DEFESA"),
-])
-def test_tabela_de_buckets(n_subsidios, esperado):
-    v = avaliar_acordo(C, BUCKETS[n_subsidios])
-    assert v.decisao == esperado, f"{n_subsidios} subsídios: {v.motivo}"
-
-
-def test_bucket_de_quatro_ficou_fora_da_politica():
-    """
-    ATENÇÃO — ESTE TESTE DOCUMENTA UMA PERDA, NÃO UM ACERTO.
-
-    O bucket de 4 subsídios são 15.719 processos (26,2% da carteira) e era o
-    ganho principal da política: o limiar econômico os colocava em ACORDO onde
-    um classificador cortando em 50% os mandaria defender.
-
-    Com a retirada da sucumbência e das custas (13/09) o custo de litigar
-    encolheu, o limiar subiu para 39,2% e P = 35,9% passou a ficar ABAIXO dele.
-    Não é mais questão de faixa estreita: litigar custa menos que a própria
-    oferta de abertura.
-
-    Passar custas reais por UF traz parte destes casos de volta.
-    """
-    v = avaliar_acordo(C, BUCKETS[4])
-
-    assert v.decisao == "DEFESA"
-    assert v.p_nao_exito < v.p_estrela, "agora a viabilidade é que barra"
-    assert "Litigar custa menos" in v.motivo
-
-
-def test_bucket_de_quatro_volta_com_custas_reais():
-    """Não é um caso perdido: é um caso que depende de um dado que não temos."""
-    assert avaliar_acordo(C, BUCKETS[4], custas_uf=400.0).decisao == "ACORDO"
-
-
+    assert p_estrela(C) == pytest.approx(0.408, abs=1e-3)
+    assert p_estrela(C, custas_uf=600.0) == pytest.approx(0.352, abs=1e-3)
 
 
 # ── Invariantes da faixa ─────────────────────────────────────────────────────
@@ -151,16 +118,6 @@ def test_faixa_e_ordenada(p):
     f = faixa_de(avaliar_acordo(C, p))
     assert f.abertura <= f.alvo <= f.walk_away
     assert f.amplitude == pytest.approx(f.walk_away - f.abertura, abs=0.01)
-
-
-def test_alvo_colapsa_na_abertura_quando_a_faixa_e_minima():
-    """
-    Com amplitude perto do mínimo, walk_away x (1 - 0,20) cai abaixo da
-    abertura. O clamp segura: não se mira abaixo da própria oferta de abertura.
-    """
-    f = faixa_de(avaliar_acordo(C, 0.45))      # faixa curta, mas ainda negociável
-    assert f.negociavel
-    assert f.alvo == pytest.approx(f.abertura, abs=0.01)
 
 
 def test_defesa_nao_devolve_faixa():
@@ -196,7 +153,7 @@ def test_faixa_curta_vira_valor_unico():
     Abrir em R$ X para fechar em R$ X + 90 não é negociação, é ruído. O motor
     entrega um número só — o walk-away — e a tela não mostra intervalo.
     """
-    v = avaliar_acordo(C, 0.40)
+    v = avaliar_acordo(C, 0.42)
 
     assert v.decisao == "ACORDO", "faixa curta NÃO é motivo para defender"
     f = faixa_de(v)
@@ -211,7 +168,7 @@ def test_amplitude_minima_nao_move_a_decisao():
     REGRESSÃO. A amplitude mínima é regra de APRESENTAÇÃO, não de viabilidade.
     Mexer nela muda como o valor é mostrado, nunca se o caso entra na política.
     """
-    for p in (0.395, 0.40, 0.45, 0.662):
+    for p in (0.415, 0.42, 0.45, 0.662):
         decisoes = {avaliar_acordo(C, p, amplitude_min_rel=a).decisao
                     for a in (0.0, 0.05, 0.15, 0.50)}
         assert decisoes == {"ACORDO"}, f"amplitude mudou a decisão em p={p}"
@@ -219,7 +176,7 @@ def test_amplitude_minima_nao_move_a_decisao():
 
 def test_economia_no_alvo_e_zero_no_valor_unico():
     """Pagar o walk-away é pagar o máximo: não sobra economia sobre litigar."""
-    v = avaliar_acordo(C, 0.40)
+    v = avaliar_acordo(C, 0.42)
     assert v.economia_no_alvo == pytest.approx(0.0, abs=0.01)
 
 
@@ -230,15 +187,15 @@ def test_economia_no_alvo_e_zero_no_valor_unico():
 # ── Intervalo de confiança ───────────────────────────────────────────────────
 
 def test_ic_aperta_o_alvo():
-    sem_ic = avaliar_acordo(C, 0.662)
-    com_ic = avaliar_acordo(C, 0.662, p_nao_exito_inf=0.55)
+    sem_ic = avaliar_acordo(C, 0.662, concessao=0.5)
+    com_ic = avaliar_acordo(C, 0.662, concessao=0.5, p_nao_exito_inf=0.55)
     assert faixa_de(com_ic).alvo < faixa_de(sem_ic).alvo
 
 
 def test_ic_nao_move_a_decisao_nem_o_walk_away():
     """
-    Viabilidade usa o P honesto. Se o IC mexesse no walk-away, o P* deixaria
-    de ser 34,1% e o bucket de 4 se perderia de novo.
+    Viabilidade usa o P honesto. Se o IC mexesse no walk-away, a incerteza da
+    estimativa passaria a mudar quais casos entram na política.
     """
     sem_ic = avaliar_acordo(C, 0.662)
     com_ic = avaliar_acordo(C, 0.662, p_nao_exito_inf=0.20)
@@ -301,7 +258,7 @@ def test_policy_version_em_toda_saida():
 def test_premissas_usadas_sao_declaradas():
     v = avaliar_acordo(C, 0.662)
     assert {RATIO_CONDENACAO.id, RATIO_ABERTURA.id} <= set(v.premissas_usadas)
-    assert MARGEM.id in v.premissas_usadas
+    assert CONCESSAO.id in v.premissas_usadas
 
 
 
@@ -337,9 +294,9 @@ def test_custos_negativos_rejeitados():
         avaliar_acordo(C, 0.5, custas_uf=-1.0)
 
 
-def test_margem_invalida_rejeitada():
-    with pytest.raises(ValueError, match="margem"):
-        avaliar_acordo(C, 0.5, margem=1.0)
+def test_concessao_invalida_rejeitada():
+    with pytest.raises(ValueError, match="concessao"):
+        avaliar_acordo(C, 0.5, concessao=1.5)
 
 
 def test_p_exito_fora_do_intervalo():
