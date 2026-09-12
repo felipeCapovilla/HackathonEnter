@@ -21,6 +21,32 @@ CREATE TABLE IF NOT EXISTS cases (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS banks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('BANCO', 'ADVOGADO_EXTERNO', 'ADMIN_GLOBAL')),
+    bank_id TEXT REFERENCES banks(id),
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    CHECK((role = 'ADMIN_GLOBAL' AND bank_id IS NULL) OR (role != 'ADMIN_GLOBAL' AND bank_id IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    csrf_token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
     case_id TEXT NOT NULL REFERENCES cases(id),
@@ -110,6 +136,17 @@ CREATE TABLE IF NOT EXISTS lawyer_decisions (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    actor_user_id TEXT REFERENCES users(id),
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    case_id TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
 CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
@@ -118,6 +155,8 @@ ON dossie_analyses(document_id, sha256, model, analyzer_version) WHERE status = 
 CREATE INDEX IF NOT EXISTS analyses_case_idx ON analyses(case_id, created_at);
 CREATE INDEX IF NOT EXISTS requests_case_idx ON document_requests(case_id, status);
 CREATE INDEX IF NOT EXISTS decisions_analysis_idx ON lawyer_decisions(analysis_id);
+CREATE INDEX IF NOT EXISTS users_bank_idx ON users(bank_id, role, is_active);
+CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id, expires_at);
 """
 
 
@@ -128,6 +167,15 @@ def initialize_database(database_path: Path) -> None:
         connection.execute("PRAGMA journal_mode = WAL")
         connection.execute("PRAGMA busy_timeout = 5000")
         connection.executescript(SCHEMA)
+        case_columns = {row[1] for row in connection.execute("PRAGMA table_info(cases)")}
+        for name, definition in (("bank_id", "TEXT"), ("assigned_lawyer_id", "TEXT"), ("created_by_user_id", "TEXT")):
+            if name not in case_columns:
+                connection.execute(f"ALTER TABLE cases ADD COLUMN {name} {definition}")
+        document_columns = {row[1] for row in connection.execute("PRAGMA table_info(documents)")}
+        if "uploaded_by_user_id" not in document_columns:
+            connection.execute("ALTER TABLE documents ADD COLUMN uploaded_by_user_id TEXT")
+        connection.execute("INSERT OR IGNORE INTO banks (id, name, created_at) VALUES ('banco-unicamp', 'Banco Unicamp', '1970-01-01T00:00:00+00:00')")
+        connection.execute("UPDATE cases SET bank_id = 'banco-unicamp' WHERE bank_id IS NULL")
         columns = {row[1] for row in connection.execute("PRAGMA table_info(analyses)")}
         if "pricing" not in columns:
             connection.execute("ALTER TABLE analyses ADD COLUMN pricing TEXT")

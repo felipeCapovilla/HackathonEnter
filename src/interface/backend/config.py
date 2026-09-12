@@ -11,6 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
     "http://localhost:4173",
     "http://127.0.0.1:4173",
 )
@@ -24,6 +26,7 @@ class Settings:
     artifact_dir: Path
     max_upload_bytes: int
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
+    auth_required: bool = True
 
 
 def get_settings() -> Settings:
@@ -42,4 +45,5 @@ def get_settings() -> Settings:
             for origin in os.getenv("ENTERAGREE_CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
             if origin.strip()
         ),
+        auth_required=os.getenv("ENTERAGREE_AUTH_REQUIRED", "true").lower() not in {"0", "false", "no"},
     )

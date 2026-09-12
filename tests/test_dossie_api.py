@@ -41,6 +41,7 @@ def application(tmp_path: Path):
         runtime_dir=tmp_path, database_path=tmp_path / "test.db",
         document_dir=tmp_path / "documents",
         artifact_dir=Path(__file__).parents[1] / "artefatos", max_upload_bytes=1024 * 1024,
+        auth_required=False,
     )
     app = create_app(settings)
     with TestClient(app) as client:
