@@ -92,3 +92,53 @@ class Recomendacao(BaseModel):
     justificativa: list[str]
     alertas: list[str] = []
     premissas_usadas: list[str]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Saída do motor de valor de acordo (src/policy/valor_acordo.py).
+#
+# Convive com FaixaAcordo acima, que continua servindo pricing.calcular_faixa
+# e o protótipo visual. São políticas diferentes: FaixaAcordo ancora a banda
+# nos 280 acordos históricos; FaixaNegociacao deriva o limite superior do
+# custo de litigar.
+# ─────────────────────────────────────────────────────────────────────────────
+
+DecisaoAcordo = Literal["ACORDO", "DEFESA"]
+
+
+class FaixaNegociacao(BaseModel):
+    """Os três números da correção de 13/09: onde abre, onde mira, onde levanta."""
+
+    abertura: float = Field(description="Onde abre. 0,29 x valor da causa, âncora dos 280 acordos")
+    alvo: float = Field(description="Onde quer fechar. Walk-away menos a margem de negociação")
+    walk_away: float = Field(description="Onde levanta da mesa. Igual ao custo esperado de defesa")
+    amplitude: float = Field(description="walk_away - abertura: o espaço real de negociação")
+    negociavel: bool = Field(
+        default=True,
+        description="False quando a amplitude é pequena demais para negociar. Nesse caso "
+        "o advogado recebe UM número — o walk-away — em vez de uma faixa, e `alvo` "
+        "já vem igual a ele. A tela não deve mostrar intervalo.")
+
+
+class VereditoAcordo(BaseModel):
+    """
+    Veredito econômico de um caso. É isto que a tela do advogado renderiza e
+    o que o log de auditoria grava.
+
+    `faixa` é None quando a decisão é DEFESA — não existe faixa boa nesse caso,
+    e devolver uma seria convidar a oferta que a política acabou de rejeitar.
+    """
+
+    decisao: DecisaoAcordo
+    p_nao_exito: float = Field(ge=0, le=1, description="P(derrota) usada na viabilidade")
+    p_estrela: float = Field(
+        ge=0, le=1,
+        description="Limiar de indiferença DESTE caso, já com as custas dele. Derivado, nunca 0,5")
+    e_condenacao: float = Field(description="E[condenação | derrota] = 0,74 x valor da causa")
+    custo_defesa: float = Field(description="Custo esperado de litigar, incluindo sucumbência e custas")
+    faixa: Optional[FaixaNegociacao] = None
+    economia_no_alvo: float = Field(
+        description="custo_defesa - alvo. Quanto o banco economiza fechando na meta. 0 em DEFESA")
+    motivo: str = Field(description="Linguagem jurídica, para a tela do advogado")
+    premissas_usadas: list[str] = Field(default_factory=list)
+    policy_version: str
