@@ -1,9 +1,9 @@
 """
 Contratos da política por segmentos, consumidos por src.policy.engine.decidir.
 
-`make schema` exporta estes tipos para o protótipo visual preservado da main.
-A API documental usa os contratos HTTP de src.interface.backend.schemas,
-publicados em /openapi.json, e mantém o motor PolicyEngine do Grupo 9.
+`make schema` exporta estes tipos para o protótipo visual. A API usa os
+contratos HTTP de src.interface.backend.schemas, publicados em /openapi.json,
+e grava a Recomendacao completa em cada análise.
 """
 from __future__ import annotations
 
@@ -56,13 +56,6 @@ class CaseFeatures(BaseModel):
     analise_dossie: Optional[AnaliseDossie] = None
     canal_contratacao: Optional[Canal] = None
     contradicoes: list[str] = []
-
-
-class FaixaAcordo(BaseModel):
-    abertura: float
-    alvo: float
-    maximo_aceitavel: float
-    teto_absoluto: float
 
 
 class PlanoRecuperacao(BaseModel):
@@ -142,12 +135,9 @@ class Recomendacao(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Saída do motor de valor de acordo (src/policy/valor_acordo.py).
-#
-# Convive com FaixaAcordo acima, que continua servindo pricing.calcular_faixa
-# e o protótipo visual. São políticas diferentes: FaixaAcordo ancora a banda
-# nos 280 acordos históricos; FaixaNegociacao deriva o limite superior do
-# custo de litigar.
+# Saída do motor de valor de acordo (src/policy/valor_acordo.py): a faixa vai
+# da abertura (preço de mercado dos acordos) ao walk-away (custo esperado de
+# litigar, limitado pela alçada do banco).
 # ─────────────────────────────────────────────────────────────────────────────
 
 DecisaoAcordo = Literal["ACORDO", "DEFESA"]

@@ -131,6 +131,6 @@ export default function DossieAnalysis({ document, record, disabled, request, ap
       </div>
       <small>Modelo: {currentRecord.model}. Resultado persistido; novas consultas reutilizam a análise concluída.</small>
     </div>}
-    <p className="muted">Resultado auxiliar sujeito à revisão humana. Não autentica assinaturas e não altera automaticamente a recomendação do XGBoost ou da política G9.</p>
+    <p className="muted">Resultado sujeito à revisão humana; não autentica assinaturas. Quando concluída, a análise entra na recomendação: parecer não conforme desconsidera o contrato como prova, e a perícia da assinatura do contrato pode indicar recuperá-lo.</p>
   </section>;
 }

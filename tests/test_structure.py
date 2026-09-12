@@ -11,4 +11,4 @@ def test_relocated_configuration_still_resolves_root_artifacts(tmp_path, monkeyp
 
     assert PROJECT_ROOT == Path(__file__).resolve().parents[1] == REPO_ROOT
     assert settings.database_path == tmp_path / "runtime" / "enteragree.db"
-    assert (settings.artifact_dir / "modelo_xgboost.pkl").is_file()
+    assert (settings.artifact_dir / "politica_segmentos.json").is_file()

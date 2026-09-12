@@ -2,7 +2,7 @@
 
 ## Fonte única de decisão
 
-`src/policy` preserva o motor Grupo 9: regras para casos claros e XGBoost apenas na zona intermediária. `src/policy/service.py` é o adaptador entre documentos e esse motor. Um documento só torna uma feature verdadeira quando está com extração concluída e `CONFIRMED` ou `USER_CONFIRMED`; nome de arquivo e declaração do usuário não bastam.
+`src/policy/engine.decidir` é o único ponto de decisão: gate de prova, tabela de segmentos gerada da base, preço pelo custo esperado da defesa e recomendação de recuperar documento. `src/policy/service.py` é o adaptador entre documentos, análise de dossiê, contrato do banco e essa função. Um documento só torna uma feature verdadeira quando está com extração concluída e `CONFIRMED` ou `USER_CONFIRMED`; nome de arquivo e declaração do usuário não bastam.
 
 ## Documentos extensos
 
@@ -23,10 +23,11 @@ O advogado pode criar pedido de documento; o banco pode anexar a resposta, decla
 Há extração auxiliar de dossiê por LLM, iniciada explicitamente pelo usuário,
 com campos estruturados, citação literal por página e resultado persistido.
 O tipo documental permanece determinístico. O detalhe do caso carrega resumos;
-as evidências completas são consultadas sob demanda. A API G9 não usa o resultado
-para alterar automaticamente as recomendações.
+as evidências completas são consultadas sob demanda. A análise concluída entra na
+política: veredito não conforme desconsidera o contrato como prova, e a perícia da
+assinatura do contrato habilita a recomendação de recuperá-lo.
 
-Não há OCR, RAG, validação cruzada entre documentos nem autenticação nesta entrega.
+Não há OCR, RAG nem validação cruzada entre documentos nesta entrega.
 A confiança de extração não foi calibrada. O texto enviado é tratado como dado
 não confiável, sem ferramentas disponíveis ao LLM; validação literal não garante
 correção semântica. A revisão humana continua necessária.

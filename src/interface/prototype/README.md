@@ -15,5 +15,4 @@ npm run dev
 ```
 
 O contrato ilustrado vem de `contracts/schema.py` e `src.policy.engine.decidir`.
-A API documental usa `src.policy.engine.PolicyEngine`; esta reorganização
-preserva ambos os contratos sem alterar a política escolhida pela API.
+A API usa a mesma função `decidir`.

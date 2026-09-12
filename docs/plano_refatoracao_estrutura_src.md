@@ -1,5 +1,8 @@
 # Plano de refatoração física para src — EnterAgree
 
+> **Nota (12/09):** documento histórico do plano de migração. O `PolicyEngine`, o modelo XGBoost
+> e seus artefatos foram removidos depois; a política ativa é `src/policy/engine.decidir`.
+
 A execução deste plano foi solicitada para preparar a integração com main. A escolha é mover fisicamente a implementação para `src/policy`, `src/utils` e `src/interface`, preservando contratos e comportamento. Não basta criar módulos que reexportem a aplicação dos diretórios antigos.
 
 O plano foi revisado contra a implementação documental e `origin/main`, inicialmente em `07de512b` e posteriormente em `1ab771bc`, após atualização do histórico remoto. Ambas as referências foram integradas. A árvore remota contém `contracts/`, `src/policy/`, `src/tools/`, `web/` e testes, mas não exige esta organização de API e React. O alinhamento é uma decisão desta entrega. O roteiro define os critérios; a seção final registra as verificações concluídas.
@@ -23,7 +26,7 @@ O plano foi revisado contra a implementação documental e `origin/main`, inicia
 
 `engine.py` não é o destino do serviço: substituir o motor pelo antigo `policy_service.py` apagaria suas responsabilidades. `artefatos/modelo_xgboost.pkl`, `features.json` e métricas permanecem na raiz, sem copiar nem retreinar o modelo.
 
-`PolicyEngine` do Grupo 9 e `decidir(CaseFeatures)` de main representam contratos e lógicas diferentes. Preservar as duas interfaces e testar cada uma; não declarar que foram unificadas nem mudar silenciosamente a lógica consumida pelo fluxo documental. O serviço documental continua chamando `PolicyEngine`.
+`PolicyEngine` legado (removido) e `decidir(CaseFeatures)` de main representam contratos e lógicas diferentes. Preservar as duas interfaces e testar cada uma; não declarar que foram unificadas nem mudar silenciosamente a lógica consumida pelo fluxo documental. O serviço documental continua chamando `PolicyEngine`.
 
 Não existem na implementação documental revisada `auth.py`, pacote RAG, Dockerfile, docker-compose ou `seed_database.py`. Login/perfis, RAG e OCR permanecem planejados; sua ausência não é corrigida criando implementações fictícias. Sinalizar páginas com pouco texto não comprova execução de OCR. O banco usa `sqlite3`, sem sessão SQLAlchemy.
 
@@ -174,7 +177,7 @@ Ausência de referências antigas no último comando retorna código 1 do `rg`, 
 - [x] `PROJECT_ROOT`, artefatos e runtime padrão continuam na raiz; overrides funcionam.
 - [x] Criação/listagem de processos, upload, consulta documental, solicitação e resposta, análise, decisão e monitoramento mantêm seus contratos.
 - [x] Uploads concorrentes/duplicados, vínculo com solicitação e transições preservam as correções existentes.
-- [x] Modelo real carrega de `artefatos/`; regras do Grupo 9 e `decidir(CaseFeatures)` continuam cobertas separadamente.
+- [x] Modelo real carrega de `artefatos/`; regras legadas e `decidir(CaseFeatures)` continuam cobertas separadamente.
 - [x] Testes de main e testes documentais passam juntos, sem descartar um conjunto para obter sucesso.
 - [x] React compila e consome a mesma API; renderização inicial e navegação existente continuam funcionais.
 - [x] Protótipo de main está identificado como demonstrador e não aparece como frontend operacional.
@@ -192,7 +195,7 @@ Revisar diff, documentação e resultados. Registrar migração e integração c
 Os seis passos foram executados. A integração preserva a referência inicial
 `07de512b`, a atualização remota `1ab771bc` e os commits da branch de documentação.
 As mudanças posteriores de gate, ajuste de UF em log-odds, alertas, backtest e
-aprendizado de aceitação foram conciliadas sem substituir o motor ativo do Grupo 9.
+aprendizado de aceitação foram conciliadas sem substituir o motor ativo legado (removido).
 O resultado está publicado em
 `feat/docs-pipeline`, no [PR #3](https://github.com/felipeCapovilla/HackatonEnter/pull/3).
 
