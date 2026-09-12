@@ -1,181 +1,186 @@
-# Plano de Refatoração Física da Estrutura para `src/` — EnterAgree
+# Plano de refatoração física para src — EnterAgree
 
-Este documento especifica detalhadamente o **plano de execução** para refatorar a estrutura física de arquivos do repositório **EnterAgree**, migrando da arquitetura atual (`backend/` + `frontend/`) para a arborescência padronizada sob o diretório `src/` exigida na branch `main`.
+A execução deste plano foi solicitada para preparar a integração com main. A escolha é mover fisicamente a implementação para `src/policy`, `src/utils` e `src/interface`, preservando contratos e comportamento. Não basta criar módulos que reexportem a aplicação dos diretórios antigos.
 
-> [!IMPORTANT]  
-> Este documento é uma especificação técnica e plano de ação. As etapas descritas abaixo devem ser executadas somente após aprovação do time de desenvolvimento.
+O plano foi revisado contra a implementação documental e `origin/main` em `07de512b`. A árvore remota contém `contracts/`, `src/policy/`, `src/tools/`, `web/` e testes, mas não exige esta organização de API e React. O alinhamento é uma decisão desta entrega. Os itens abaixo são critérios de execução, não uma declaração de testes concluídos.
 
----
+## Mapeamento
 
-## 1. Mapeamento Geral de Migração (De / Para)
+| Origem anterior à migração | Destino | Responsabilidade |
+| --- | --- | --- |
+| `backend/app/policy_service.py` | `src/policy/service.py` | `PolicyService`: compor documentos, chamar o motor e persistir a análise |
+| `src/policy/engine.py` | Mesmo caminho | `PolicyEngine`: regras e XGBoost; preservar também a API `decidir(CaseFeatures)` de main |
+| `src/policy/{constants,normalization,pricing}.py` | Mesmos caminhos | Atributos, normalização e cálculo financeiro |
+| `backend/app/document_service.py` | `src/utils/document_service.py` | `DocumentService`: streaming e extração PDF/TXT |
+| `backend/app/document_type_validator.py` | `src/utils/document_type_validator.py` | `validate_document_type`: sinais determinísticos |
+| `backend/app/{main,config,database,repository,schemas,monitoring}.py` | `src/interface/backend/`, mesmos nomes | API, configuração, SQLite via sqlite3, persistência, Pydantic e resumo operacional |
+| `backend/app/__init__.py` | `src/interface/backend/__init__.py` | Pacote Python da API |
+| `frontend/` | `src/interface/frontend/` | React/Vite, incluindo package-lock e entradas HTML/JSX |
+| `src/monitor/` | Mesmo caminho | Análises offline e métricas |
+| `artefatos/`, `scripts/`, `tests/` | Mesmos caminhos na raiz | Modelo, treinamento e testes |
+| `contracts/`, `src/tools/`, `src/policy/{gate,table}.py` de main | Mesmos caminhos | Contratos e componentes remotos preservados |
+| `web/` de main | `src/interface/prototype/` | Demonstrador com dados simulados, documentado e separado do frontend ativo |
 
-| Arquivo/Pasta Atual | Novo Destino sob `src/` | Responsabilidade |
-| :--- | :--- | :--- |
-| `backend/app/policy_service.py` | `src/policy/service.py` | Regras de política de acordo, faixas de valor e modelo XGBoost |
-| `src/policy/*` (engine, pricing, etc.) | `src/policy/` | Motores determinísticos e constantes numéricas da política |
-| `backend/app/document_service.py` | `src/utils/document_service.py` | Extração em streaming de PDFs e integração OCR |
-| `backend/app/document_type_validator.py` | `src/utils/document_type_validator.py` | Validação de sinais determinísticos dos documentos |
-| `backend/app/rag/` | `src/utils/rag/` | Componente RAG, embeddings e chunking semântico |
-| `backend/app/main.py` | `src/interface/backend/main.py` | Servidor Web e rotas da API (FastAPI) |
-| `backend/app/database.py` | `src/interface/backend/database.py` | Configuração do banco de dados SQLite e sessão SQLAlchemy |
-| `backend/app/repository.py` | `src/interface/backend/repository.py` | Camada de acesso a dados (CRUD de Casos e Análises) |
-| `backend/app/schemas.py` | `src/interface/backend/schemas.py` | Esquemas Pydantic de requisição e resposta |
-| `backend/app/auth.py` | `src/interface/backend/auth.py` | Autenticação e permissões por perfil (Banco, Advogado, Admin) |
-| `backend/app/monitoring.py` | `src/interface/backend/monitoring.py` | Endpoints de métricas gerenciais e aderência |
-| `frontend/` | `src/interface/frontend/` | Interface do Usuário (Single Page Application em React + Vite) |
-| `src/monitor/` | `src/monitor/` (mantido) | Scripts de análise contrafactual e aderência |
+`engine.py` não é o destino do serviço: substituir o motor pelo antigo `policy_service.py` apagaria suas responsabilidades. `artefatos/modelo_xgboost.pkl`, `features.json` e métricas permanecem na raiz, sem copiar nem retreinar o modelo.
 
----
+`PolicyEngine` do Grupo 9 e `decidir(CaseFeatures)` de main representam contratos e lógicas diferentes. Preservar as duas interfaces e testar cada uma; não declarar que foram unificadas nem mudar silenciosamente a lógica consumida pelo fluxo documental. O serviço documental continua chamando `PolicyEngine`.
 
-## 2. Nova Arborescência Alvo
+Não existem na implementação documental revisada `auth.py`, pacote RAG, Dockerfile, docker-compose ou `seed_database.py`. Login/perfis, RAG e OCR permanecem planejados; sua ausência não é corrigida criando implementações fictícias. Sinalizar páginas com pouco texto não comprova execução de OCR. O banco usa `sqlite3`, sem sessão SQLAlchemy.
 
-Após a execução da refatoração, o repositório terá a seguinte estrutura física de arquivos:
+## Estrutura de destino
 
 ```text
 HackatonEnter/
+├── contracts/
 ├── src/
-│   ├── policy/                     # Lógica de Políticas de Acordo & Modelo ML
+│   ├── __init__.py
+│   ├── policy/
 │   │   ├── __init__.py
-│   │   ├── engine.py               # Motor determinístico
-│   │   ├── service.py              # policy_service.py refatorado
-│   │   ├── pricing.py              # Regras de faixas e valores
-│   │   ├── normalization.py        # Normalização de atributos
-│   │   └── constants.py            # Limiares e parâmetros
-│   │
-│   ├── utils/                      # Processamento de Documentos e RAG
+│   │   ├── engine.py
+│   │   ├── service.py
+│   │   ├── constants.py
+│   │   ├── normalization.py
+│   │   ├── pricing.py
+│   │   ├── gate.py
+│   │   └── table.py
+│   ├── utils/
 │   │   ├── __init__.py
-│   │   ├── document_service.py     # Extração de texto e OCR
-│   │   ├── document_type_validator.py # Sinais determinísticos
-│   │   └── rag/                    # Embeddings, retriever e chunker
-│   │
-│   ├── interface/                  # Interfaces de Acesso (API & Web)
-│   │   ├── backend/                # Servidor FastAPI
-│   │   │   ├── main.py             # App FastAPI & Rotas
-│   │   │   ├── database.py         # Configuração DB
-│   │   │   ├── repository.py       # Data Access Object
-│   │   │   ├── schemas.py          # Pydantic Models
-│   │   │   ├── auth.py             # Autenticação JWT / Perfis
-│   │   │   └── monitoring.py       # API de Monitoramento
-│   │   └── frontend/               # Dashboard React SPA
-│   │       ├── src/                # Componentes React (JSX, CSS)
-│   │       ├── package.json
-│   │       └── vite.config.js
-│   │
-│   └── monitor/                    # Análises e Métricas Offline
-│       ├── counterfactual.py
-│       ├── baseline.py
-│       └── metrics_effectiveness.py
-│
-├── artefatos/                      # Modelo XGBoost binário (.pkl) e artefatos
-├── docs/                           # Documentação arquitetural
-├── scripts/                        # Scripts de treinamento e preparação
-├── tests/                          # Suíte de testes (pytest)
-├── Dockerfile & docker-compose.yml
+│   │   ├── document_service.py
+│   │   └── document_type_validator.py
+│   ├── interface/
+│   │   ├── __init__.py
+│   │   ├── backend/
+│   │   │   ├── __init__.py
+│   │   │   ├── main.py
+│   │   │   ├── config.py
+│   │   │   ├── database.py
+│   │   │   ├── repository.py
+│   │   │   ├── schemas.py
+│   │   │   └── monitoring.py
+│   │   ├── frontend/
+│   │   │   ├── src/
+│   │   │   ├── index.html
+│   │   │   ├── package.json
+│   │   │   └── package-lock.json
+│   │   └── prototype/
+│   ├── monitor/
+│   └── tools/
+├── artefatos/
+├── scripts/
+├── tests/
+├── docs/
 ├── requirements.txt
+├── pyproject.toml
+├── Makefile
 └── README.md
 ```
 
----
+## Roteiro em seis passos
 
-## 3. Roteiro Passo a Passo para Execução Futura
+### 1. Inventariar e preparar
 
-Quando for autorizada a execução da refatoração física, siga os passos ordenados abaixo:
+Na raiz, conferir `git status --short`, `git worktree list` e o diff pendente. Preservar as correções de auditoria existentes. Atualizar `origin/main` e comparar `contracts/`, `src/policy/`, `tests/test_smoke.py`, `pyproject.toml`, `Makefile` e `web/` antes de resolver sobreposições. O guia Git descreve a publicação sem reescrita de histórico.
 
-### Passo 1: Criar novas pastas de destino
-No PowerShell ou Bash:
+Criar os diretórios Python sem pré-criar a pasta que receberá a aplicação frontend inteira:
+
 ```powershell
-# PowerShell / Bash / Git Bash
-mkdir -Force src/interface/backend
-mkdir -Force src/interface/frontend
-mkdir -Force src/utils
+New-Item -ItemType Directory -Force src/interface/backend, src/utils
 ```
 
-### Passo 2: Mover arquivos preservando o histórico (`git mv`)
-```bash
-# 1. Mover backend app para src/interface/backend
-git mv backend/app/main.py src/interface/backend/
-git mv backend/app/database.py src/interface/backend/
-git mv backend/app/repository.py src/interface/backend/
-git mv backend/app/schemas.py src/interface/backend/
-git mv backend/app/auth.py src/interface/backend/
-git mv backend/app/monitoring.py src/interface/backend/
-git mv backend/app/config.py src/interface/backend/
+Esse comando é PowerShell, não Bash. Se os destinos já contiverem arquivos, conferir seu conteúdo antes de mover.
 
-# 2. Mover utilitários de documento e RAG para src/utils
-git mv backend/app/document_service.py src/utils/
-git mv backend/app/document_type_validator.py src/utils/
-git mv backend/app/rag src/utils/
+### 2. Mover módulos e preservar pacotes
 
-# 3. Mover serviço de política para src/policy
+Movimentações rastreáveis de referência:
+
+```powershell
+git mv backend/app/main.py src/interface/backend/main.py
+git mv backend/app/config.py src/interface/backend/config.py
+git mv backend/app/database.py src/interface/backend/database.py
+git mv backend/app/repository.py src/interface/backend/repository.py
+git mv backend/app/schemas.py src/interface/backend/schemas.py
+git mv backend/app/monitoring.py src/interface/backend/monitoring.py
+git mv backend/app/__init__.py src/interface/backend/__init__.py
+git mv backend/app/document_service.py src/utils/document_service.py
+git mv backend/app/document_type_validator.py src/utils/document_type_validator.py
 git mv backend/app/policy_service.py src/policy/service.py
-
-# 4. Mover a aplicação frontend inteira para src/interface/frontend
-git mv frontend src/interface/frontend/
-
-# 5. Remover pasta backend vazia (se houver sobras)
-rmdir /s /q backend  # Windows PowerShell/CMD
-# ou: rm -rf backend  # Linux / Git Bash
+git mv frontend src/interface/frontend
 ```
 
-### Passo 3: Atualizar Referências e Imports Python
+Uma edição equivalente que registre adição e remoção dos mesmos arquivos é válida; o Git reconhece renomes pelo conteúdo. Preservar mudanças locais. Criar `src/interface/__init__.py` e `src/utils/__init__.py`, manter `src/__init__.py` e `src/policy/__init__.py`, e remover apenas o antigo `backend/__init__.py` após conferir que não contém lógica.
 
-Atualizar as declarações de `import` nos seguintes arquivos:
+Após integrar main, mover seu `web/` para `src/interface/prototype/` e documentar que é um demonstrador com dados simulados. Ele não substitui o frontend que usa a API. Não adicionar `node_modules/` ou `dist/` ao índice. Não usar remoção recursiva para limpar diretórios antigos que possam conter arquivos locais.
 
-1. Em `src/interface/backend/main.py`:
-   ```python
-   # Antes:
-   from backend.app.policy_service import calcular_politica
-   from backend.app.document_service import extrair_documento
+### 3. Corrigir imports e caminhos
 
-   # Depois:
-   from src.policy.service import calcular_politica
-   from src.utils.document_service import extrair_documento
-   ```
+Em `src/interface/backend/main.py`, usar os nomes reais:
 
-2. Em `tests/` (`test_auth.py`, `test_rag.py`, `test_sla_and_ocr.py`, `test_dossie_renaming.py`):
-   Ajustar `sys.path` ou os imports para apontar para os módulos em `src.policy`, `src.utils` e `src.interface.backend`.
+```python
+from src.policy.service import PolicyService
+from src.utils.document_service import DocumentService
+from src.utils.document_type_validator import validate_document_type
+```
 
-### Passo 4: Atualizar Arquivos de Configuração e Build
+Imports locais da API, como `from .repository import Repository`, continuam relativos. Em `src/policy/service.py`, importar `Repository` e enums por `src.interface.backend.repository` e `src.interface.backend.schemas`. Em `src/utils/document_service.py`, importar `Settings`, `Repository` e schemas por `src.interface.backend`; manter o import relativo do validador. O validador importa enums por `src.interface.backend.schemas`.
 
-1. **`README.md`**:
-   Atualizar os comandos de execução no PowerShell:
-   ```powershell
-   # Executar Backend:
-   python -m uvicorn src.interface.backend.main:app --reload
+A migração preserva dependências existentes do serviço em relação à persistência e aos schemas da API. Isso não representa separação completa entre domínio e infraestrutura. Evitar reexportar `PolicyService` no `src/policy/__init__.py` se causar importação circular ou carregar a API ao importar apenas o motor.
 
-   # Executar Frontend:
-   cd src/interface/frontend
-   npm install
-   npm run dev
-   ```
+No `config.py` movido, o nome existente é `PROJECT_ROOT`, não `REPO_ROOT`. Ajustar a profundidade:
 
-2. **`Dockerfile` & `docker-compose.yml`**:
-   Atualizar os caminhos do `WORKDIR` e `CMD`:
-   ```dockerfile
-   CMD ["uvicorn", "src.interface.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-   ```
+```python
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+```
 
-3. **`scripts/seed_database.py`**:
-   Ajustar a importação de `database.py` e `repository.py` para `src.interface.backend`.
+Isso mantém `.runtime/` e `artefatos/` na raiz. `src/monitor/paths.py` tem sua própria resolução de raiz e não foi movido; não alterar sua profundidade indiscriminadamente. Preservar `ENTERAGREE_RUNTIME_DIR`, `ENTERAGREE_DATABASE_PATH` e `ENTERAGREE_MAX_UPLOAD_BYTES`.
 
-### Passo 5: Validação e Testes Automatizados
+Atualizar imports reais de `tests/test_api.py`, `tests/test_database.py` e `tests/test_monitoring.py` para `src.interface.backend`. Preservar testes do motor e verificar caminhos e entrypoint, sem alterar `sys.path` artificialmente para sustentar o caminho antigo.
 
-Após a refatoração, execute as seguintes verificações para garantir que nenhuma regressão foi introduzida:
+### 4. Atualizar configuração, frontend e instruções
+
+Atualizar `.gitignore` para ignorar `src/interface/frontend/node_modules/` e `src/interface/frontend/dist/`. Preservar `package-lock.json` e imports de JSX, CSS e `index.html`.
+
+No README e no alvo `api` do Makefile integrado de main, usar:
 
 ```powershell
-# 1. Executar testes automatizados
-pytest
-
-# 2. Testar inicialização da API Backend
-python -m uvicorn src.interface.backend.main:app --port 8000
-
-# 3. Testar build do Frontend
-cd src/interface/frontend
-npm run build
+python -m uvicorn src.interface.backend.main:app --reload --port 8000
 ```
 
-### Passo 6: Commit com Conventional Commits
+Para o frontend, a partir da raiz:
+
 ```powershell
-git add .
-git commit -m "refactor: restructure project directories into src/policy, src/interface, and src/utils"
+npm --prefix src/interface/frontend ci
+npm --prefix src/interface/frontend run dev
 ```
+
+Revisar `pyproject.toml` para instalar os pacotes e dependências reais. Ajustar o alvo `schema` do Makefile ao novo destino do protótipo. Atualizar o README do frontend e `docs/arquitetura.md`. Preservar URLs `/api/...`, payloads, status HTTP e configuração do endereço da API; mover arquivos não autoriza alterar rotas.
+
+### 5. Validar comportamento e árvore final
+
+Executar na raiz, com as dependências instaladas:
+
+```powershell
+python -m pytest -q
+python -m compileall -q src contracts scripts tests
+npm --prefix src/interface/frontend run build
+git diff --check
+rg -n 'backend\.app|backend/app|cd frontend|src\.api\.main' src tests scripts README.md Makefile pyproject.toml
+```
+
+Ausência de referências antigas no último comando retorna código 1 do `rg`, o que não é falha de compilação. Documentos de migração podem citar caminhos antigos como origem, mas comandos operacionais devem apontar para os novos destinos.
+
+- [ ] API inicia pelo novo entrypoint e sua rota de saúde responde.
+- [ ] `PROJECT_ROOT`, artefatos e runtime padrão continuam na raiz; overrides funcionam.
+- [ ] Criação/listagem de processos, upload, consulta documental, solicitação e resposta, análise, decisão e monitoramento mantêm seus contratos.
+- [ ] Uploads concorrentes/duplicados, vínculo com solicitação e transições preservam as correções existentes.
+- [ ] Modelo real carrega de `artefatos/`; regras do Grupo 9 e `decidir(CaseFeatures)` continuam cobertas separadamente.
+- [ ] Testes de main e testes documentais passam juntos, sem descartar um conjunto para obter sucesso.
+- [ ] React compila e consome a mesma API; renderização inicial e navegação existente continuam funcionais.
+- [ ] Protótipo de main está identificado como demonstrador e não aparece como frontend operacional.
+- [ ] Nenhum módulo depende de `backend.app`; nenhuma árvore dupla `frontend/frontend` foi criada.
+- [ ] `git status` não inclui runtime, bases locais, ambientes virtuais, dependências instaladas ou builds.
+
+Comparar o inventário de rotas em execução ao anterior: testar somente saúde não comprova os demais fluxos. Não retreinar XGBoost para validar uma movimentação de diretórios.
+
+### 6. Revisar e publicar
+
+Revisar diff, documentação e resultados. Registrar migração e integração com mensagens descritivas, publicar `feat/docs-pipeline` e criar ou atualizar o PR para main, seguindo `guia_conformidade_git.md`. Incluir limitações e verificações executadas. Manter a branch remota antiga enquanto seu PR estiver ativo. Criar o PR não autoriza seu merge.

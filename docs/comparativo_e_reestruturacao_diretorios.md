@@ -1,104 +1,83 @@
-# Comparativo e Reestruturação do Repositório — Proposta `main` vs. Implementação Atual
+# Comparativo e decisão de reestruturação — EnterAgree
 
-Este documento analisa as diferenças entre a **estrutura proposta na branch `main` (repositório base do hackathon)** e a **estrutura implementada na branch de desenvolvimento (`HackatonEnter`)**, fornecendo os planos de ação para colocar o projeto em total conformidade.
+A decisão desta entrega é migrar fisicamente API, frontend e serviços documentais para `src/`, mantendo motor e artefatos nos locais apropriados. Este documento compara fontes verificadas; a organização proposta não é uma imposição presumida de main.
 
----
+## 1. Fontes e estado observado
 
-## 1. Mapeamento das Estruturas
+A revisão usa a implementação documental originada em `(feat)_docs_pipeline`, com correções locais, e `origin/main` em `07de512b`. A referência remota foi atualizada durante a revisão. Não existe `README.md` em origin/main; portanto, não há ali uma árvore publicada que exija `src/interface/` ou `src/utils/`.
 
-### 🏛️ Estrutura Proposta na `main` (Base Original)
-A proposta padrão da `main` organiza o código-fonte sob o diretório `src/`:
+Árvore resumida da referência remota:
 
 ```text
-hackathon-ufmg-2026/
+main/
+├── contracts/
 ├── src/
-│   ├── policy/            # Lógica da política de acordos (regras de decisão, modelo XGBoost, cálculo de faixas)
-│   ├── interface/         # Interface de acesso do advogado / servidor Web (ex: Flask ou FastAPI + visualizações)
-│   └── utils/             # Extratores de PDF/TXT, validadores e utilitários compartilhados
-├── data/                  # Planilhas e dados de entrada
-├── docs/                  # Documentação arquitetural e de uso
-├── environment.yml / requirements.txt
-└── README.md
+│   ├── policy/
+│   └── tools/
+├── tests/
+├── web/
+├── .env.example
+├── pyproject.toml
+└── Makefile
 ```
 
----
-
-### 🚀 Estrutura Implementada Atualmente (`HackatonEnter`)
-A implementação atual adotou uma arquitetura moderna Full-Stack desacoplada (`backend` + `frontend`):
+Implementação documental antes da migração:
 
 ```text
 HackatonEnter/
-├── backend/               # Servidor FastAPI
-│   └── app/
-│       ├── main.py        # Endpoints da API
-│       ├── policy_service.py # Motor de regras e política
-│       ├── document_service.py # Processamento de PDFs e OCR
-│       └── repository.py  # Persistência SQLite
-├── frontend/              # Interface SPA (React + Vite)
-│   └── src/               # Componentes visuais e dashboards
-├── artefatos/             # Modelo XGBoost (.pkl), features.json e métricas
-├── scripts/               # Scripts de preparação de dados e treinamento
-├── tests/                 # Testes automatizados (pytest)
-├── docs/                  # Planos e documentações arquiteturais
-├── Dockerfile & docker-compose.yml
+├── backend/app/
+├── frontend/
+├── src/
+│   ├── policy/
+│   └── monitor/
+├── artefatos/
+├── scripts/
+├── tests/
+├── docs/
+├── requirements.txt
 └── README.md
 ```
 
----
+`src/policy/` já existe na implementação documental. Não é correto reduzir sua equivalência a `policy_service.py` e aos artefatos: motor, normalização e cálculo financeiro têm módulos próprios. A API não implementa login ou áreas isoladas para Banco, Advogado e Admin; isso permanece no plano de acesso.
 
-## 2. Comparativo de Equivalência de Módulos
+## 2. Matriz de responsabilidades
 
-| Módulo Proposto na `main` (`src/`) | Equivalente Implementado no Projeto (`HackatonEnter`) | Função |
-| :--- | :--- | :--- |
-| `src/policy/` | `backend/app/policy_service.py` & `artefatos/` | Regras determinísticas de acordo + modelo XGBoost reproduzido |
-| `src/interface/` | `frontend/` & `backend/app/main.py` | Dashboard React + Endpoints REST do advogado/banco |
-| `src/utils/` | `backend/app/document_service.py` & `document_type_validator.py` | Extração por streaming, OCR e validação de PDFs |
+| Responsabilidade | Origem documental | Destino escolhido | Integração com main |
+| --- | --- | --- | --- |
+| Decisão por regras e modelo | `src/policy/engine.py` | Mesmo caminho | Preservar `PolicyEngine` e a API remota `decidir(CaseFeatures)` |
+| Composição e persistência da análise | `backend/app/policy_service.py` | `src/policy/service.py` | Serviço separado do motor, consumindo `PolicyEngine` |
+| Atributos, normalização e valores | `src/policy/{constants,normalization,pricing}.py` | Mesmos caminhos | Conciliar sobreposições e preservar `gate.py` e `table.py` |
+| Upload e extração PDF/TXT | `backend/app/document_service.py` | `src/utils/document_service.py` | Preservar streaming e lotes |
+| Conferência de tipo | `backend/app/document_type_validator.py` | `src/utils/document_type_validator.py` | Preservar confirmação e incompatibilidades determinísticas |
+| API e persistência | `backend/app/{main,config,database,repository,schemas,monitoring}.py` | `src/interface/backend/` | Preservar schemas e integrar contratos sem regressão |
+| Interface operacional React/Vite | `frontend/` | `src/interface/frontend/` | Continua consumindo a API real |
+| Protótipo remoto | `web/` de main | `src/interface/prototype/` | Demonstrador com dados simulados, identificado como tal |
+| Modelo e metadados | `artefatos/` | Mesmo caminho na raiz | Não mover binários para o pacote nem retreinar |
+| Monitoramento offline | `src/monitor/` | Mesmo caminho | Preservar consumidores e caminhos |
+| Contratos e ferramentas remotos | Ausentes ou distintos antes do merge | `contracts/`, `src/tools/` | Preservar módulos, dependências e testes |
+| Treinamento e testes | `scripts/`, `tests/` | Mesmos caminhos na raiz | Atualizar imports e executar testes das duas origens |
 
----
+## 3. Migração escolhida
 
-## 3. Planos de Ação para Conformidade
+Utilizar a migração física de `plano_refatoracao_estrutura_src.md`. Manter `backend/` e `frontend/` e acrescentar wrappers não atende à escolha de alinhar os diretórios.
 
-Oferecemos duas alternativas para alinhar o repositório à `main`:
+1. `PolicyService` vai para `service.py`; `engine.py` continua motor. `PolicyEngine` e `decidir(CaseFeatures)` possuem contratos e regras diferentes: preservar e testar ambos, sem declarar uma unificação silenciosa.
+2. `artefatos/`, `scripts/`, `tests/` e `src/monitor/` permanecem. `contracts/`, `src/tools/` e componentes úteis de main são preservados. O protótipo remoto fica explicitamente separado da aplicação operacional.
+3. Pacotes Python recebem os `__init__.py` necessários; imports apontam para destinos reais.
+4. `src/interface/backend/config.py` usa `PROJECT_ROOT = Path(__file__).resolve().parents[3]`, mantendo runtime e artefatos na raiz.
+5. Rotas, payloads e fluxos documentais mantêm compatibilidade. Mover React não muda o endereço da API.
+6. Login/perfis, RAG e OCR permanecem planejados. A refatoração não cria autenticação, embeddings, Docker ou seed inexistentes para corresponder a uma árvore imaginada.
 
-### 🔹 Opção 1: Migração Completa para a Estrutura `src/` (Fidelidade Restrita à `main`)
-Reorganizar fisicamente as pastas para responder exatamente à arborescência de `main`:
+## 4. Evidências de conclusão
 
-- Mover `backend/app/policy_service.py` e artefatos para `src/policy/`
-- Mover a API FastAPI e a aplicação Frontend React para `src/interface/` (`src/interface/backend` e `src/interface/frontend`)
-- Mover os serviços de extração e validação de documentos para `src/utils/`
+Os documentos são complementares: este registra a decisão e as equivalências; o plano contém seis passos e validações; o guia Git define publicação e preservação do histórico.
 
-#### Árvore Resultante (Opção 1):
-```text
-src/
-├── policy/
-│   ├── engine.py           # policy_service.py refatorado
-│   ├── modelo_xgboost.pkl  # artefato do modelo
-│   └── features.json
-├── interface/
-│   ├── backend/            # FastAPI app
-│   └── frontend/           # React + Vite app
-└── utils/
-    ├── document_extractor.py
-    └── validator.py
-```
+- [ ] API em `src/interface/backend`, React em `src/interface/frontend`, serviços em `src/utils` e orquestração em `src/policy/service.py`.
+- [ ] Imports, raiz de configuração, Makefile, dependências e comandos correspondem à árvore real.
+- [ ] Contratos e testes de main foram integrados aos fluxos documentais existentes.
+- [ ] Artefatos e dados locais permanecem preservados.
+- [ ] Testes automatizados, inicialização da API e build React verificados pelos novos caminhos.
+- [ ] Protótipo remoto identificado como demonstrador; frontend operacional continua sem dados simulados.
+- [ ] Publicação em `feat/docs-pipeline` e PR para main descrevem o resultado sem declarar funcionalidades planejadas como prontas.
 
----
-
-### 🔹 Opção 2: Compatibilidade via Wrappers & Mapeamento no `src/` (Recomendado)
-Manter a separação limpa `backend/` + `frontend/` e adicionar um módulo adaptador dentro de `src/` que reexporta os componentes principais.
-
-No `src/`:
-- `src/policy/__init__.py`: importa `policy_service.py` do backend.
-- `src/interface/__init__.py`: redireciona para a aplicação backend/frontend.
-- `src/utils/__init__.py`: importa `document_service.py`.
-
-Essa abordagem preserva a execução de testes automatizados (`pytest`), contêineres Docker e ferramentas de build do React sem quebrar os caminhos originais do projeto.
-
----
-
-## 4. Checklist para Mudança da Estrutura
-
-- [ ] Escolha entre a **Opção 1** (Reestruturação física em `src/`) ou **Opção 2** (Mapeamento/Adaptação no `src/`).
-- [ ] Atualização dos caminhos de importação nos testes em `tests/`.
-- [ ] Atualização dos comandos de execução no `README.md` principal.
-- [ ] Execução da suíte de testes (`pytest`) para validar a integridade.
+Mover arquivos não basta para comprovar a reestruturação: verificar os novos entrypoints, fluxos e contratos é parte da entrega.

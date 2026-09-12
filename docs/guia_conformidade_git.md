@@ -1,118 +1,95 @@
-# Guia de Conformidade de Branches e Commits — EnterAgree
+# Guia de branches, commits e publicação — EnterAgree
 
-Este documento estabelece as diretrizes de padronização para branches, mensagens de commit e fluxo de trabalho Git no repositório **EnterAgree**, garantindo a conformidade entre branches de funcionalidade (`feature`) e a branch principal (`main`).
+Este guia registra a convenção adotada para publicar a reorganização em `feat/docs-pipeline` e abrir um PR para `main`. Não estabelece uma exigência histórica que o repositório não possui.
 
----
+## 1. Evidência e convenção escolhida
 
-## 1. Diagnóstico do Estado Atual
+Na revisão, `origin/main` aponta para `07de512b`. Sua raiz contém `contracts/`, `src/`, `tests/`, `web/`, `pyproject.toml` e `Makefile`. Não existe `README.md` nessa referência; `git show origin/main:README.md` não fornece uma regra de contribuição. O histórico contém mensagens como `Estrutura inicial: contrato de tipos, motor de política e teste de fumaça`, sem Conventional Commits. Não foi identificada uma exigência de Git Flow ou Conventional Commits em main.
 
-Na análise realizada no repositório:
-- **Branch Atual Anterior**: `(feat)_docs_pipeline`
-- **Branch Principal**: `main`
+`(feat)_docs_pipeline` é um nome aceito pelo Git. Caracteres especiais exigem cuidado com aspas em comandos, mas não tornam o nome inválido. Para esta entrega, a convenção escolhida é `tipo/descricao-kebab-case`, usando `feat/docs-pipeline`.
 
-### Inconformidades Identificadas:
-1. **Formato do Nome da Branch**:
-   - O uso de parênteses e sublinhados `(feat)_docs_pipeline` não segue a convenção Git nem do repositório.
-   - Parênteses no nome da branch exigem aspas para navegação em terminais (Bash/Zsh/PowerShell) e podem quebrar pipelines de CI/CD ou integrações automatizadas.
-2. **Padrão Exigido por `main`**:
-   - Padrão **Git Flow / Conventional Branches**: Categoria minúscula com barra `/` e separação por hífens `-` (ex: `feat/docs-pipeline` ou `docs/pipeline`).
-   - Padrão **Conventional Commits**: Commits estruturados no formato `<tipo>: <descrição imperativa em minúsculas>`.
+| Tipo | Uso | Exemplo |
+| --- | --- | --- |
+| `feat/` | Funcionalidade | `feat/docs-pipeline` |
+| `fix/` | Correção | `fix/upload-concorrente` |
+| `refactor/` | Reorganização | `refactor/estrutura-src` |
+| `docs/` | Documentação | `docs/plano-acesso` |
+| `test/` | Testes | `test/contratos-api` |
 
----
+Para novos commits da entrega, utilizar `tipo(escopo opcional): descrição`, por exemplo `refactor: reorganize application under src`. A descrição deve explicar a mudança; caixa baixa ou idioma específico não são condições de validade. Não reescrever commits já publicados para adequar seu formato.
 
-## 2. Padrões Exigidos no Repositório
+## 2. Preparar e preservar o trabalho
 
-### 2.1 Nomenclatura de Branches
-As branches devem seguir o formato `<tipo>/<descricao-kebab-case>`:
+Executar na raiz de `HackatonEnter`, conferindo o resultado de cada etapa:
 
-| Tipo | Descrição | Exemplo |
-| :--- | :--- | :--- |
-| `feat/` | Novas funcionalidades | `feat/autenticacao-jwt` |
-| `docs/` | Alterações puras de documentação | `docs/pipeline-documentacao` |
-| `fix/` | Correção de bugs | `fix/validacao-ocr` |
-| `refactor/` | Refatoração de código sem alterar regra de negócio | `refactor/politicas-servico` |
-| `test/` | Adição ou alteração de testes | `test/cobertura-rag` |
-
-### 2.2 Formato de Commits (Conventional Commits)
-Todas as mensagens de commit em conformidade com a `main` devem seguir:
-```text
-<tipo>: <descrição curta e clara>
-
-[corpo opcional detalhando o motivo da mudança]
-```
-Exemplos válidos observados no projeto:
-- `docs: plan bank lawyer and global admin access`
-- `feat: add evidence-backed agreement pipeline`
-- `test: add unit tests for document type validation`
-
----
-
-## 3. Passo a Passo: Como Colocar a Branch Atual em Conformidade
-
-Se você possui uma branch no formato incorreto (como `(feat)_docs_pipeline`), siga os passos abaixo para deixá-la em conformidade total com a `main`:
-
-### Passo 1: Renomear a Branch Localmente
-Renomeie a branch atual para o nome padronizado usando hífen e barra:
-```bash
-git branch -m "(feat)_docs_pipeline" feat/docs-pipeline
-```
-
-### Passo 2: Commitar ou Organizar Mudanças Pendentes
-Verifique o estado das suas alterações (`git status`). Commite as alterações pendentes respeitando o Conventional Commits:
-```bash
-git add backend/ frontend/ tests/
-git commit -m "feat: implement document pipeline and interface components"
-```
-
-### Passo 3: Sincronizar e Aplicar Rebase sobre a `main`
-Garanta que sua branch esteja atualizada a partir do topo da `main`:
-```bash
+```powershell
+git status --short
+git branch --show-current
+git worktree list
 git fetch origin
-git rebase origin/main
+git log -5 --oneline origin/main
+git diff --stat
 ```
-> **Nota**: Se houver conflitos durante o rebase, resolva os arquivos, execute `git add <arquivo-resolvido>` e continue com `git rebase --continue`.
 
-### Passo 4: Publicar a Nova Branch no Remoto
-Envie a branch renomeada e ajustada para o repositório remoto:
-```bash
+Se a branch atual ainda for `(feat)_docs_pipeline` e `feat/docs-pipeline` não existir, criar a nova branch a partir do trabalho atual:
+
+```powershell
+git switch -c feat/docs-pipeline
+```
+
+Se já estiver na branch de destino, não repetir a criação. Se ela estiver em outro worktree, continuar naquele diretório. Alterações não commitadas devem ser preservadas e revisadas; não descartar arquivos para limpar a árvore.
+
+## 3. Integrar main sem reescrever o histórico
+
+Registrar as correções e a migração em commits revisados antes de integrar main. Selecionar somente os caminhos inspecionados com `git add -- <caminhos>`, incluindo a remoção dos caminhos antigos após a migração, e conferir o índice:
+
+```powershell
+git diff --cached --stat
+git diff --cached --check
+git commit -m "refactor: reorganize application under src"
+git merge origin/main
+```
+
+O commit pressupõe que os arquivos pretendidos já estão no índice. Não adicionar dados privados, `.runtime/`, `.env`, ambientes virtuais, `node_modules/` ou `dist/`.
+
+O merge preserva o histórico publicado. Resolver conflitos comparando responsabilidades e contratos: main também contém um motor, tipos em `contracts/`, testes e configurações. Não selecionar uma versão inteira sem verificar o comportamento da outra. Após resolver, adicionar somente os arquivos resolvidos e concluir `git merge --continue`. Não é necessário rebase, force push ou reescrita de commits anteriores.
+
+## 4. Publicar e abrir o PR
+
+Após validar o plano de refatoração e revisar o diff:
+
+```powershell
 git push -u origin feat/docs-pipeline
+gh pr list --head feat/docs-pipeline --base main
 ```
 
-### Passo 5: Remover a Branch com Nome Antigo do Remoto (se aplicável)
-Se a branch antiga `(feat)_docs_pipeline` já havia sido enviada ao GitHub/GitLab:
-```bash
-git push origin --delete "(feat)_docs_pipeline"
+Se ainda não houver PR dessa branch, criar um PR com base main, descrevendo a estrutura final, a compatibilidade dos contratos, as correções e os testes. Preparar um arquivo com a descrição revisada e usar:
+
+```powershell
+gh pr create --base main --head feat/docs-pipeline --title "refactor: align application structure under src" --body-file pr-description.md
 ```
 
----
+`pr-description.md` é um exemplo de arquivo temporário de publicação: deve existir com o texto revisado e não precisa integrar o commit. Se o PR já existir, atualizar sua descrição em vez de criar outro.
 
-## 4. Uso de Git Worktree (Árvores de Trabalho Isoladas)
+A branch remota `(feat)_docs_pipeline` deve permanecer enquanto houver PR ativo ou dependentes. Não remover a branch antiga, fechar seu PR ou fazer merge do novo PR automaticamente como parte da padronização. Registrar no novo PR a relação com o anterior, se aplicável.
 
-Para trabalhar em novas tarefas ou documentações sem sujar o diretório atual nem precisar alternar (`git checkout`) constantemente, utiliza-se o **Git Worktree**.
+## 5. Worktree de documentação
 
-### O que foi executado para este trabalho:
-Criamos um worktree isolado na pasta paralela `worktree-docs`:
-```bash
-git worktree add ..\worktree-docs -b docs/padronizacao-branches-e-fluxo main
+Os documentos foram preparados em `worktree-docs`, associado a `docs/padronizacao-branches-e-fluxo`. Conferir o estado antes de integrar o conteúdo à branch de implementação:
+
+```powershell
+git -C ../worktree-docs status --short
+git -C ../worktree-docs log -3 --oneline
 ```
 
-### Comandos Úteis do Git Worktree:
-- **Listar worktrees ativos**:
-  ```bash
-  git worktree list
-  ```
-- **Remover um worktree após concluir o trabalho**:
-  ```bash
-  git worktree remove ..\worktree-docs
-  ```
+Integrar somente os documentos revisados, preservando alterações existentes. Não remover o worktree enquanto contiver trabalho não integrado. Seu caminho não é parte da estrutura de execução do aplicativo.
 
----
+## 6. Checklist de publicação
 
-## 5. Checklist de Verificação Antes do Pull Request (PR)
-
-Antes de abrir um Pull Request para a branch `main`:
-- [ ] Branch renomeada sem parênteses e no padrão `tipo/nome-da-feature`.
-- [ ] Commits no padrão Conventional Commits (`feat:`, `docs:`, `fix:`, etc.).
-- [ ] Rebase executado com sucesso sobre a `main` mais recente.
-- [ ] Suíte de testes automatizados executada e aprovada (`pytest`).
-- [ ] Documentação atualizada na pasta `docs/`.
+- [ ] Branch de trabalho e destino conferidos; publicação em `feat/docs-pipeline`.
+- [ ] Correções existentes preservadas e novos commits com mensagens descritivas.
+- [ ] `origin/main` atualizado e integrado sem perda de contratos ou testes.
+- [ ] Refatoração e validações de `plano_refatoracao_estrutura_src.md` concluídas.
+- [ ] Diff revisado, sem dados locais, dependências instaladas ou segredos.
+- [ ] PR para main criado ou atualizado com evidências de validação.
+- [ ] Branch remota e PR anteriores preservados; nenhum merge de PR automático.
