@@ -41,7 +41,7 @@ Os payloads seguem `src/interface/backend/schemas.py`. Não há dados simulados 
 
 ## Análise auxiliar de dossiês
 
-Cada documento declarado como `DOSSIE`, com extração concluída e sem divergência de tipo pendente, oferece o botão **Analisar dossiê com IA**. O aviso anterior ao botão informa o envio do texto à OpenAI; nenhuma análise LLM é iniciada automaticamente. A presença e a classificação documental continuam determinísticas. O detalhe do caso inclui `dossie_analyses`, permitindo recuperar resultados persistidos ao voltar ao processo; o backend também disponibiliza `GET /documents/{document_id}/dossie-analysis` para consulta direta.
+Cada documento declarado como `DOSSIE`, com extração concluída e sem divergência de tipo pendente, oferece o botão **Analisar dossiê com IA**. O aviso anterior ao botão informa o envio do texto à OpenAI; a análise LLM também é iniciada automaticamente ao fim da extração quando `OPENAI_API_KEY` está configurada (desligável com `ENTERAGREE_DOSSIE_AUTO=false`). A presença e a classificação documental continuam determinísticas. O detalhe do caso inclui `dossie_analyses`, permitindo recuperar resultados persistidos ao voltar ao processo; o backend também disponibiliza `GET /documents/{document_id}/dossie-analysis` para consulta direta.
 
 O detalhe do caso transporta somente o resumo mais recente por documento, com `evidencias_total` e `evidencias_carregadas: false`, sem os trechos. **Carregar evidências** consulta o resultado completo sob demanda, sem repetir a análise LLM. Atualizações periódicas do mesmo registro preservam as evidências já carregadas e atualizam avisos e cobertura; uma nova análise invalida a cópia anterior. Falhas de carregamento preservam o resumo e permitem tentar novamente.
 

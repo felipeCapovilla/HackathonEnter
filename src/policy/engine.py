@@ -36,6 +36,7 @@ def _avaliar(valor_causa: float, p: float, contrato: ParametrosContrato) -> Vere
         honorario_ganho=contrato.honorario_defesa_ganha.em_reais(valor_causa, condenacao),
         honorario_acordo=contrato.honorario_acordo.em_reais(valor_causa, condenacao),
         teto_alcada=contrato.teto_alcada_fator * valor_causa if contrato.teto_alcada_fator else None,
+        concessao=contrato.concessao,
     )
 
 

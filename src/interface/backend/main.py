@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import hashlib
+import logging
+import os
 import secrets
 from datetime import UTC, datetime
 
@@ -53,6 +55,9 @@ from .schemas import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
 
@@ -60,8 +65,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         initialize_database(app_settings.database_path)
         app.state.repository = Repository(app_settings.database_path)
-        app.state.documents = DocumentService(app.state.repository, app_settings)
         app.state.dossie = DossieService(app.state.repository)
+
+        def analisar_dossie_ao_extrair(document_id: str) -> None:
+            """Q37: o dossiê é analisado assim que a extração termina, para a política já usá-lo."""
+            if not app_settings.dossie_auto_analysis or not os.getenv("OPENAI_API_KEY", "").strip():
+                return
+            document = app.state.repository.get_document_internal(document_id)
+            if document is None or document["declared_type"] != DocumentType.DOSSIE.value:
+                return
+            try:
+                app.state.dossie.analyze(document_id)
+            except (LookupError, ValueError, DossieUnavailableError) as exc:
+                logger.info("Análise automática do dossiê %s não realizada: %s", document_id, exc)
+
+        app.state.documents = DocumentService(
+            app.state.repository, app_settings, on_extraction_completed=analisar_dossie_ao_extrair
+        )
         def contrato_do_banco(bank_id: str | None) -> ParametrosContrato:
             record = app.state.repository.get_active_bank_contract(bank_id) if bank_id else None
             if record is None:
