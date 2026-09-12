@@ -20,7 +20,7 @@ Canal = Literal["digital", "correspondente", "agencia", "desconhecido"]
 class ItemDossie(BaseModel):
     tipo: Literal["assinatura", "documento_identidade", "comprovante_residencia", "liveness"]
     resultado: Literal["ok", "falha", "inconclusivo"]
-    indice: Optional[float] = Field(None, description="0-1 quando o laudo traz índice")
+    indice: Optional[float] = Field(None, ge=0, le=1, allow_inf_nan=False, description="0-1 quando o laudo traz índice")
 
 
 class AnaliseDossie(BaseModel):
@@ -32,8 +32,8 @@ class AnaliseDossie(BaseModel):
         "É o que autoriza inferir que o CONTRATO existe (sinal de recuperabilidade)."
     )
     numero_contrato_referenciado: Optional[str] = None
-    itens: list[ItemDossie] = []
-    confianca_extracao: float = 1.0
+    itens: list[ItemDossie] = Field(default_factory=list)
+    confianca_extracao: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False)
 
 
 class CaseFeatures(BaseModel):

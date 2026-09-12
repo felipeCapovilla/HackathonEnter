@@ -28,7 +28,8 @@ A API atende em `http://localhost:8000` e a interface usa `http://localhost:5173
 - `src/interface/frontend/`: aplicação React/Vite conectada à API.
 - `src/utils/`: extração de documentos e verificação determinística de tipo.
 - `src/monitor/`: análises históricas e simulações offline.
-- `contracts/` e `src/tools/`: contratos e ponto de integração do analisador de dossiê trazidos da `main`; o analisador ainda é um stub.
+- `contracts/` e `src/tools/`: contratos e analisador de dossiê com extração estruturada e evidências por página.
+- `src/graph.py`: workflow LangGraph opcional para extração e revisão, separado da política ativa da API.
 - `src/interface/prototype/`: desenho de tela da `main` com exemplos estáticos, separado da aplicação conectada à API.
 - `artefatos/`, `scripts/` e `tests/`: modelo treinado, preparação/treinamento e testes, respectivamente.
 
@@ -84,6 +85,28 @@ Veja o [guia Git](docs/guia_conformidade_git.md), o
 4. A política registra recomendação, faixa de acordo, vetor de atributos, origem de cada atributo, limitações e decisão posterior do advogado.
 5. O banco acompanha análises, decisões e aderência em `GET /api/monitoring`.
 
+## Análise auxiliar de dossiê
+
+Instale o extra opcional e configure a chave somente no servidor:
+
+```powershell
+python -m pip install -e ".[dossie]"
+$env:OPENAI_API_KEY = "sua-chave"
+$env:ENTERAGREE_DOSSIE_MODEL = "gpt-4o-mini"
+python -m uvicorn src.interface.backend.main:app --reload
+```
+
+Após enviar um documento do tipo `DOSSIE` e concluir a extração, use **Analisar
+dossiê com IA**. A operação envia texto à OpenAI apenas mediante esse comando.
+Mostra parecer do perito, exame da assinatura contratual, índices, contrato
+referenciado e citações. Informação ausente permanece desconhecida, não zero.
+O resultado é auxiliar: não autentica documentos, não ativa a presença de contrato
+e não altera automaticamente a política G9. A falta de chave retorna erro explícito,
+sem impedir os demais fluxos da aplicação. Arquivos `.env` não são carregados automaticamente.
+
+Consulte [implementação e auditoria do analisador](docs/dossie_analyser_implementacao.md)
+para limites, cache, endpoints, revisão humana e testes.
+
 ## Modelo e dados
 
 `artefatos/modelo_xgboost.pkl` foi reproduzido pelos scripts originais do Grupo 9 a partir da base recebida. Para gerar novamente, disponibilize a planilha e execute:
@@ -97,7 +120,7 @@ Na reprodução local: AUC de validação cruzada `0.9079 ± 0.0013`, AUC de tes
 
 ## Limites e evolução
 
-Esta entrega usa SQLite e tarefas em processo para demonstração. Produção requer armazenamento de objetos, fila de workers, banco transacional, autenticação/autorização, criptografia, antivírus, auditoria imutável e observabilidade. Páginas com pouco texto são sinalizadas; a métrica de qualidade e a etapa de OCR estão explicitamente pendentes. A extração semântica/RAG pode complementar, mas não substituir, a política e a confirmação determinística de tipo.
+Esta entrega usa SQLite e tarefas em processo para demonstração. Produção requer armazenamento de objetos, fila de workers, banco transacional, autenticação/autorização, criptografia, antivírus, auditoria imutável e observabilidade. Páginas com pouco texto são sinalizadas; a métrica de qualidade e a etapa de OCR estão explicitamente pendentes. A extração de dossiê já complementa a leitura documental, mas não substitui a política nem a confirmação determinística de tipo. RAG e validação cruzada entre documentos continuam pendentes.
 
 Consulte `docs/arquitetura.md` para contrato, estados e critérios de evolução.
 

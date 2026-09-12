@@ -49,6 +49,28 @@ CREATE TABLE IF NOT EXISTS document_pages (
     PRIMARY KEY(document_id, page_number)
 );
 
+CREATE TABLE IF NOT EXISTS dossie_analyses (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    sha256 TEXT NOT NULL,
+    model TEXT NOT NULL,
+    analyzer_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('COMPLETED', 'FAILED')),
+    result TEXT,
+    error_code TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dossie_analysis_claims (
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    sha256 TEXT NOT NULL,
+    model TEXT NOT NULL,
+    analyzer_version TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    PRIMARY KEY(document_id, sha256, model, analyzer_version)
+);
+
 CREATE TABLE IF NOT EXISTS analyses (
     id TEXT PRIMARY KEY,
     case_id TEXT NOT NULL REFERENCES cases(id),
@@ -90,6 +112,9 @@ CREATE TABLE IF NOT EXISTS lawyer_decisions (
 
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
+CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS dossie_analysis_success_idx
+ON dossie_analyses(document_id, sha256, model, analyzer_version) WHERE status = 'COMPLETED';
 CREATE INDEX IF NOT EXISTS analyses_case_idx ON analyses(case_id, created_at);
 CREATE INDEX IF NOT EXISTS requests_case_idx ON document_requests(case_id, status);
 CREATE INDEX IF NOT EXISTS decisions_analysis_idx ON lawyer_decisions(analysis_id);

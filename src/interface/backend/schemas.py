@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
+from contracts.dossie import DossieReport
 
 
 class SourceParty(StrEnum):
@@ -92,6 +94,18 @@ class TypeConfirmation(BaseModel):
     action: str = Field(pattern="^(RECLASSIFY|CONTINUE_WITH_RESERVATION|REMOVE)$")
     document_type: DocumentType | None = None
     reason: str = Field(min_length=3, max_length=1000)
+
+
+class DossieAnalysisRecord(BaseModel):
+    id: str
+    document_id: str
+    status: Literal["COMPLETED", "FAILED"]
+    result: DossieReport | None = None
+    error_code: str | None = None
+    model: str
+    created_at: datetime
+    evidencias_total: int = Field(default=0, ge=0)
+    evidencias_carregadas: bool = True
 
 
 class FeatureProvenance(BaseModel):

@@ -101,7 +101,7 @@ class PolicyService:
         if statuses & {DocumentStatus.UPLOADED.value, DocumentStatus.EXTRACTING.value}:
             return DocumentaryStatus.ANALISE_PRELIMINAR, ["A extração documental ainda está em andamento."]
         limitations = [
-            "A confirmação atual verifica tipo e extração; validação semântica aprofundada por LLM é etapa posterior.",
+            "Esta recomendação usa tipo e extração; a análise auxiliar de dossiê por LLM é consultada separadamente e não altera a política automaticamente.",
         ]
         if DocumentTypeStatus.UNCONFIRMED.value in type_statuses:
             limitations.append("Há documento não confirmado, que não ativou nenhuma variável da política.")
