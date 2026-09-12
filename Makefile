@@ -1,10 +1,13 @@
-.PHONY: setup test api schema
+.PHONY: setup test api frontend build schema
 setup:
-	uv venv --python 3.12 && uv pip install -e ".[dev]"
+	python -m pip install -e ".[dev]"
 test:
-	pytest -q
+	python -m pytest -q
 api:
-	uvicorn src.api.main:app --reload --port 8000
-schema:   ## gera o JSON Schema que o front consome — evita divergência de chave
-	python -c "import json;from contracts.schema import Recomendacao,CaseFeatures;\
-print(json.dumps({'CaseFeatures':CaseFeatures.model_json_schema(),'Recomendacao':Recomendacao.model_json_schema()},indent=2,ensure_ascii=False))" > web/schema.json
+	python -m uvicorn src.interface.backend.main:app --reload --port 8000
+frontend:
+	npm --prefix src/interface/frontend run dev
+build:
+	npm --prefix src/interface/frontend run build
+schema:
+	python -m scripts.export_policy_schema

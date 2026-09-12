@@ -1,21 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "hackaton-enter"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = [
-    "pydantic>=2.7",
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "pandas>=2.2",
-    "openai>=1.40",
-    "langgraph>=0.2",
-    "langchain-openai>=0.2",
-    "pypdf>=4.2",
-    "python-dotenv>=1.0",
-]
+dynamic = ["dependencies"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+agents = ["openai>=1.40", "langgraph>=0.2", "langchain-openai>=0.2", "python-dotenv>=1.0"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["src", "src.*", "contracts", "contracts.*"]
+exclude = ["src.interface.frontend*", "src.interface.prototype*"]
+namespaces = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

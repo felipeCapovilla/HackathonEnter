@@ -1,9 +1,9 @@
 """
-FONTE ÚNICA DE VERDADE dos tipos trocados entre política, API e front.
+Contratos da política por segmentos, consumidos por src.policy.engine.decidir.
 
-Regra do time: nenhum dict solto atravessa fronteira de módulo. Se um campo
-não está aqui, ele não existe. Todo mundo importa daqui — inclusive o front,
-via o JSON Schema gerado por `make schema`.
+`make schema` exporta estes tipos para o protótipo visual preservado da main.
+A API documental usa os contratos HTTP de src.interface.backend.schemas,
+publicados em /openapi.json, e mantém o motor PolicyEngine do Grupo 9.
 """
 from __future__ import annotations
 
