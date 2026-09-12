@@ -72,12 +72,20 @@ Utilizar a migração física de `plano_refatoracao_estrutura_src.md`. Manter `b
 
 Os documentos são complementares: este registra a decisão e as equivalências; o plano contém seis passos e validações; o guia Git define publicação e preservação do histórico.
 
-- [ ] API em `src/interface/backend`, React em `src/interface/frontend`, serviços em `src/utils` e orquestração em `src/policy/service.py`.
-- [ ] Imports, raiz de configuração, Makefile, dependências e comandos correspondem à árvore real.
-- [ ] Contratos e testes de main foram integrados aos fluxos documentais existentes.
-- [ ] Artefatos e dados locais permanecem preservados.
-- [ ] Testes automatizados, inicialização da API e build React verificados pelos novos caminhos.
-- [ ] Protótipo remoto identificado como demonstrador; frontend operacional continua sem dados simulados.
-- [ ] Publicação em `feat/docs-pipeline` e PR para main descrevem o resultado sem declarar funcionalidades planejadas como prontas.
+- [x] API em `src/interface/backend`, React em `src/interface/frontend`, serviços em `src/utils` e orquestração em `src/policy/service.py`.
+- [x] Imports, raiz de configuração, Makefile, dependências e comandos correspondem à árvore real.
+- [x] Contratos e testes de main foram integrados aos fluxos documentais existentes.
+- [x] Artefatos e dados locais permanecem preservados.
+- [x] Testes automatizados, inicialização da API e build React verificados pelos novos caminhos.
+- [x] Protótipo remoto identificado como demonstrador; frontend operacional continua sem dados simulados.
+- [x] Publicação em `feat/docs-pipeline` e PR para main descrevem o resultado sem declarar funcionalidades planejadas como prontas.
 
 Mover arquivos não basta para comprovar a reestruturação: verificar os novos entrypoints, fluxos e contratos é parte da entrega.
+
+## Resultado
+
+Migração física executada e integrada à main de referência. As evidências e
+os comandos verificados estão no
+[plano de refatoração](plano_refatoracao_estrutura_src.md#evidências-desta-execução--12092026).
+Código e documentos publicados em `origin/feat/docs-pipeline`, com revisão no
+[PR #3 para main](https://github.com/felipeCapovilla/HackatonEnter/pull/3).

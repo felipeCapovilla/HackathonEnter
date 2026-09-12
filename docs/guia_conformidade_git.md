@@ -86,10 +86,19 @@ Integrar somente os documentos revisados, preservando alterações existentes. N
 
 ## 6. Checklist de publicação
 
-- [ ] Branch de trabalho e destino conferidos; publicação em `feat/docs-pipeline`.
-- [ ] Correções existentes preservadas e novos commits com mensagens descritivas.
-- [ ] `origin/main` atualizado e integrado sem perda de contratos ou testes.
-- [ ] Refatoração e validações de `plano_refatoracao_estrutura_src.md` concluídas.
-- [ ] Diff revisado, sem dados locais, dependências instaladas ou segredos.
-- [ ] PR para main criado ou atualizado com evidências de validação.
-- [ ] Branch remota e PR anteriores preservados; nenhum merge de PR automático.
+- [x] Branch de trabalho e destino conferidos; publicação em `feat/docs-pipeline`.
+- [x] Correções existentes preservadas e novos commits com mensagens descritivas.
+- [x] `origin/main` atualizado e integrado sem perda de contratos ou testes.
+- [x] Refatoração e validações de `plano_refatoracao_estrutura_src.md` concluídas.
+- [x] Diff revisado, sem dados locais, dependências instaladas ou segredos.
+- [x] PR para main criado ou atualizado com evidências de validação.
+- [x] Branch remota e PR anteriores preservados; nenhum merge de PR automático.
+
+## Registro desta publicação
+
+Executado em 12/09/2026: os commits da migração e do worktree de documentação
+foram integrados sem rebase e publicados em `origin/feat/docs-pipeline`.
+O [PR #3 para main](https://github.com/felipeCapovilla/HackatonEnter/pull/3)
+foi aberto pela API do GitHub autenticada, equivalente aos comandos `gh` acima
+(o GitHub CLI não estava instalado neste ambiente). O PR #1 já estava encerrado;
+a branch antiga foi preservada. Nenhum PR foi mesclado nesta execução.

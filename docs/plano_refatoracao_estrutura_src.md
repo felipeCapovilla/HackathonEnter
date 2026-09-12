@@ -168,19 +168,50 @@ rg -n 'backend\.app|backend/app|cd frontend|src\.api\.main' src tests scripts RE
 
 Ausência de referências antigas no último comando retorna código 1 do `rg`, o que não é falha de compilação. Documentos de migração podem citar caminhos antigos como origem, mas comandos operacionais devem apontar para os novos destinos.
 
-- [ ] API inicia pelo novo entrypoint e sua rota de saúde responde.
-- [ ] `PROJECT_ROOT`, artefatos e runtime padrão continuam na raiz; overrides funcionam.
-- [ ] Criação/listagem de processos, upload, consulta documental, solicitação e resposta, análise, decisão e monitoramento mantêm seus contratos.
-- [ ] Uploads concorrentes/duplicados, vínculo com solicitação e transições preservam as correções existentes.
-- [ ] Modelo real carrega de `artefatos/`; regras do Grupo 9 e `decidir(CaseFeatures)` continuam cobertas separadamente.
-- [ ] Testes de main e testes documentais passam juntos, sem descartar um conjunto para obter sucesso.
-- [ ] React compila e consome a mesma API; renderização inicial e navegação existente continuam funcionais.
-- [ ] Protótipo de main está identificado como demonstrador e não aparece como frontend operacional.
-- [ ] Nenhum módulo depende de `backend.app`; nenhuma árvore dupla `frontend/frontend` foi criada.
-- [ ] `git status` não inclui runtime, bases locais, ambientes virtuais, dependências instaladas ou builds.
+- [x] API inicia pelo novo entrypoint e sua rota de saúde responde.
+- [x] `PROJECT_ROOT`, artefatos e runtime padrão continuam na raiz; overrides funcionam.
+- [x] Criação/listagem de processos, upload, consulta documental, solicitação e resposta, análise, decisão e monitoramento mantêm seus contratos.
+- [x] Uploads concorrentes/duplicados, vínculo com solicitação e transições preservam as correções existentes.
+- [x] Modelo real carrega de `artefatos/`; regras do Grupo 9 e `decidir(CaseFeatures)` continuam cobertas separadamente.
+- [x] Testes de main e testes documentais passam juntos, sem descartar um conjunto para obter sucesso.
+- [x] React compila e consome a mesma API; renderização inicial e navegação existente continuam funcionais.
+- [x] Protótipo de main está identificado como demonstrador e não aparece como frontend operacional.
+- [x] Nenhum módulo depende de `backend.app`; nenhuma árvore dupla `frontend/frontend` foi criada.
+- [x] `git status` não inclui runtime, bases locais, ambientes virtuais, dependências instaladas ou builds.
 
 Comparar o inventário de rotas em execução ao anterior: testar somente saúde não comprova os demais fluxos. Não retreinar XGBoost para validar uma movimentação de diretórios.
 
 ### 6. Revisar e publicar
 
 Revisar diff, documentação e resultados. Registrar migração e integração com mensagens descritivas, publicar `feat/docs-pipeline` e criar ou atualizar o PR para main, seguindo `guia_conformidade_git.md`. Incluir limitações e verificações executadas. Manter a branch remota antiga enquanto seu PR estiver ativo. Criar o PR não autoriza seu merge.
+
+## Evidências desta execução — 12/09/2026
+
+Os seis passos foram executados. A integração preserva `origin/main` em `07de512b`
+e os commits da branch de documentação. O resultado está publicado em
+`feat/docs-pipeline`, no [PR #3](https://github.com/felipeCapovilla/HackatonEnter/pull/3).
+
+| Verificação | Resultado observado |
+| --- | --- |
+| `python -m pytest -q` | 22 testes passaram, incluindo os seis testes originais de main |
+| `python -m compileall -q src contracts scripts tests` | Sem erros |
+| Importação de módulos | 30 módulos Python de `src`/`contracts` importados; monitor offline carrega o artefato real |
+| Instalação editável | `python -m pip install --no-deps --no-build-isolation -e .` passou no ambiente com dependências instaladas |
+| Schema | `python -m scripts.export_policy_schema` gerou os contratos do protótipo no destino correto |
+| API real | Uvicorn pelo novo entrypoint; saúde 200; processo criado, dois uploads e análise com `policy_source=MODEL` |
+| Compatibilidade HTTP | 13 pares método/rota anteriores preservados; OpenAPI publica 12 caminhos |
+| Regras da main | AST das três funções de decisão preservado; contratos e testes mantidos |
+| Frontend | Build passou; cinco regressões Playwright no Chrome executaram o bundle de produção com API interceptada apenas nos testes |
+| Fluxo integrado real | Chrome + Vite + FastAPI em portas isoladas: criação, solicitação, envio vinculado, dois documentos, XGBoost e decisão persistida; zero erros de página |
+| Protótipo | Build separado passou; exemplos estáticos identificados no README |
+| Dependências JavaScript | `npm audit --audit-level=high` completo: zero vulnerabilidades nas duas aplicações |
+| Diretórios e artefatos | Sem imports do pacote antigo nem arquivos versionados em `backend/`, `frontend/`, `web/` ou `venv/`; artefatos mantidos sem retreino |
+
+Vite foi atualizado para 7.3.6 e requer Node 20.19 (linha 20) ou 22.12+.
+As origens locais de desenvolvimento/preview são configuráveis por
+`ENTERAGREE_CORS_ORIGINS`. Os comandos do Makefile possuem equivalentes Python/npm
+no README; `make` não estava instalado no ambiente Windows desta validação.
+
+A verificação é da refatoração e dos fluxos atuais. Não inclui validação de OCR,
+extração semântica, autenticação, desempenho de 600 páginas/s ou eficácia jurídica
+em produção, que permanecem fora desta entrega.
