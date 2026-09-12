@@ -44,10 +44,19 @@ def test_gate_fecha_sem_contrato_e_sem_extrato():
     assert decidir(CASO_02).gate_defesa_disponivel is False
 
 
-def test_dossie_nao_conforme_forca_acordo():
+def test_dossie_nao_conforme_invalida_o_contrato():
+    """
+    Não conformidade não pula a economia: derruba o contrato como prova e
+    reprecifica. Forçar acordo aqui pagaria ~R$ 4.500 certos para evitar um
+    custo esperado de ~R$ 225.
+    """
     c = CASO_01.model_copy(update={"analise_dossie": AnaliseDossie(
         veredito="nao_conforme", analisou_assinatura_contrato=True)})
-    assert decidir(c).acao == "ACORDAR"
+    base, r = decidir(CASO_01), decidir(c)
+    assert r.p_perda > base.p_perda, "contrato deveria ter sido desconsiderado"
+    assert r.segmento.startswith("C0"), r.segmento
+    assert any("NÃO CONFORMIDADE" in a for a in r.alertas)
+    assert r.custo_esperado_defesa < (r.acordo.alvo if r.acordo else float("inf")) or r.acao == "DEFENDER"
 
 
 def test_terceira_via_quando_dossie_prova_que_contrato_existe():
@@ -61,3 +70,26 @@ def test_terceira_via_quando_dossie_prova_que_contrato_existe():
     assert r.recuperacao.documento == "contrato"
     assert r.recuperacao.confianca == "alta"
     assert r.recuperacao.ganho_estimado > 0
+
+
+def test_ajuste_de_uf_nao_estoura_nos_extremos():
+    """
+    Ajuste de UF é em log-odds, não multiplicativo. Multiplicando, um segmento
+    de 98,9% em UF de risco baixo cairia para 84% — erro grosseiro justamente
+    onde está 35% do custo.
+    """
+    from src.policy.table import p_perda
+    for uf in ("AM", "SP", "MA"):
+        p = p_perda(False, False, False, "Golpe", uf)
+        assert 0.90 < p < 1.0, f"{uf}: {p}"
+
+
+def test_recuperar_exige_que_o_dossie_tenha_periciado_o_contrato():
+    """Dossiê que só validou RG e liveness não prova que o contrato existe."""
+    base = CASO_02.model_copy(update={"dossie": True})
+    fraco = base.model_copy(update={"analise_dossie": AnaliseDossie(
+        veredito="conforme", analisou_assinatura_contrato=False)})
+    forte = base.model_copy(update={"analise_dossie": AnaliseDossie(
+        veredito="conforme", analisou_assinatura_contrato=True)})
+    assert decidir(forte).acao == "RECUPERAR"
+    assert decidir(fraco).acao != "RECUPERAR"
