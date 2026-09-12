@@ -43,3 +43,7 @@ Na reprodução local: AUC de validação cruzada `0.9079 ± 0.0013`, AUC de tes
 Esta entrega usa SQLite e tarefas em processo para demonstração. Produção requer armazenamento de objetos, fila de workers, banco transacional, autenticação/autorização, criptografia, antivírus, auditoria imutável e observabilidade. Páginas com pouco texto são sinalizadas; a métrica de qualidade e a etapa de OCR estão explicitamente pendentes. A extração semântica/RAG pode complementar, mas não substituir, a política e a confirmação determinística de tipo.
 
 Consulte `docs/arquitetura.md` para contrato, estados e critérios de evolução.
+
+## Feature planejada: acesso por perfil
+
+O [plano de banco, advogado, admin global e login](docs/plano_acesso_banco_advogado_admin.md) define telas, permissões, sessões, migração, contratos e critérios de aceite para a próxima implementação. Nesta entrega, somente o documento foi criado; autenticação e áreas separadas ainda não estão implementadas.
