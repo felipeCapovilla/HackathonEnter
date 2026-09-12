@@ -49,7 +49,11 @@ def test_upload_confirms_type_and_creates_auditable_analysis(tmp_path: Path) -> 
         assert analysis.status_code == 201
         result = analysis.json()
         assert result["recommendation"] == "ACORDO"
-        assert result["decision_code"] == "CRITICOS_INSUFICIENTES"
+        assert result["decision_code"] == "ACORDO_MAIS_BARATO"
+        assert result["policy_source"] == "TABELA_SEGMENTOS"
+        assert result["policy_output"]["acao"] == "ACORDAR"
+        assert result["policy_version"].startswith("politica-")
+        assert result["contract_version"] == "padrao"
         assert result["feature_provenance"][0]["value"] == 1
         assert result["pricing"]["target_value"] > 0
 
@@ -237,7 +241,7 @@ def test_concurrent_duplicate_upload_preserves_the_original_file(tmp_path: Path)
         assert download.content == content
 
 
-def test_relocated_api_can_load_xgboost_for_an_intermediate_case(tmp_path: Path) -> None:
+def test_contract_and_statement_lead_to_defense_by_the_segment_table(tmp_path: Path) -> None:
     app = create_app(_settings(tmp_path))
     with TestClient(app) as client:
         case_id = _create_case(client)
@@ -253,8 +257,11 @@ def test_relocated_api_can_load_xgboost_for_an_intermediate_case(tmp_path: Path)
             assert response.status_code == 201
         analysis = client.post(f"/api/cases/{case_id}/analyses")
         assert analysis.status_code == 201
-        assert analysis.json()["policy_source"] == "MODEL"
-        assert 0 <= analysis.json()["agreement_probability"] <= 1
+        result = analysis.json()
+        assert result["policy_source"] == "TABELA_SEGMENTOS"
+        assert result["recommendation"] == "DEFESA"
+        assert result["pricing"] is None
+        assert result["policy_output"]["segmento"].startswith("C1 E1")
 
 
 def test_frontend_preview_origin_can_access_the_api(tmp_path: Path) -> None:

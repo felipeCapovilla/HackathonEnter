@@ -510,15 +510,18 @@ class Repository:
             connection.execute(
                 """INSERT INTO analyses (
                     id, case_id, recommendation, decision_code, policy_source, agreement_probability,
-                    documentary_status, reasons, feature_vector, feature_provenance, pricing, limitations, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    documentary_status, reasons, feature_vector, feature_provenance, pricing, limitations,
+                    policy_output, policy_version, contract_version, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     record["id"], record["case_id"], record["recommendation"], record["decision_code"],
                     record["policy_source"], record["agreement_probability"], record["documentary_status"],
                     _json(record["reasons"]), _json(record["feature_vector"]),
                     _json(record["feature_provenance"]),
                     _json(record["pricing"]) if record.get("pricing") is not None else None,
-                    _json(record["limitations"]), record["created_at"],
+                    _json(record["limitations"]),
+                    _json(record["policy_output"]) if record.get("policy_output") is not None else None,
+                    record.get("policy_version"), record.get("contract_version"), record["created_at"],
                 ),
             )
         return record
@@ -637,4 +640,5 @@ class Repository:
         for key in ("reasons", "feature_vector", "feature_provenance", "limitations"):
             record[key] = json.loads(record[key])
         record["pricing"] = json.loads(record["pricing"]) if record.get("pricing") else None
+        record["policy_output"] = json.loads(record["policy_output"]) if record.get("policy_output") else None
         return record

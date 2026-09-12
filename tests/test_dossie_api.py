@@ -374,3 +374,59 @@ def test_legacy_database_adds_dossier_tables_idempotently(application) -> None:
     assert app.state.repository.get_dossie_analysis(document["id"]) is None
     with connection_for(path) as connection:
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+class ConformingAnalyzer:
+    def analyze_pages(self, pages) -> DossieReport:
+        list(pages)
+        return DossieReport(
+            docie_existe=True,
+            analise=AnaliseDossie(veredito="conforme", analisou_assinatura_contrato=True,
+                                  numero_contrato_referenciado="603827451"),
+            evidencias=[], avisos=[], paginas_processadas=1, trechos_processados=1, completo=True,
+            assinatura_contrato_status="sim",
+        )
+
+
+def _document_in_case(app, case_id: str, declared_type: DocumentType, text: str) -> dict:
+    repository = app.state.repository
+    document = repository.create_document(
+        case_id=case_id, original_filename=f"{declared_type.value.lower()}.txt", file_path=Path("unused.txt"),
+        declared_type=declared_type, source_party=SourceParty.BANCO, sha256=str(uuid4()), request_id=None,
+    )
+    repository.append_document_pages(document["id"], [{
+        "page_number": 1, "text_content": text, "extraction_method": "TEXT", "quality_flags": [],
+    }])
+    repository.update_document_extraction(
+        document["id"], status="COMPLETED", page_count=1, pages_extracted=1,
+        quality_flags=[], detected_type=declared_type, type_status=DocumentTypeStatus.CONFIRMED,
+    )
+    return repository.get_document(document["id"])
+
+
+def test_dossier_that_examined_the_contract_signature_turns_settlement_into_recovery(application) -> None:
+    """A análise do dossiê alimenta a política: o contrato existe, e recuperá-lo vence acordar."""
+    app, client = application
+    app.state.dossie.analyzer = ConformingAnalyzer()
+    case = app.state.repository.create_case(
+        CaseCreate(case_number=str(uuid4()), uf="AM", value_of_claim=15000, sub_subject="Golpe"))
+    _document_in_case(app, case["id"], DocumentType.EXTRATO, "Extrato bancário com crédito em conta.")
+    _document_in_case(app, case["id"], DocumentType.COMPROVANTE_CREDITO, "Comprovante de crédito BACEN.")
+    dossie = _document_in_case(app, case["id"], DocumentType.DOSSIE, "Dossiê com perícia da assinatura do contrato.")
+
+    before = client.post(f"/api/cases/{case['id']}/analyses").json()
+    assert before["recommendation"] == "ACORDO"
+    assert any("sem análise concluída" in item for item in before["limitations"])
+
+    assert client.post(f"/api/documents/{dossie['id']}/dossie-analysis").status_code == 201
+    after = client.post(f"/api/cases/{case['id']}/analyses").json()
+    assert after["recommendation"] == "RECUPERAR"
+    assert after["decision_code"] == "RECUPERAR_DOCUMENTO"
+    assert after["policy_output"]["recuperacao"]["documento"] == "contrato"
+    assert after["pricing"]["target_value"] > 0, "a faixa fica disponível para o caso de o documento não vir"
+    assert any(item["feature"] == "Análise do dossiê" for item in after["feature_provenance"])
+
+    decision = client.post(f"/api/cases/{case['id']}/lawyer-decisions?analysis_id={after['id']}",
+                           json={"action": "RECUPERAR"})
+    assert decision.status_code == 201
+    assert client.get("/api/monitoring").json()["adherence_rate"] == 1.0

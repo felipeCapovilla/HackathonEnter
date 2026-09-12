@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS analyses (
     feature_provenance TEXT NOT NULL,
     pricing TEXT,
     limitations TEXT NOT NULL,
+    policy_output TEXT,
+    policy_version TEXT,
+    contract_version TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -177,8 +180,9 @@ def initialize_database(database_path: Path) -> None:
         connection.execute("INSERT OR IGNORE INTO banks (id, name, created_at) VALUES ('banco-unicamp', 'Banco Unicamp', '1970-01-01T00:00:00+00:00')")
         connection.execute("UPDATE cases SET bank_id = 'banco-unicamp' WHERE bank_id IS NULL")
         columns = {row[1] for row in connection.execute("PRAGMA table_info(analyses)")}
-        if "pricing" not in columns:
-            connection.execute("ALTER TABLE analyses ADD COLUMN pricing TEXT")
+        for name in ("pricing", "policy_output", "policy_version", "contract_version"):
+            if name not in columns:
+                connection.execute(f"ALTER TABLE analyses ADD COLUMN {name} TEXT")
         connection.execute(
             "UPDATE document_requests SET status = 'REQUESTED' WHERE status IN ('PENDING', 'OVERDUE')"
         )

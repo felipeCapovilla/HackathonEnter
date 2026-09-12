@@ -139,6 +139,9 @@ class AnalysisRecord(BaseModel):
     feature_provenance: list[FeatureProvenance]
     pricing: dict[str, object] | None = None
     limitations: list[str] = Field(default_factory=list)
+    policy_output: dict[str, object] | None = None
+    policy_version: str | None = None
+    contract_version: str | None = None
     created_at: datetime
 
 
@@ -164,7 +167,7 @@ class DocumentRequestResponse(BaseModel):
 
 
 class LawyerDecisionCreate(BaseModel):
-    action: str = Field(pattern="^(ACORDO|DEFESA)$")
+    action: str = Field(pattern="^(ACORDO|DEFESA|RECUPERAR)$")
     reason: str | None = Field(default=None, max_length=2000)
     proposed_value: float | None = Field(default=None, ge=0)
 

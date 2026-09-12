@@ -28,7 +28,7 @@ def build_monitoring_summary(connection: sqlite3.Connection, bank_id: str | None
     """Build the monitoring payload consumed by the bank dashboard.
 
     Adherence is measured only for decisions that reference an analysis whose
-    recommendation is ``ACORDO`` or ``DEFESA``. Orphan decisions and analyses
+    recommendation is ``ACORDO``, ``DEFESA`` or ``RECUPERAR``. Orphan decisions and analyses
     without a decision remain visible in their respective totals, but cannot
     be interpreted as either adherent or non-adherent.
     """
@@ -57,8 +57,8 @@ def build_monitoring_summary(connection: sqlite3.Connection, bank_id: str | None
             ) AS adherent_decisions
         FROM lawyer_decisions AS decision
         INNER JOIN analyses AS analysis ON analysis.id = decision.analysis_id
-            {scoped_where} UPPER(TRIM(decision.action)) IN ('ACORDO', 'DEFESA')
-          AND UPPER(TRIM(analysis.recommendation)) IN ('ACORDO', 'DEFESA')
+            {scoped_where} UPPER(TRIM(decision.action)) IN ('ACORDO', 'DEFESA', 'RECUPERAR')
+          AND UPPER(TRIM(analysis.recommendation)) IN ('ACORDO', 'DEFESA', 'RECUPERAR')
         """, scoped_args
     ).fetchone()
 

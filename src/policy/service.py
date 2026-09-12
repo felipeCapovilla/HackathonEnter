@@ -1,93 +1,162 @@
-"""Compose validated documentary evidence with the Group 9 policy engine."""
+"""
+Monta o caso a partir das evidências documentais e aplica a política.
+
+Único caminho da API até a decisão: documentos confirmados viram as flags de
+presença, a análise de dossiê concluída vira `AnaliseDossie`, e tudo passa por
+`src.policy.engine.decidir`.
+"""
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.policy.engine import PolicyEngine
-
+from contracts.schema import AnaliseDossie, CaseFeatures, ParametrosContrato, Recomendacao
+from src.policy.engine import decidir
 from src.interface.backend.repository import Repository
 from src.interface.backend.schemas import DocumentaryStatus, DocumentStatus, DocumentTypeStatus
-
 
 TYPE_TO_FEATURE = {
     "CONTRATO": "contrato",
     "EXTRATO": "extrato",
     "COMPROVANTE_CREDITO": "comprovante_credito",
     "DOSSIE": "dossie",
-    "DEMONSTRATIVO_DIVIDA": "demonstrativo_divida",
-    "LAUDO_REFERENCIADO": "laudo_referenciado",
+    "DEMONSTRATIVO_DIVIDA": "demonstrativo",
+    "LAUDO_REFERENCIADO": "laudo",
 }
+# Nomes de coluna da base histórica: mantidos no feature_vector para auditoria.
+FEATURE_LABELS = {
+    "contrato": "Contrato",
+    "extrato": "Extrato",
+    "comprovante_credito": "Comprovante de crédito",
+    "dossie": "Dossiê",
+    "demonstrativo": "Demonstrativo de evolução da dívida",
+    "laudo": "Laudo referenciado",
+}
+ACAO_PARA_API = {"ACORDAR": "ACORDO", "DEFENDER": "DEFESA", "RECUPERAR": "RECUPERAR"}
+USABLE_TYPE = {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value}
+USABLE_STATUS = {DocumentStatus.COMPLETED.value, DocumentStatus.COMPLETED_WITH_WARNINGS.value}
+
+ContractProvider = Callable[[str | None], ParametrosContrato]
+
+
+def _contrato_padrao(_bank_id: str | None) -> ParametrosContrato:
+    return ParametrosContrato()
 
 
 class PolicyService:
-    def __init__(self, repository: Repository, model_path: str) -> None:
+    def __init__(self, repository: Repository, model_path: str | None = None,
+                 contract_provider: ContractProvider | None = None) -> None:
+        # model_path fica aceito por compatibilidade com quem ainda o passa;
+        # a política por segmentos não carrega modelo.
         self.repository = repository
-        self.engine = PolicyEngine(model_path=model_path)
+        self.contract_provider = contract_provider or _contrato_padrao
 
     def evaluate(self, case_id: str) -> dict:
         case = self.repository.get_case(case_id)
         if case is None:
             raise LookupError("Processo não encontrado.")
         documents = self.repository.list_documents(case_id)
-        input_data, provenance = self._build_policy_input(case, documents)
-        decision = self.engine.evaluate(input_data)
-        documentary_status, limitations = self._documentary_status(documents)
-        pricing = asdict(decision.pricing) if decision.pricing else None
+        features, provenance = self._build_features(case, documents)
+        contrato = self.contract_provider(case.get("bank_id"))
+        recomendacao = decidir(features, contrato)
+        documentary_status, limitations = self._documentary_status(documents, features)
         record = {
             "id": str(uuid4()),
             "case_id": case_id,
-            "recommendation": decision.recommendation,
-            "decision_code": decision.decision_code,
-            "policy_source": decision.source,
-            "agreement_probability": decision.agreement_probability,
+            "recommendation": ACAO_PARA_API[recomendacao.acao],
+            "decision_code": self._decision_code(recomendacao),
+            "policy_source": "TABELA_SEGMENTOS" if recomendacao.fonte_probabilidade == "tabela" else "FONTE_EXTERNA",
+            "agreement_probability": None,
             "documentary_status": documentary_status.value,
-            "reasons": list(decision.reasons),
-            "feature_vector": decision.feature_vector,
+            "reasons": recomendacao.justificativa,
+            "feature_vector": {
+                **{FEATURE_LABELS[k]: int(getattr(features, k)) for k in FEATURE_LABELS},
+                "is_golpe": int(features.sub_assunto == "Golpe"),
+            },
             "feature_provenance": provenance,
-            "pricing": pricing,
-            "limitations": limitations,
+            "pricing": self._pricing(recomendacao),
+            "limitations": [*limitations, *recomendacao.alertas],
+            "policy_output": recomendacao.model_dump(mode="json"),
+            "policy_version": recomendacao.versao_politica,
+            "contract_version": recomendacao.versao_contrato,
             "created_at": datetime.now(UTC).isoformat(),
         }
         return self.repository.create_analysis(record)
 
-    @staticmethod
-    def _build_policy_input(case: dict, documents: list[dict]) -> tuple[dict, list[dict]]:
-        input_data = {
-            "case_id": case["case_number"],
-            "uf": case["uf"],
-            "value_of_claim": case["value_of_claim"],
-            "sub_subject": case["sub_subject"],
-            "dossie_status": case["dossie_status"],
-            **{feature: False for feature in TYPE_TO_FEATURE.values()},
-        }
+    def _build_features(self, case: dict, documents: list[dict]) -> tuple[CaseFeatures, list[dict]]:
+        flags = {feature: False for feature in TYPE_TO_FEATURE.values()}
         evidence: dict[str, list[str]] = {feature: [] for feature in TYPE_TO_FEATURE.values()}
         for document in documents:
             feature = TYPE_TO_FEATURE.get(document["declared_type"])
-            is_usable = (
-                feature is not None
-                and document["status"] in {DocumentStatus.COMPLETED.value, DocumentStatus.COMPLETED_WITH_WARNINGS.value}
-                and document["type_status"]
-                in {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value}
-            )
-            if is_usable:
-                input_data[feature] = True
+            if feature and document["status"] in USABLE_STATUS and document["type_status"] in USABLE_TYPE:
+                flags[feature] = True
                 evidence[feature].append(document["id"])
+
+        analise, dossie_document_id = self._analise_dossie(case, documents)
+        features = CaseFeatures(
+            numero_processo=case["case_number"],
+            uf=case["uf"],
+            sub_assunto="Golpe" if "golpe" in (case.get("sub_subject") or "").lower() else "Generico",
+            valor_causa=float(case.get("value_of_claim") or 0.0),
+            analise_dossie=analise,
+            **flags,
+        )
         provenance = [
-            {
-                "feature": feature,
-                "value": int(input_data[feature]),
-                "document_ids": evidence[feature],
-                "derivation_rule": "tipo declarado confirmado ou confirmado pelo usuário; extração concluída",
-            }
-            for feature in TYPE_TO_FEATURE.values()
+            {"feature": FEATURE_LABELS[feature], "value": int(flags[feature]), "document_ids": evidence[feature],
+             "derivation_rule": "tipo declarado confirmado ou confirmado pelo usuário; extração concluída"}
+            for feature in FEATURE_LABELS
         ]
-        return input_data, provenance
+        if analise is not None:
+            provenance.append({
+                "feature": "Análise do dossiê", "value": int(analise.analisou_assinatura_contrato),
+                "document_ids": [dossie_document_id] if dossie_document_id else [],
+                "derivation_rule": f"veredito {analise.veredito}; 1 = periciou a assinatura do contrato",
+            })
+        return features, provenance
+
+    def _analise_dossie(self, case: dict, documents: list[dict]) -> tuple[AnaliseDossie | None, str | None]:
+        from src.utils.dossie_service import DossieService
+
+        usable = {d["id"]: d for d in documents
+                  if d["declared_type"] == "DOSSIE" and d["type_status"] in USABLE_TYPE and d["status"] in USABLE_STATUS}
+        for summary in self.repository.list_current_dossie_summaries(case["id"]):
+            document = usable.get(summary["document_id"])
+            if summary["status"] != "COMPLETED" or document is None:
+                continue
+            record = DossieService.apply_document_context(summary, document)
+            if record.get("result"):
+                return AnaliseDossie.model_validate(record["result"]["analise"]), document["id"]
+        if (case.get("dossie_status") or "").upper() == "NAO_CONFORME":
+            return AnaliseDossie(veredito="nao_conforme", analisou_assinatura_contrato=False), None
+        return None, None
 
     @staticmethod
-    def _documentary_status(documents: list[dict]) -> tuple[DocumentaryStatus, list[str]]:
+    def _decision_code(r: Recomendacao) -> str:
+        if r.acao == "RECUPERAR":
+            return "RECUPERAR_DOCUMENTO"
+        if r.acao == "ACORDAR":
+            return "ACORDO_GATE_FECHADO" if not r.gate_defesa_disponivel else "ACORDO_MAIS_BARATO"
+        return "DEFESA_COM_JUSTIFICATIVA" if not r.gate_defesa_disponivel else "DEFESA_MAIS_BARATA"
+
+    @staticmethod
+    def _pricing(r: Recomendacao) -> dict | None:
+        if r.acordo is None:
+            return None
+        return {
+            "opening_value": r.acordo.abertura,
+            "target_value": r.acordo.alvo,
+            "walk_away_value": r.acordo.walk_away,
+            "negotiable": r.acordo.negociavel,
+            "expected_defense_cost": r.custo_esperado_defesa,
+            "savings_at_target": r.economia_no_alvo,
+            "loss_probability": r.p_perda,
+            "indifference_probability": r.p_estrela,
+        }
+
+    @staticmethod
+    def _documentary_status(documents: list[dict], features: CaseFeatures) -> tuple[DocumentaryStatus, list[str]]:
         if not documents:
             return DocumentaryStatus.INFORMACAO_INSUFICIENTE, ["Nenhum documento foi enviado para o processo."]
         statuses = {document["status"] for document in documents}
@@ -100,17 +169,14 @@ class PolicyService:
             return DocumentaryStatus.FALHA_TECNICA, ["Não foi possível extrair texto dos documentos enviados."]
         if statuses & {DocumentStatus.UPLOADED.value, DocumentStatus.EXTRACTING.value}:
             return DocumentaryStatus.ANALISE_PRELIMINAR, ["A extração documental ainda está em andamento."]
-        limitations = [
-            "Esta recomendação usa tipo e extração; a análise auxiliar de dossiê por LLM é consultada separadamente e não altera a política automaticamente.",
-        ]
+        limitations = []
+        if features.dossie and features.analise_dossie is None:
+            limitations.append("Dossiê presente sem análise concluída: a recomendação não usa o conteúdo dele.")
         if DocumentTypeStatus.UNCONFIRMED.value in type_statuses:
             limitations.append("Há documento não confirmado, que não ativou nenhuma variável da política.")
         if any(document["quality_flags"] for document in documents):
             limitations.append("Métrica de qualidade de OCR permanece pendente; páginas com pouco texto foram sinalizadas.")
-        usable = any(
-            document["type_status"] in {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value}
-            for document in documents
-        )
+        usable = any(document["type_status"] in USABLE_TYPE for document in documents)
         if not usable:
             return DocumentaryStatus.INFORMACAO_INSUFICIENTE, limitations
         return DocumentaryStatus.SUSTENTADA_COM_RESSALVAS, limitations

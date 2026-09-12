@@ -5,8 +5,10 @@ import { useAction, useResource } from "./hooks";
 import { Brand, Icon } from "./Brand";
 import { DocumentPanel } from "./DocumentPanel";
 
-const labels = { ACORDO: "Acordo", DEFESA: "Defesa", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
+const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Recuperar documento", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+const actionText = { ACORDO: "Propor acordo", DEFESA: "Disputar a causa", RECUPERAR: "Solicitar o documento ao banco antes de decidir" };
+const recommendationClass = { ACORDO: "agreement", DEFESA: "defense", RECUPERAR: "recover" };
 const homeFor = (user) => user.role === "BANCO" ? "/banco" : user.role === "ADVOGADO_EXTERNO" ? "/advogado" : "/admin";
 
 function ErrorNotice({ message, onRetry }) {
@@ -200,16 +202,17 @@ function CaseDetail({ caseId, user }) {
       <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} canUpload={user.role === "BANCO"} onUploaded={resource.reload} />
       <article className="panel analysis"><h3>Saída da ferramenta</h3>
         {recommendation ? <>
-          <div className={`recommendation ${recommendation.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation]}</strong></div>
-          <p><b>Ação indicada:</b> {recommendation.recommendation === "ACORDO" ? "Propor acordo" : "Disputar a causa"}</p>
-          {recommendation.pricing?.target_value != null && <div className="price-block"><span>Valor sugerido</span><strong>{money(recommendation.pricing.target_value)}</strong></div>}
+          <div className={`recommendation ${recommendationClass[recommendation.recommendation] || "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation] || recommendation.recommendation}</strong></div>
+          <p><b>Ação indicada:</b> {actionText[recommendation.recommendation] || recommendation.recommendation}</p>
+          {recommendation.policy_output?.recuperacao && <div className="price-block"><span>Documento a solicitar · ganho esperado</span><strong>{labels[recommendation.policy_output.recuperacao.documento.toUpperCase()] || recommendation.policy_output.recuperacao.documento} · {money(recommendation.policy_output.recuperacao.ganho_estimado)}</strong></div>}
+          {recommendation.pricing?.target_value != null && <div className="price-block"><span>{recommendation.pricing.negotiable === false ? "Valor único de acordo" : "Faixa de negociação"}</span><strong>{recommendation.pricing.negotiable === false ? money(recommendation.pricing.target_value) : `${money(recommendation.pricing.opening_value)} a ${money(recommendation.pricing.walk_away_value)}`}</strong>{recommendation.pricing.negotiable !== false && <small>Alvo {money(recommendation.pricing.target_value)} · acima de {money(recommendation.pricing.walk_away_value)} é defesa</small>}</div>}
           <ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
         </> : <p className="muted">Aguardando avaliação do advogado.</p>}
       </article></div>
       {user.role === "ADVOGADO_EXTERNO" && recommendation && <article className="panel decision"><h3>Registrar decisão</h3>
         <form key={recommendation.id} onSubmit={decide}>
           <fieldset className="form-fields" disabled={busy}>
-            <label>Ação<select aria-label="Ação" name="action" defaultValue={recommendation.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option></select></label>
+            <label>Ação<select aria-label="Ação" name="action" defaultValue={recommendation.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option><option value="RECUPERAR">Recuperar documento</option></select></label>
             <label>Valor proposto<input name="value" type="number" min="0" step="0.01" /></label>
             <label>Justificativa<textarea name="reason" maxLength="2000" /></label>
             <button>Registrar decisão</button>
