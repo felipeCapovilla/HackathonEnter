@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -256,6 +258,138 @@ class Repository:
         record["quality_flags"] = json.loads(record["quality_flags"])
         return record
 
+    def iter_document_pages(self, document_id: str, batch_size: int = 32) -> Iterator[dict]:
+        if batch_size < 1:
+            raise ValueError("O tamanho do lote deve ser positivo.")
+        last_page = 0
+        while True:
+            with connection_for(self.database_path) as connection:
+                rows = connection.execute(
+                    """SELECT page_number, text_content FROM document_pages
+                    WHERE document_id = ? AND page_number > ? ORDER BY page_number LIMIT ?""",
+                    (document_id, last_page, batch_size),
+                ).fetchall()
+            if not rows:
+                return
+            for row in rows:
+                last_page = row["page_number"]
+                yield dict(row)
+
+    def get_cached_dossie_analysis(
+        self, document_id: str, sha256: str, model: str, analyzer_version: str
+    ) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                """SELECT * FROM dossie_analyses WHERE document_id = ? AND sha256 = ?
+                AND model = ? AND analyzer_version = ? AND status = 'COMPLETED'""",
+                (document_id, sha256, model, analyzer_version),
+            ).fetchone()
+        return self._decode_dossie_analysis(_row(row))
+
+    def claim_dossie_analysis(
+        self, document: dict, model: str, analyzer_version: str, timeout_seconds: int
+    ) -> str | None:
+        token = str(uuid4())
+        now = time.time()
+        with connection_for(self.database_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM dossie_analysis_claims WHERE expires_at <= ?", (now,))
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO dossie_analysis_claims
+                (document_id, sha256, model, analyzer_version, token, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (document["id"], document["sha256"], model, analyzer_version, token, now + timeout_seconds),
+            )
+        return token if cursor.rowcount == 1 else None
+
+    def release_dossie_analysis(self, token: str) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.execute("DELETE FROM dossie_analysis_claims WHERE token = ?", (token,))
+
+    def create_dossie_analysis(
+        self, *, document: dict, model: str, analyzer_version: str,
+        result: dict | None = None, error_code: str | None = None,
+    ) -> dict:
+        record = {
+            "id": str(uuid4()),
+            "document_id": document["id"],
+            "sha256": document["sha256"],
+            "model": model,
+            "analyzer_version": analyzer_version,
+            "status": "FAILED" if error_code else "COMPLETED",
+            "result": _json(result) if result is not None else None,
+            "error_code": error_code,
+            "created_at": _now(),
+        }
+        try:
+            with connection_for(self.database_path) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                if not error_code:
+                    current = connection.execute(
+                        """SELECT declared_type, type_status, status, sha256
+                        FROM documents WHERE id = ?""", (document["id"],)
+                    ).fetchone()
+                    if current is None or any(
+                        current[key] != document[key]
+                        for key in ("declared_type", "type_status", "status", "sha256")
+                    ):
+                        raise ValueError("O documento mudou durante a análise; tente novamente.")
+                connection.execute(
+                    """INSERT INTO dossie_analyses
+                    (id, document_id, sha256, model, analyzer_version, status, result, error_code, created_at)
+                    VALUES (:id, :document_id, :sha256, :model, :analyzer_version,
+                    :status, :result, :error_code, :created_at)""", record,
+                )
+        except sqlite3.IntegrityError:
+            cached = self.get_cached_dossie_analysis(document["id"], document["sha256"], model, analyzer_version)
+            if cached is not None:
+                return cached
+            raise
+        return self._decode_dossie_analysis(record)
+
+    def get_dossie_analysis(self, document_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                """SELECT * FROM dossie_analyses WHERE document_id = ?
+                ORDER BY CASE status WHEN 'COMPLETED' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT 1""",
+                (document_id,),
+            ).fetchone()
+        return self._decode_dossie_analysis(_row(row))
+
+    def list_dossie_analyses(self, case_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                """SELECT analysis.* FROM dossie_analyses AS analysis
+                JOIN documents AS document ON document.id = analysis.document_id
+                WHERE document.case_id = ? AND document.type_status != 'REMOVED'
+                ORDER BY CASE analysis.status WHEN 'COMPLETED' THEN 0 ELSE 1 END,
+                analysis.created_at DESC""", (case_id,),
+            ).fetchall()
+        return [self._decode_dossie_analysis(dict(row)) for row in rows]
+
+    def list_current_dossie_summaries(self, case_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                """WITH ranked AS (
+                    SELECT analysis.*, ROW_NUMBER() OVER (
+                        PARTITION BY analysis.document_id
+                        ORDER BY CASE analysis.status WHEN 'COMPLETED' THEN 0 ELSE 1 END,
+                        analysis.created_at DESC, analysis.id DESC
+                    ) AS position
+                    FROM dossie_analyses AS analysis
+                    JOIN documents AS document ON document.id = analysis.document_id
+                    WHERE document.case_id = ? AND document.type_status != 'REMOVED'
+                )
+                SELECT id, document_id, model, status, error_code, created_at,
+                    json_set(result, '$.evidencias', json('[]')) AS result,
+                    COALESCE(json_array_length(result, '$.evidencias'), 0) AS evidencias_total
+                FROM ranked WHERE position = 1 ORDER BY created_at DESC""", (case_id,),
+            ).fetchall()
+        return [
+            {**self._decode_dossie_analysis(dict(row)), "evidencias_carregadas": False}
+            for row in rows
+        ]
+
     def update_document_type(
         self,
         document_id: str,
@@ -376,6 +510,15 @@ class Repository:
                 "SELECT * FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC", (case_id,)
             ).fetchall()
         return [dict(row) for row in rows]
+
+    @staticmethod
+    def _decode_dossie_analysis(record: dict | None) -> dict | None:
+        if record is None:
+            return None
+        record["result"] = json.loads(record["result"]) if record["result"] else None
+        record.pop("sha256", None)
+        record.pop("analyzer_version", None)
+        return record
 
     @staticmethod
     def _decode_document(record: dict | None, *, include_internal: bool = False) -> dict | None:

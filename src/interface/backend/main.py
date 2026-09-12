@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from .config import Settings, get_settings
 from .database import connection_for, initialize_database
 from src.utils.document_service import DocumentService
+from src.utils.dossie_service import DossieService, DossieUnavailableError
 from src.utils.document_type_validator import validate_document_type
 from .monitoring import build_monitoring_summary
 from src.policy.service import PolicyService
@@ -27,6 +28,7 @@ from .schemas import (
     DocumentRequestStatus,
     DocumentType,
     DocumentTypeStatus,
+    DossieAnalysisRecord,
     LawyerDecisionCreate,
     MonitoringSummary,
     SourceParty,
@@ -42,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         initialize_database(app_settings.database_path)
         app.state.repository = Repository(app_settings.database_path)
         app.state.documents = DocumentService(app.state.repository, app_settings)
+        app.state.dossie = DossieService(app.state.repository)
         app.state.policy = PolicyService(
             app.state.repository, str(app_settings.artifact_dir / "modelo_xgboost.pkl")
         )
@@ -86,11 +89,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/cases/{case_id}")
     def get_case(case_id: str) -> dict:
         case = require_case(case_id)
+        documents = repository().list_documents(case_id)
         return {
             "case": case,
-            "documents": repository().list_documents(case_id),
+            "documents": documents,
             "document_requests": repository().list_document_requests(case_id),
             "analyses": repository().list_analyses(case_id),
+            "dossie_analyses": app.state.dossie.summaries(case_id, documents),
             "lawyer_decisions": repository().list_lawyer_decisions(case_id),
         }
 
@@ -138,6 +143,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not path.exists():
             raise HTTPException(410, "Arquivo original não está mais disponível.")
         return FileResponse(path, filename=document["original_filename"])
+
+    @app.get("/api/documents/{document_id}/dossie-analysis", response_model=DossieAnalysisRecord)
+    def get_dossie_analysis(document_id: str) -> dict:
+        try:
+            return app.state.dossie.get(document_id)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @app.post("/api/documents/{document_id}/dossie-analysis", response_model=DossieAnalysisRecord, status_code=201)
+    def analyze_dossie(document_id: str) -> dict:
+        try:
+            return app.state.dossie.analyze(document_id)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except DossieUnavailableError as exc:
+            raise HTTPException(503, str(exc)) from exc
 
     @app.post("/api/documents/{document_id}/type-confirmation", response_model=DocumentRecord)
     def confirm_document_type(document_id: str, payload: TypeConfirmation) -> dict:

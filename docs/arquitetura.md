@@ -20,7 +20,17 @@ O advogado pode criar pedido de documento; o banco pode anexar a resposta, decla
 
 ## Limites atuais
 
-Não há OCR, classificação semântica, RAG, LLM nem autenticação nesta entrega. A avaliação de conteúdo além da identificação de tipo é deliberadamente futura: deverá retornar fatos estruturados com citação de página, confiança, validação cruzada entre documentos e revisão humana. Nunca deverá aceitar instruções presentes nos autos como instruções do sistema.
+Há extração auxiliar de dossiê por LLM, iniciada explicitamente pelo usuário,
+com campos estruturados, citação literal por página e resultado persistido.
+O tipo documental permanece determinístico. O detalhe do caso carrega resumos;
+as evidências completas são consultadas sob demanda. A API G9 não usa o resultado
+para alterar automaticamente as recomendações.
+
+Não há OCR, RAG, validação cruzada entre documentos nem autenticação nesta entrega.
+A confiança de extração não foi calibrada. O texto enviado é tratado como dado
+não confiável, sem ferramentas disponíveis ao LLM; validação literal não garante
+correção semântica. A revisão humana continua necessária.
+Veja [contratos, limites e validação](dossie_analyser_implementacao.md).
 
 ## Critérios para produção
 
