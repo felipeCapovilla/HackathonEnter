@@ -63,6 +63,9 @@ recebe `404` para processo de outro responsável, evitando a enumeração de cas
 - Testes de navegador: jornada de banco e de advogado com APIs simuladas.
 - Build Vite: garante rotas React e bundles de produção.
 
+As correções de formulários, logout, carregamento e identidade visual, incluindo
+a validação com API real, estão registradas em `auditoria_frontend.md`.
+
 ## Limites conhecidos e próximos passos
 
 - O cadastro inicial é propositalmente por CLI; não há endpoint público de

@@ -117,6 +117,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         token = request.cookies.get(COOKIE_NAME)
         if token:
             repository().revoke_session(hashlib.sha256(token.encode()).hexdigest())
+        response.status_code = status.HTTP_204_NO_CONTENT
+        response.headers["Cache-Control"] = "no-store"
         response.delete_cookie(COOKIE_NAME)
         return response
 
@@ -128,7 +130,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/admin/banks", response_model=BankRecord, status_code=201)
     def create_bank(payload: BankCreate, request: Request) -> dict:
         require_role(current_user(request), UserRole.ADMIN_GLOBAL)
-        return repository().create_bank(payload.name)
+        try:
+            return repository().create_bank(payload.name)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.get("/api/admin/users", response_model=list[UserRecord])
     def admin_users(request: Request) -> list[dict]:
@@ -142,7 +147,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(422, "Administradores não possuem banco; usuários operacionais exigem banco.")
         if payload.bank_id and repository().get_bank(payload.bank_id) is None:
             raise HTTPException(422, "Banco não encontrado.")
-        return repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
+        try:
+            return repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.patch("/api/admin/users/{user_id}", response_model=UserRecord)
     def update_user(user_id: str, payload: UserUpdate, request: Request) -> dict:
@@ -194,7 +202,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.patch("/api/cases/{case_id}/assignment", response_model=CaseRecord)
     def assign_case(case_id: str, payload: CaseAssignment, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.BANCO)
-        case = repository().assign_lawyer(case_id, payload.assigned_lawyer_id, user["bank_id"])
+        try:
+            case = repository().assign_lawyer(case_id, payload.assigned_lawyer_id, user["bank_id"])
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
         if case is None:
             raise HTTPException(404, "Processo não encontrado.")
         return case

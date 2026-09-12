@@ -1,58 +1,338 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import "./styles.css";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { request, sendJson, SESSION_EXPIRED } from "./api";
+import { useAction, useResource } from "./hooks";
+import { Brand, Icon } from "./Brand";
 
-const API = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000/api`;
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+const homeFor = (user) => user.role === "BANCO" ? "/banco" : user.role === "ADVOGADO_EXTERNO" ? "/advogado" : "/admin";
 
-async function request(path, options = {}) {
-  const response = await fetch(API + path, { credentials: "include", ...options });
-  if (response.status === 204) return null;
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || `Erro ${response.status}`);
-  return data;
+function ErrorNotice({ message, onRetry }) {
+  if (!message) return null;
+  return <div className="warning" role="alert"><p>{message}</p>{onRetry && <button type="button" onClick={onRetry}>Tentar novamente</button>}</div>;
 }
 
-function Login({ onLogin }) {
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
-  const submit = async (event) => {
-    event.preventDefault(); const form = new FormData(event.currentTarget); setPending(true); setError("");
-    try { onLogin(await request("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.get("email"), password: form.get("password") }) })); }
-    catch (cause) { setError(cause.message); } finally { setPending(false); }
+function Login({ onLogin, notice }) {
+  const action = useAction();
+  const submit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    action.run(async () => {
+      await sendJson("/auth/login", { email: form.get("email").trim(), password: form.get("password") });
+      const user = await request("/auth/me");
+      if (!user) throw new Error("O navegador não manteve a sessão. Verifique se a interface e a API usam o mesmo endereço.");
+      onLogin(user);
+    });
   };
-  return <main className="login-page"><section className="login-card"><p className="eyebrow">ENTEROS · BANCO UNICAMP</p><h1>EnterAgree</h1><p>Acesse sua área de operação.</p><form onSubmit={submit}><label>E-mail<input name="email" type="email" required autoComplete="email" /></label><label>Senha<input name="password" type="password" required autoComplete="current-password" /></label>{error && <p className="warning" role="alert">{error}</p>}<button disabled={pending}>{pending ? "Entrando…" : "Entrar"}</button></form></section></main>;
+  return <main className="login-page">
+    <aside className="login-story">
+      <Brand />
+      <div className="login-story-copy"><p className="eyebrow">INTELIGÊNCIA JURÍDICA EM ESCALA</p>
+        <h2>Inteligência que<br />impulsiona<br /><span>a justiça.</span></h2>
+        <p>Conecte documentos, política e decisões em uma operação mais eficiente.</p>
+        <div className="story-steps"><span><Icon name="files" />Analise</span><span><Icon name="spark" />Decida</span><span><Icon name="chart" />Acompanhe</span></div>
+      </div>
+      <p className="story-footer">PESSOAS. TECNOLOGIA. EFICIÊNCIA.</p>
+    </aside>
+    <section className="login-form-area"><div className="login-card">
+    <Brand compact />
+    <p className="eyebrow">BEM-VINDO AO ENTEROS</p><h1>Acesse sua operação.</h1><p className="login-description">Entre no EnterAgree para acompanhar seus processos e transformar dados em decisões.</p>
+    {notice && <p role="status">{notice}</p>}
+    <form onSubmit={submit}>
+      <fieldset className="form-fields" disabled={action.pending}>
+        <label>E-mail<input name="email" type="email" required autoComplete="username" /></label>
+        <label>Senha<input name="password" type="password" required autoComplete="current-password" /></label>
+        <ErrorNotice message={action.error} />
+        <button>{action.pending ? "Entrando…" : <>Entrar<Icon name="arrow" /></>}</button>
+      </fieldset>
+    </form>
+    <p className="login-footnote"><Icon name="shield" />Acesso restrito aos usuários cadastrados.</p>
+  </div><p className="login-signature">MESMA JUSTIÇA. MAIS IMPACTO.</p></section></main>;
 }
 
-function Shell({ user, onLogout, children }) {
-  const base = user.role === "BANCO" ? "/banco" : user.role === "ADVOGADO_EXTERNO" ? "/advogado" : "/admin";
-  return <main className="shell"><header><div><p className="eyebrow">ENTEROS · {user.bank_name || "PLATAFORMA"}</p><h1>EnterAgree</h1><p>{labels[user.role]} · {user.name}</p></div><nav><Link to={base}>Início</Link>{user.role === "BANCO" && <Link to="/banco/monitoramento">Monitoramento</Link>}<button className="secondary" onClick={onLogout}>Sair</button></nav></header>{children}</main>;
+function Shell({ user, onLogout, logout, children }) {
+  const { pathname } = useLocation();
+  const isCase = pathname.includes("/casos/");
+  const isMonitoring = pathname.endsWith("/monitoramento");
+  const title = user.role === "ADMIN_GLOBAL" ? "Uma operação conectada." : isMonitoring ? "Resultados que importam." : user.role === "BANCO" ? "Do dado à decisão." : "Seu próximo passo, com clareza.";
+  const description = user.role === "ADMIN_GLOBAL" ? "Gerencie bancos e os profissionais que fazem parte da plataforma." : isMonitoring ? "Acompanhe decisões e a aderência à política de acordos do seu banco." : user.role === "BANCO" ? "Organize processos, atribua responsáveis e acompanhe cada decisão." : "Consulte seus processos e encontre a recomendação para cada caso.";
+  const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
+  return <div className="app-frame">
+    <aside className="sidebar">
+      <div className="sidebar-brand"><Brand /><span>ENTERAGREE <span className="product-tag">ENTEROS</span></span></div>
+      <nav aria-label="Navegação principal">
+        <p className="nav-caption">ESPAÇO DE TRABALHO</p>
+        <NavLink to={homeFor(user)} end><Icon name={user.role === "ADMIN_GLOBAL" ? "users" : "files"} />{user.role === "ADMIN_GLOBAL" ? "Administração" : user.role === "BANCO" ? "Processos" : "Meus processos"}</NavLink>
+        {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Monitoramento</NavLink>}
+      </nav>
+      <div className="sidebar-bottom"><div className="sidebar-message">Mesma justiça.<br /><span>Mais impacto.</span></div>
+        <div className="sidebar-account"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{labels[user.role]}</span></div></div>
+        <button className="logout-button" disabled={logout.pending} onClick={onLogout}><Icon name="logout" />{logout.pending ? "Saindo…" : "Sair"}</button>
+      </div>
+    </aside>
+    <main className="shell">
+      <header className="topbar"><div><span className="topbar-product">EnterOS</span><span className="breadcrumb-divider">/</span><span>{user.bank_name || "Administração global"}</span></div>
+        <span className="session-badge"><span />Sessão ativa</span>
+      </header>
+      <div className="page-content">
+        {!isCase && <section className="page-intro"><p className="eyebrow">{isMonitoring ? "INTELIGÊNCIA DA OPERAÇÃO" : "POLÍTICA DE ACORDOS"}</p><h1>{title} {user.role === "BANCO" && !isMonitoring && <span>Em escala.</span>}</h1><p>{description}</p></section>}
+        <ErrorNotice message={logout.error} />
+        {children}
+      </div>
+    </main>
+  </div>;
 }
 
 function Cases({ user }) {
-  const [cases, setCases] = useState([]); const [lawyers, setLawyers] = useState([]); const [error, setError] = useState(""); const navigate = useNavigate();
-  const load = async () => { try { setCases(await request("/cases")); if (user.role === "BANCO") setLawyers(await request("/bank/lawyers")); } catch (cause) { setError(cause.message); } };
-  useEffect(() => { load(); }, []);
-  const create = async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); try { const item = await request("/cases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ case_number: form.get("case_number"), uf: form.get("uf"), value_of_claim: Number(form.get("value_of_claim")), sub_subject: form.get("sub_subject") || null, assigned_lawyer_id: form.get("assigned_lawyer_id") || null }) }); event.currentTarget.reset(); navigate(`/banco/casos/${item.id}`); } catch (cause) { setError(cause.message); } };
-  return <section className="role-layout">{error && <p className="warning">{error}</p>}<article className="panel"><h2>{user.role === "BANCO" ? "Abrir novo processo" : "Meus processos"}</h2>{user.role === "BANCO" && <form onSubmit={create}><label>Número do processo<input name="case_number" required minLength="3" /></label><div className="row"><label>UF<input name="uf" defaultValue="SP" required maxLength="2" /></label><label>Valor da causa<input name="value_of_claim" type="number" min="0" required /></label></div><label>Subassunto<input name="sub_subject" defaultValue="Não reconhecimento de empréstimo" /></label><button>Abrir processo</button></form>}</article><article className="panel"><h2>{user.role === "BANCO" ? "Processos do banco" : "Processos sob sua responsabilidade"}</h2>{cases.length ? <div className="cases">{cases.map((item) => <Link className="case-card link-card" key={item.id} to={user.role === "BANCO" ? `/banco/casos/${item.id}` : `/advogado/casos/${item.id}`}><strong>{item.case_number}</strong><span>{item.uf} · {money(item.value_of_claim)}{item.assigned_lawyer_id ? " · Responsável atribuído" : " · Sem responsável"}</span></Link>)}</div> : <p className="muted">Nenhum processo disponível.</p>}</article></section>;
+  const cases = useResource("/cases");
+  const lawyers = useResource(user.role === "BANCO" ? "/bank/lawyers" : null);
+  const action = useAction();
+  const navigate = useNavigate();
+  const create = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    action.run(async () => {
+      const item = await sendJson("/cases", {
+        case_number: form.get("case_number").trim(), uf: form.get("uf").trim().toUpperCase(),
+        value_of_claim: Number(form.get("value_of_claim")), sub_subject: form.get("sub_subject").trim() || null,
+        assigned_lawyer_id: form.get("assigned_lawyer_id") || null,
+      });
+      navigate(`/banco/casos/${item.id}`);
+    });
+  };
+  return <section className={user.role === "BANCO" ? "role-layout" : "workspace"}>
+    <div className="case-overview"><Metric label={user.role === "BANCO" ? "Processos cadastrados" : "Processos atribuídos"} value={cases.data?.length ?? "—"} />
+      {user.role === "BANCO" && <><Metric label="Com responsável" value={cases.data?.filter((item) => item.assigned_lawyer_id).length ?? "—"} /><Metric label="Aguardando atribuição" value={cases.data?.filter((item) => !item.assigned_lawyer_id).length ?? "—"} /></>}
+    </div>
+    <ErrorNotice message={action.error} />
+    {user.role === "BANCO" && <article className="panel">
+      <div className="panel-heading"><span className="panel-icon"><Icon name="files" /></span><div><h2>Abrir novo processo</h2><p>Comece pelos dados principais do caso.</p></div></div>
+      <form onSubmit={create}>
+        <fieldset className="form-fields" disabled={action.pending}>
+          <label>Número do processo<input name="case_number" required minLength="3" maxLength="80" /></label>
+          <div className="row"><label>UF<input name="uf" defaultValue="SP" required minLength="2" maxLength="2" /></label>
+            <label>Valor da causa<input name="value_of_claim" type="number" min="0" step="0.01" required /></label></div>
+          <label>Subassunto<input name="sub_subject" defaultValue="Não reconhecimento de empréstimo" maxLength="120" /></label>
+          <label>Advogado responsável<select name="assigned_lawyer_id" defaultValue="" disabled={lawyers.loading}>
+            <option value="">Atribuir depois</option>
+            {(lawyers.data || []).map((lawyer) => <option key={lawyer.id} value={lawyer.id}>{lawyer.name} · {lawyer.email}</option>)}
+          </select></label>
+          <button>{action.pending ? "Salvando…" : <>Abrir processo<Icon name="arrow" /></>}</button>
+        </fieldset>
+      </form>
+      <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
+    </article>}
+    <article className="panel">
+      <div className="panel-heading"><div><h2>{user.role === "BANCO" ? "Processos do banco" : "Meus processos"}</h2><p>{user.role === "BANCO" ? "Da abertura à decisão, em um só lugar." : "Os casos sob sua responsabilidade."}</p></div><span className="count-badge">{cases.data?.length ?? "—"}</span></div>
+      <ErrorNotice message={cases.error} onRetry={cases.reload} />
+      {cases.loading && <p role="status">Carregando processos…</p>}
+      {cases.data?.length ? <div className="cases">{cases.data.map((item) =>
+        <Link className="case-card link-card" key={item.id} to={`${homeFor(user)}/casos/${item.id}`}>
+          <span className="case-card-icon"><Icon name="files" /></span><span className="case-card-content"><strong>{item.case_number}</strong><span>{item.uf} · {money(item.value_of_claim)}</span><small className={item.assigned_lawyer_id ? "assignment-tag assigned" : "assignment-tag"}>{item.assigned_lawyer_id ? "Responsável atribuído" : "Sem responsável"}</small></span><Icon name="arrow" />
+        </Link>)}
+      </div> : !cases.loading && !cases.error && <div className="empty-state"><Icon name="files" /><p>Nenhum processo disponível.</p><span>{user.role === "BANCO" ? "Os casos cadastrados aparecerão aqui." : "Os casos atribuídos pelo banco aparecerão aqui."}</span></div>}
+    </article>
+  </section>;
 }
 
-function CaseDetail({ user }) {
-  const { caseId } = useParams(); const [detail, setDetail] = useState(null); const [lawyers, setLawyers] = useState([]); const [error, setError] = useState("");
-  const load = async () => { try { setDetail(await request(`/cases/${caseId}`)); if (user.role === "BANCO") setLawyers(await request("/bank/lawyers")); } catch (cause) { setError(cause.message); } };
-  useEffect(() => { load(); }, [caseId]);
-  const assign = async (event) => { const lawyer = event.target.value || null; try { await request(`/cases/${caseId}/assignment`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assigned_lawyer_id: lawyer }) }); load(); } catch (cause) { setError(cause.message); } };
-  const analyze = async () => { try { await request(`/cases/${caseId}/analyses`, { method: "POST" }); load(); } catch (cause) { setError(cause.message); } };
-  const decide = async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); try { await request(`/cases/${caseId}/lawyer-decisions?analysis_id=${detail.analyses[0].id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: form.get("action"), proposed_value: form.get("value") ? Number(form.get("value")) : null, reason: form.get("reason") || null }) }); event.currentTarget.reset(); load(); } catch (cause) { setError(cause.message); } };
-  if (error) return <p className="warning">{error}</p>; if (!detail) return <p>Carregando processo…</p>;
-  const recommendation = detail.analyses?.[0]; const decision = detail.lawyer_decisions?.[0];
-  return <section className="workspace"><Link to={user.role === "BANCO" ? "/banco" : "/advogado"}>← Voltar aos processos</Link><div className="case-title"><div><p className="eyebrow">PROCESSO</p><h2>{detail.case.case_number}</h2><p>{detail.case.uf} · {money(detail.case.value_of_claim)}</p></div>{user.role === "ADVOGADO_EXTERNO" && <button className="primary" onClick={analyze}>Avaliar risco e recomendação</button>}</div>{user.role === "BANCO" && <article className="panel"><h3>Advogado responsável</h3><select value={detail.case.assigned_lawyer_id || ""} onChange={assign}><option value="">Sem responsável</option>{lawyers.map((lawyer) => <option key={lawyer.id} value={lawyer.id}>{lawyer.name} · {lawyer.email}</option>)}</select></article>}<div className="cards"><article className="panel"><h3>Documentos do processo</h3>{detail.documents.length ? <ul>{detail.documents.map((document) => <li key={document.id}>{document.original_filename} · {document.declared_type} · {document.status}</li>)}</ul> : <p className="muted">Nenhum documento enviado.</p>}</article><article className="panel analysis"><h3>Saída da ferramenta</h3>{recommendation ? <><div className={`recommendation ${recommendation.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span>Recomendação</span><strong>{labels[recommendation.recommendation]}</strong></div><p><b>Ação indicada:</b> {recommendation.recommendation === "ACORDO" ? "Propor acordo" : "Disputar a causa"}</p>{recommendation.pricing?.target_value != null && <p><b>Valor sugerido:</b> {money(recommendation.pricing.target_value)}</p>}<ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul></> : <p className="muted">Aguardando avaliação do advogado.</p>}</article></div>{user.role === "ADVOGADO_EXTERNO" && recommendation && <article className="panel decision"><h3>Registrar decisão</h3><form onSubmit={decide}><label>Ação<select name="action" defaultValue={recommendation.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option></select></label><label>Valor proposto<input name="value" type="number" min="0" /></label><label>Justificativa<textarea name="reason" /></label><button>Registrar decisão</button></form></article>}{decision && <p className="registered">Decisão registrada pelo advogado: {labels[decision.action] || decision.action}</p>}</section>;
+function CaseRoute({ user }) {
+  const { caseId } = useParams();
+  return <CaseDetail key={caseId} caseId={caseId} user={user} />;
 }
 
-function Monitoring() { const [data, setData] = useState(null); useEffect(() => { request("/monitoring").then(setData); }, []); return <article className="panel"><h2>Monitoramento do Banco</h2>{!data ? <p>Carregando…</p> : <div className="monitor"><Metric label="Análises" value={data.total_analyses}/><Metric label="Decisões" value={data.total_lawyer_decisions}/><Metric label="Aderência" value={data.adherence_rate == null ? "—" : `${(data.adherence_rate * 100).toFixed(1)}%`}/></div>}</article>; }
-function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div>; }
+function CaseDetail({ caseId, user }) {
+  const resource = useResource(`/cases/${caseId}`);
+  const lawyers = useResource(user.role === "BANCO" ? "/bank/lawyers" : null);
+  const action = useAction();
+  const detail = resource.data;
+  const recommendation = detail?.analyses?.[0];
+  const decision = detail?.lawyer_decisions?.[0];
+  const busy = action.pending || resource.loading;
+  const assign = (event) => {
+    const lawyerId = event.target.value || null;
+    action.run(async () => {
+      await sendJson(`/cases/${caseId}/assignment`, { assigned_lawyer_id: lawyerId }, "PATCH");
+      resource.reload();
+    });
+  };
+  const analyze = () => action.run(async () => {
+    await request(`/cases/${caseId}/analyses`, { method: "POST" });
+    resource.reload();
+  });
+  const decide = (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    action.run(async () => {
+      await sendJson(`/cases/${caseId}/lawyer-decisions?analysis_id=${recommendation.id}`, {
+        action: form.get("action"), proposed_value: form.get("value") ? Number(form.get("value")) : null,
+        reason: form.get("reason").trim() || null,
+      });
+      formElement.reset();
+      resource.reload();
+    });
+  };
+  return <section className="workspace">
+    <Link to={homeFor(user)}>← Voltar aos processos</Link>
+    <ErrorNotice message={resource.error} onRetry={resource.reload} />
+    <ErrorNotice message={action.error} />
+    {resource.loading && <p role="status">Carregando processo…</p>}
+    {detail && <>
+      <div className="case-title"><div><p className="eyebrow">PROCESSO</p><h2>{detail.case.case_number}</h2><p>{detail.case.uf} · {money(detail.case.value_of_claim)}</p></div>
+        {user.role === "ADVOGADO_EXTERNO" && <button className="primary" disabled={busy} onClick={analyze}><Icon name="spark" />Avaliar risco e recomendação</button>}
+      </div>
+      {user.role === "BANCO" && <article className="panel"><h3>Advogado responsável</h3>
+        <select aria-label="Advogado responsável" value={detail.case.assigned_lawyer_id || ""} disabled={busy || lawyers.loading || Boolean(lawyers.error)} onChange={assign}>
+          <option value="">Sem responsável</option>
+          {detail.case.assigned_lawyer_id && !(lawyers.data || []).some((lawyer) => lawyer.id === detail.case.assigned_lawyer_id) && <option value={detail.case.assigned_lawyer_id}>Responsável indisponível</option>}
+          {(lawyers.data || []).map((lawyer) => <option key={lawyer.id} value={lawyer.id}>{lawyer.name} · {lawyer.email}</option>)}
+        </select>
+        <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
+      </article>}
+      <div className="cards"><article className="panel"><h3>Documentos do processo</h3>
+        {detail.documents.length ? <ul>{detail.documents.map((document) => <li key={document.id}>{document.original_filename} · {document.declared_type} · {document.status}</li>)}</ul> : <p className="muted">Nenhum documento enviado.</p>}
+      </article><article className="panel analysis"><h3>Saída da ferramenta</h3>
+        {recommendation ? <>
+          <div className={`recommendation ${recommendation.recommendation === "ACORDO" ? "agreement" : "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation]}</strong></div>
+          <p><b>Ação indicada:</b> {recommendation.recommendation === "ACORDO" ? "Propor acordo" : "Disputar a causa"}</p>
+          {recommendation.pricing?.target_value != null && <div className="price-block"><span>Valor sugerido</span><strong>{money(recommendation.pricing.target_value)}</strong></div>}
+          <ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
+        </> : <p className="muted">Aguardando avaliação do advogado.</p>}
+      </article></div>
+      {user.role === "ADVOGADO_EXTERNO" && recommendation && <article className="panel decision"><h3>Registrar decisão</h3>
+        <form key={recommendation.id} onSubmit={decide}>
+          <fieldset className="form-fields" disabled={busy}>
+            <label>Ação<select aria-label="Ação" name="action" defaultValue={recommendation.recommendation}><option value="ACORDO">Acordo</option><option value="DEFESA">Defesa</option></select></label>
+            <label>Valor proposto<input name="value" type="number" min="0" step="0.01" /></label>
+            <label>Justificativa<textarea name="reason" maxLength="2000" /></label>
+            <button>Registrar decisão</button>
+          </fieldset>
+        </form>
+      </article>}
+      {decision && <p className="registered"><Icon name="check" />Decisão registrada pelo advogado: {labels[decision.action] || decision.action}</p>}
+    </>}
+  </section>;
+}
 
-function Admin() { const [banks, setBanks] = useState([]); const [users, setUsers] = useState([]); const [error, setError] = useState(""); const load = () => Promise.all([request("/admin/banks"), request("/admin/users")]).then(([nextBanks, nextUsers]) => { setBanks(nextBanks); setUsers(nextUsers); }).catch((cause) => setError(cause.message)); useEffect(() => { load(); }, []); const addBank = async (event) => { event.preventDefault(); try { await request("/admin/banks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: new FormData(event.currentTarget).get("name") }) }); event.currentTarget.reset(); load(); } catch (cause) { setError(cause.message); } }; const addUser = async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); try { await request("/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.fromEntries(form)) }); event.currentTarget.reset(); load(); } catch (cause) { setError(cause.message); } }; return <section className="role-layout">{error && <p className="warning">{error}</p>}<article className="panel"><h2>Bancos</h2><form onSubmit={addBank}><label>Nome<input name="name" required /></label><button>Cadastrar banco</button></form><ul>{banks.map((bank) => <li key={bank.id}>{bank.name}</li>)}</ul></article><article className="panel"><h2>Cadastro de advogados e usuários</h2><form onSubmit={addUser}><label>Nome<input name="name" required /></label><label>E-mail<input name="email" type="email" required /></label><label>Senha inicial (15+ caracteres)<input name="password" type="password" minLength="15" required /></label><label>Perfil<select name="role" defaultValue="ADVOGADO_EXTERNO"><option value="ADVOGADO_EXTERNO">Advogado externo</option><option value="BANCO">Banco</option><option value="ADMIN_GLOBAL">Admin global</option></select></label><label>Banco<select name="bank_id" defaultValue="banco-unicamp"><option value="">Nenhum (somente admin)</option>{banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}</select></label><button>Cadastrar usuário</button></form><ul>{users.map((user) => <li key={user.id}>{user.name} · {labels[user.role]} · {user.is_active ? "ativo" : "inativo"}</li>)}</ul></article></section>; }
+function Monitoring() {
+  const resource = useResource("/monitoring");
+  const data = resource.data;
+  return <article className="panel"><h2>Monitoramento do Banco</h2>
+    <ErrorNotice message={resource.error} onRetry={resource.reload} />
+    {resource.loading && <p role="status">Carregando…</p>}
+    {data && <div className="monitor"><Metric label="Análises" value={data.total_analyses} /><Metric label="Decisões" value={data.total_lawyer_decisions} /><Metric label="Aderência" value={data.adherence_rate == null ? "—" : `${(data.adherence_rate * 100).toFixed(1)}%`} /></div>}
+  </article>;
+}
 
-export default function App() { const [user, setUser] = useState(undefined); const navigate = useNavigate(); useEffect(() => { request("/auth/me").then(setUser).catch(() => setUser(null)); }, []); const logout = async () => { await request("/auth/logout", { method: "POST" }); setUser(null); navigate("/login"); }; if (user === undefined) return <main className="login-page">Verificando sessão…</main>; if (!user) return <Routes><Route path="*" element={<Login onLogin={setUser} />} /></Routes>; const base = user.role === "BANCO" ? "/banco" : user.role === "ADVOGADO_EXTERNO" ? "/advogado" : "/admin"; return <Shell user={user} onLogout={logout}><Routes><Route path="/" element={<Navigate to={base} replace />}/><Route path="/login" element={<Navigate to={base} replace />}/><Route path="/banco" element={user.role === "BANCO" ? <Cases user={user}/> : <Navigate to={base} replace />}/><Route path="/banco/casos/:caseId" element={user.role === "BANCO" ? <CaseDetail user={user}/> : <Navigate to={base} replace />}/><Route path="/banco/monitoramento" element={user.role === "BANCO" ? <Monitoring/> : <Navigate to={base} replace />}/><Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <Cases user={user}/> : <Navigate to={base} replace />}/><Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CaseDetail user={user}/> : <Navigate to={base} replace />}/><Route path="/admin" element={user.role === "ADMIN_GLOBAL" ? <Admin/> : <Navigate to={base} replace />}/></Routes></Shell>; }
+function Metric({ label, value }) {
+  return <div className="metric"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function Admin() {
+  const banks = useResource("/admin/banks");
+  const users = useResource("/admin/users");
+  const bankAction = useAction();
+  const userAction = useAction();
+  const [role, setRole] = useState("ADVOGADO_EXTERNO");
+  const [bankId, setBankId] = useState(null);
+  const addBank = (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    bankAction.run(async () => {
+      await sendJson("/admin/banks", { name: form.get("name").trim() });
+      formElement.reset();
+      banks.reload();
+    });
+  };
+  const addUser = (event) => {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    userAction.run(async () => {
+      await sendJson("/admin/users", {
+        name: form.get("name").trim(), email: form.get("email").trim(), password: form.get("password"), role,
+        bank_id: role === "ADMIN_GLOBAL" ? null : form.get("bank_id"),
+      });
+      formElement.reset();
+      setRole("ADVOGADO_EXTERNO");
+      setBankId(null);
+      users.reload();
+    });
+  };
+  return <section className="role-layout"><article className="panel"><h2>Bancos</h2>
+    <ErrorNotice message={banks.error} onRetry={banks.reload} />
+    <ErrorNotice message={bankAction.error} />
+    <form onSubmit={addBank}><fieldset className="form-fields" disabled={bankAction.pending}>
+      <label>Nome<input name="name" required minLength="2" maxLength="120" /></label><button>{bankAction.pending ? "Salvando…" : "Cadastrar banco"}</button>
+    </fieldset></form>
+    {banks.loading && <p role="status">Carregando bancos…</p>}
+    <ul>{(banks.data || []).map((bank) => <li key={bank.id}>{bank.name}</li>)}</ul>
+  </article><article className="panel"><h2>Cadastro de advogados e usuários</h2>
+    <ErrorNotice message={users.error} onRetry={users.reload} />
+    <ErrorNotice message={userAction.error} />
+    <form onSubmit={addUser}><fieldset className="form-fields" disabled={userAction.pending}>
+      <label>Nome<input name="name" required minLength="2" maxLength="120" /></label>
+      <label>E-mail<input name="email" type="email" required maxLength="254" autoComplete="off" /></label>
+      <label>Senha inicial (15+ caracteres)<input name="password" type="password" minLength="15" maxLength="128" required autoComplete="new-password" /></label>
+      <label>Perfil<select name="role" value={role} onChange={(event) => setRole(event.target.value)}><option value="ADVOGADO_EXTERNO">Advogado externo</option><option value="BANCO">Banco</option><option value="ADMIN_GLOBAL">Admin global</option></select></label>
+      <label>Banco<select aria-label="Banco" name="bank_id" value={bankId ?? banks.data?.[0]?.id ?? ""} onChange={(event) => setBankId(event.target.value)} required={role !== "ADMIN_GLOBAL"} disabled={role === "ADMIN_GLOBAL" || banks.loading}>
+        <option value="">Selecione o banco</option>{(banks.data || []).map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+      </select></label>
+      <button disabled={role !== "ADMIN_GLOBAL" && (banks.loading || Boolean(banks.error))}>{userAction.pending ? "Salvando…" : "Cadastrar usuário"}</button>
+    </fieldset></form>
+    {users.loading && <p role="status">Carregando usuários…</p>}
+    <ul>{(users.data || []).map((user) => <li key={user.id}>{user.name} · {labels[user.role]} · {user.is_active ? "ativo" : "inativo"}</li>)}</ul>
+  </article></section>;
+}
+
+export default function App() {
+  const session = useResource("/auth/me");
+  const [sessionOverride, setSessionOverride] = useState(undefined);
+  const [notice, setNotice] = useState("");
+  const logout = useAction();
+  const navigate = useNavigate();
+  const user = sessionOverride === undefined ? session.data : sessionOverride;
+
+  useEffect(() => {
+    const expired = () => {
+      setSessionOverride(null);
+      setNotice("Sua sessão expirou. Entre novamente.");
+      navigate("/login", { replace: true });
+    };
+    window.addEventListener(SESSION_EXPIRED, expired);
+    return () => window.removeEventListener(SESSION_EXPIRED, expired);
+  }, [navigate]);
+
+  const onLogin = (nextUser) => {
+    setSessionOverride(nextUser);
+    setNotice("");
+    navigate(homeFor(nextUser), { replace: true });
+  };
+  const onLogout = () => logout.run(async () => {
+    await request("/auth/logout", { method: "POST" });
+    setSessionOverride(null);
+    setNotice("");
+    navigate("/login", { replace: true });
+  });
+
+  if (sessionOverride === undefined && (session.loading || session.error)) {
+    return <main className="session-page"><section className="login-card">
+      {session.loading ? <p role="status">Verificando sessão…</p> : <ErrorNotice message={session.error} onRetry={session.reload} />}
+    </section></main>;
+  }
+  if (!user) return <Routes><Route path="/login" element={<Login onLogin={onLogin} notice={notice} />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes>;
+  const base = homeFor(user);
+  return <Shell key={user.id} user={user} onLogout={onLogout} logout={logout}>
+    <Routes>
+      <Route path="/banco" element={user.role === "BANCO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
+      <Route path="/banco/casos/:caseId" element={user.role === "BANCO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
+      <Route path="/banco/monitoramento" element={user.role === "BANCO" ? <Monitoring /> : <Navigate to={base} replace />} />
+      <Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
+      <Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
+      <Route path="/admin" element={user.role === "ADMIN_GLOBAL" ? <Admin /> : <Navigate to={base} replace />} />
+      <Route path="*" element={<Navigate to={base} replace />} />
+    </Routes>
+  </Shell>;
+}

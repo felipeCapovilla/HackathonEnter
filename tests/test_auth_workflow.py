@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 from fastapi.testclient import TestClient
 
@@ -73,3 +74,48 @@ def test_disabled_user_session_is_revoked(tmp_path):
         login(admin_client, "admin@enter.ai")
         assert admin_client.patch(f"/api/admin/users/{bank['id']}", json={"is_active": False}).status_code == 200
         assert bank_client.get("/api/cases").status_code == 401
+
+
+def test_logout_returns_204_removes_cookie_and_revokes_session(tmp_path):
+    app = create_app(settings(tmp_path))
+    with TestClient(app) as client:
+        add_user(app, "BANCO", "bank@unicamp.br")
+        login(client, "bank@unicamp.br")
+        token = client.cookies.get("enteragree_session")
+        response = client.post("/api/auth/logout")
+        assert response.status_code == 204
+        assert response.content == b""
+        assert response.headers["Cache-Control"] == "no-store"
+        assert client.cookies.get("enteragree_session") is None
+        assert app.state.repository.get_session_user(hashlib.sha256(token.encode()).hexdigest()) is None
+        assert client.get("/api/auth/me").json() is None
+        assert client.get("/api/cases").status_code == 401
+        assert client.post("/api/auth/logout").status_code == 204
+
+
+def test_duplicate_bank_and_user_return_useful_conflict(tmp_path):
+    app = create_app(settings(tmp_path))
+    with TestClient(app) as client:
+        add_user(app, "ADMIN_GLOBAL", "admin@enter.ai")
+        login(client, "admin@enter.ai")
+        response = client.post("/api/admin/banks", json={"name": "Banco Unicamp"})
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Banco já cadastrado."
+        response = client.post("/api/admin/users", json={
+            "name": "Outro Admin", "email": "ADMIN@ENTER.AI", "password": "senha-segura-com-15",
+            "role": "ADMIN_GLOBAL", "bank_id": None,
+        })
+        assert response.status_code == 409
+        assert "E-mail já cadastrado" in response.json()["detail"]
+
+
+def test_invalid_assignment_returns_validation_error(tmp_path):
+    app = create_app(settings(tmp_path))
+    with TestClient(app) as client:
+        add_user(app, "BANCO", "bank@unicamp.br")
+        login(client, "bank@unicamp.br")
+        created = client.post("/api/cases", json={"case_number": "assignment-001", "uf": "SP"})
+        case_id = created.json()["id"]
+        response = client.patch(f"/api/cases/{case_id}/assignment", json={"assigned_lawyer_id": "missing"})
+        assert response.status_code == 422
+        assert "Advogado ativo" in response.json()["detail"]
