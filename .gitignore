@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.runtime/
+data/raw/
+data/processed/
+artefatos/X.pkl
+artefatos/y.pkl
+artefatos/dataset_completo.pkl
+frontend/node_modules/
+frontend/dist/
+.env
