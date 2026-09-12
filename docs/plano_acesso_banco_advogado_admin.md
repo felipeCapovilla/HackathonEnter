@@ -89,7 +89,7 @@ Adotar `react-router-dom` com `BrowserRouter`, em versão compatível com o Reac
 | `/` | Encaminhamento à área do usuário ou ao login | Todos |
 | `/banco` | Lista de processos, criação e atalhos de gestão | Banco |
 | `/banco/casos/:caseId` | Detalhe, responsável, documentos e histórico | Banco |
-| `/banco/pedidos` | Pedidos abertos, respondidos e atrasados | Banco |
+| `/banco/pedidos` | Pedidos abertos e respondidos | Banco |
 | `/banco/monitoramento` | Agregados reais do seu banco | Banco |
 | `/advogado` | “Meus processos”, com pendências | Advogado |
 | `/advogado/casos/:caseId` | Documentos, pedidos, análise e decisão | Advogado responsável |
@@ -104,7 +104,7 @@ O banco começa por uma lista de casos reais, com número, advogado responsável
 
 No detalhe, o banco envia documentos, acompanha a validação de tipo e lê a recomendação e a decisão do advogado. Não há formulário de decisão jurídica nessa área. Quando um upload de origem `BANCO` da sua instituição estiver classificado como divergente, pode corrigir o tipo ou removê-lo logicamente; a continuação com ressalva cabe ao advogado.
 
-Na fila de pedidos, cada item mostra processo, tipo solicitado, motivo, solicitante, prazo, estado e resposta. “Enviar documento solicitado” preenche `request_id` e o tipo solicitado. “Não temos o documento” exige motivo. A fila deve continuar permitindo upload avulso no detalhe do caso.
+Na fila de pedidos, cada item mostra processo, tipo solicitado, motivo, solicitante, estado e resposta. “Enviar documento solicitado” preenche `request_id` e o tipo solicitado. “Não temos o documento” exige motivo. A fila deve continuar permitindo upload avulso no detalhe do caso. Pedidos sem resposta ficam abertos nesta fase, sem prazo, alerta ou escalonamento automático.
 
 O painel de monitoramento usa os campos atuais da API, filtrados pelo banco. Não inventar aceitação, economia ou desfecho judicial: esses dados ainda não são coletados pelo fluxo atual e ficam para outra feature.
 
@@ -259,9 +259,9 @@ Não há `GET /api/analyses/{analysis_id}` na implementação inspecionada. Nest
 | Banco envia arquivo vinculado ao pedido | `SUBMITTED` | Banco |
 | Banco informa não ter o documento | `DECLARED_UNAVAILABLE` | Banco, com motivo |
 | Advogado retira o pedido | `CANCELLED` | Advogado responsável, com motivo |
-| Ninguém responde e o prazo passa | Manter `REQUESTED`; expor `is_overdue=true` | Calculado na leitura |
+| Ninguém responde | Manter `REQUESTED`, sem prazo ou alerta automático nesta fase | Nenhum |
 
-`is_overdue` é calculado para pedidos abertos com `due_date` anterior à data atual em `America/Sao_Paulo`. Registros antigos em `PENDING` ou `OVERDUE`, se existirem, são considerados abertos. A interface exibe “Atrasado” sem precisar de scheduler. Sem prazo, o pedido permanece “Aguardando banco”. Silêncio não significa documento indisponível.
+Não calcular nem persistir `PENDING`, `OVERDUE` ou `is_overdue` nesta fase. A interface mostra o pedido como aberto enquanto estiver `REQUESTED`; silêncio não significa documento indisponível.
 
 Upload de resposta deve ter pedido aberto do mesmo caso e tipo declarado correspondente. Inserção do registro do documento, atualização condicional para `SUBMITTED` e autoria devem ocorrer na mesma transação SQLite. Persistir o arquivo antes da transação e, em caso de falha, limpar somente o arquivo criado pela tentativa. Esse estado significa que o banco enviou um arquivo; não significa que tipo, OCR ou conteúdo foram validados. Mostrar também o estado de processamento do documento vinculado.
 
@@ -366,7 +366,7 @@ O aceite exige a matriz de permissões funcionando por HTTP, além da separaçã
 3. Entrar como banco, criar um caso, atribuir ao primeiro advogado e enviar um contrato.
 4. Entrar como primeiro advogado, abrir o arquivo, solicitar extrato e sair.
 5. Entrar como banco, responder o pedido com upload vinculado; criar outro pedido no fluxo de advogado para demonstrar “Não temos o documento”.
-6. Deixar um pedido com prazo anterior à data atual sem resposta e verificar “Atrasado”.
+6. Manter um pedido sem resposta e verificar que permanece aberto, sem ser tratado como indisponível.
 7. Entrar como responsável, executar análise, registrar decisão e consultar a recomendação com suas limitações.
 8. Entrar como banco e verificar que a decisão aparece no monitoramento real.
 9. Entrar como segundo advogado e confirmar que o primeiro caso não aparece. Atribuí-lo pelo banco e verificar a troca de acesso.
