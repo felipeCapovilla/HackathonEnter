@@ -63,6 +63,21 @@ def _round_money(valor: float) -> float:
     return round(valor, 2)
 
 
+def brl(valor: float) -> str:
+    """
+    Formato brasileiro: ponto no milhar, vírgula no decimal.
+
+    O `{:,.2f}` do Python produz 26,985.78 — formato americano, que num produto
+    lido por advogado brasileiro chega a parecer outro valor.
+    """
+    return f"{valor:,.2f}".translate(str.maketrans({",": ".", ".": ","}))
+
+
+def pct(valor: float) -> str:
+    """Percentual com vírgula decimal: 98,1% e não 98.1%."""
+    return f"{valor:.1%}".replace(".", ",")
+
+
 def p_nao_exito_de_exito(p_exito: float) -> float:
     """
     Adaptador explícito de direção da probabilidade.
@@ -211,16 +226,16 @@ def avaliar_acordo(
     if walk_away < abertura:
         if limitado_pela_alcada and walk_away_economico >= abertura:
             motivo = (
-                f"Acordar seria mais barato que litigar (R$ {custo_defesa:,.2f} esperados), "
-                f"mas a alçada do banco limita a oferta a R$ {walk_away:,.2f}, abaixo da "
-                f"abertura de R$ {abertura:,.2f}. Sem autorização para ofertar, a recomendação é defesa."
+                f"Acordar seria mais barato que litigar (R$ {brl(custo_defesa)} esperados), "
+                f"mas a alçada do banco limita a oferta a R$ {brl(walk_away)}, abaixo da "
+                f"abertura de R$ {brl(abertura)}. Sem autorização para ofertar, a recomendação é defesa."
             )
         else:
             motivo = (
                 f"Litigar custa menos que a própria oferta de abertura: "
-                f"R$ {custo_defesa:,.2f} contra R$ {abertura + honorario_acordo:,.2f}. "
-                f"P(derrota) de {p_nao_exito:.1%} está abaixo do limiar de "
-                f"indiferença de {limiar:.1%} deste caso."
+                f"R$ {brl(custo_defesa)} contra R$ {brl(abertura + honorario_acordo)}. "
+                f"P(derrota) de {pct(p_nao_exito)} está abaixo do limiar de "
+                f"indiferença de {pct(limiar)} deste caso."
             )
         return VereditoAcordo(
             decisao="DEFESA",
@@ -254,21 +269,21 @@ def avaliar_acordo(
     limite = "limite de alçada" if limitado_pela_alcada else "walk-away"
     if negociavel:
         motivo = (
-            f"Acordo entre R$ {abertura:,.2f} e R$ {walk_away:,.2f}, mirando "
-            f"R$ {alvo:,.2f}. Defender custa R$ {custo_defesa:,.2f} esperados; "
-            f"fechar no alvo economiza R$ {economia:,.2f}. "
-            f"P(derrota) de {p_nao_exito:.1%} supera o limiar de indiferença de "
-            f"{limiar:.1%} deste caso. "
-            f"Acima de R$ {walk_away:,.2f} ({limite}) não é negociação: é defesa."
+            f"Acordo entre R$ {brl(abertura)} e R$ {brl(walk_away)}, mirando "
+            f"R$ {brl(alvo)}. Defender custa R$ {brl(custo_defesa)} esperados; "
+            f"fechar no alvo economiza R$ {brl(economia)}. "
+            f"P(derrota) de {pct(p_nao_exito)} supera o limiar de indiferença de "
+            f"{pct(limiar)} deste caso. "
+            f"Acima de R$ {brl(walk_away)} ({limite}) não é negociação: é defesa."
         )
     else:
         motivo = (
-            f"Acordo em R$ {walk_away:,.2f} — valor único, não há faixa. "
-            f"O espaço entre a abertura de R$ {abertura:,.2f} e o {limite} é de "
-            f"R$ {amplitude:,.2f}, pequeno demais para negociar. "
-            f"P(derrota) de {p_nao_exito:.1%} está logo acima do limiar de "
-            f"{limiar:.1%}: litigar custa quase o mesmo. "
-            f"Acima de R$ {walk_away:,.2f} não é negociação: é defesa."
+            f"Acordo em R$ {brl(walk_away)} — valor único, não há faixa. "
+            f"O espaço entre a abertura de R$ {brl(abertura)} e o {limite} é de "
+            f"R$ {brl(amplitude)}, pequeno demais para negociar. "
+            f"P(derrota) de {pct(p_nao_exito)} está logo acima do limiar de "
+            f"{pct(limiar)}: litigar custa quase o mesmo. "
+            f"Acima de R$ {brl(walk_away)} não é negociação: é defesa."
         )
 
     return VereditoAcordo(
