@@ -218,6 +218,14 @@ form, .form-fields { display: grid; gap: var(--s5); }
 .panel ul { padding-left: var(--s5); margin-bottom: 0; color: var(--fg-soft); font-size: var(--text-base); line-height: 1.7; }
 .panel li { margin-bottom: var(--s3); }
 
+.admin-user-list { padding-left: 0; list-style: none; }
+.admin-user-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; padding: var(--s2) 0; border-bottom: 1px solid var(--border); }
+.admin-user-list li:last-child { border-bottom: none; }
+.inline-reset { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.inline-reset input { min-height: 34px; font-size: var(--text-xs); }
+.account-link { display: flex; align-items: center; gap: var(--s2); width: 100%; padding: var(--s2) var(--s4); margin-bottom: var(--s2); color: #aab3c6; font-size: var(--text-sm); font-weight: 500; text-decoration: none; border-radius: var(--r-md); }
+.account-link:hover { background: #ffffff10; color: #fff; }
+
 /* ── Métricas ─────────────────────────────────────────────────── */
 
 .case-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s4); }

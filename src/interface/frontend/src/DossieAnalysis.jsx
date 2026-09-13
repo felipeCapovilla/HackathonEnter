@@ -55,7 +55,7 @@ export default function DossieAnalysis({ document, record, disabled, request, ap
   const evidenceLoaded = currentRecord?.evidencias_carregadas !== false;
   const evidenceTotal = currentRecord?.evidencias_total ?? result?.evidencias.length ?? 0;
   const extractionReady = ["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status);
-  const typeBlocked = ["PENDING", "MISMATCH", "REMOVED"].includes(document.type_status);
+  const typeBlocked = ["PENDING", "MISMATCH", "REMOVED", "AI_REJECTED"].includes(document.type_status);
 
   async function analyze() {
     if (pending || evidencePending || disabled || !extractionReady || typeBlocked) return;

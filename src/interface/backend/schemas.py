@@ -40,6 +40,9 @@ class DocumentTypeStatus(StrEnum):
     MISMATCH = "MISMATCH"
     USER_CONFIRMED = "USER_CONFIRMED"
     REMOVED = "REMOVED"
+    # Classificação automática do tipo no upload (sem seleção manual do banco).
+    AI_CONFIRMED = "AI_CONFIRMED"
+    AI_REJECTED = "AI_REJECTED"
 
 
 class DecisionOutcome(StrEnum):
@@ -161,6 +164,9 @@ class DocumentRecord(BaseModel):
     sha256: str
     quality_flags: list[str] = Field(default_factory=list)
     created_at: datetime
+    # "AI" quando o tipo veio da classificação automática no upload; "USER" quando o banco declarou.
+    type_source: Literal["USER", "AI"] = "USER"
+    ai_type_reason: str | None = None
 
 
 class TypeConfirmation(BaseModel):
@@ -381,6 +387,37 @@ class UserUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=15, max_length=128)
     law_firm_id: str | None = None
     is_manager: bool | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    """Autoatendimento: o próprio usuário logado troca a própria senha."""
+
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=15, max_length=128)
+
+
+class ResetPasswordRequest(BaseModel):
+    """Admin ou gestor do banco define a senha de um terceiro."""
+
+    new_password: str = Field(min_length=15, max_length=128)
+
+
+class AuditEventRecord(BaseModel):
+    id: str
+    actor_user_id: str | None
+    actor_name: str | None = None
+    action: str
+    entity_type: str
+    entity_id: str
+    case_id: str | None = None
+    reason: str | None = None
+    created_at: datetime
+
+
+class AuditChainStatus(BaseModel):
+    valid: bool
+    checked: int
+    broken_at_id: str | None = None
 
 
 class LawFirmCreate(BaseModel):

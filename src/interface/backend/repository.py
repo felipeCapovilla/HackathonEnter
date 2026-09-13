@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import time
@@ -269,18 +270,23 @@ class Repository:
         case_id: str,
         original_filename: str,
         file_path: Path,
-        declared_type: DocumentType,
+        declared_type: DocumentType | None,
         source_party: SourceParty,
         sha256: str,
         request_id: str | None,
     ) -> dict:
+        # Sem tipo declarado: o banco não escolheu, a IA classifica depois da
+        # extração. OUTRO é só o placeholder até lá — `type_source` é o que
+        # diferencia dos documentos onde OUTRO foi realmente escolhido à mão.
+        type_source = "USER" if declared_type is not None else "AI"
+        effective_type = declared_type or DocumentType.OUTRO
         document_id = str(uuid4())
         record = {
             "id": document_id,
             "case_id": case_id,
             "original_filename": original_filename,
             "file_path": str(file_path),
-            "declared_type": declared_type.value,
+            "declared_type": effective_type.value,
             "detected_type": None,
             "type_status": DocumentTypeStatus.PENDING.value,
             "source_party": source_party.value,
@@ -288,6 +294,7 @@ class Repository:
             "sha256": sha256,
             "request_id": request_id,
             "created_at": _now(),
+            "type_source": type_source,
         }
         with connection_for(self.database_path) as connection:
             if request_id:
@@ -299,7 +306,7 @@ class Repository:
                     raise ValueError("Solicitação documental não encontrada.")
                 if request["case_id"] != case_id:
                     raise ValueError("A solicitação não pertence a este processo.")
-                if request["document_type"] != declared_type.value:
+                if declared_type is not None and request["document_type"] != declared_type.value:
                     raise ValueError("O tipo do documento não corresponde ao solicitado.")
                 if source_party != SourceParty.BANCO:
                     raise ValueError("Apenas o banco pode atender uma solicitação documental.")
@@ -309,10 +316,10 @@ class Repository:
                 connection.execute(
                     """INSERT INTO documents (
                         id, case_id, original_filename, file_path, declared_type, detected_type,
-                        type_status, source_party, status, sha256, request_id, created_at
+                        type_status, source_party, status, sha256, request_id, created_at, type_source
                     ) VALUES (
                         :id, :case_id, :original_filename, :file_path, :declared_type, :detected_type,
-                        :type_status, :source_party, :status, :sha256, :request_id, :created_at
+                        :type_status, :source_party, :status, :sha256, :request_id, :created_at, :type_source
                     )""",
                     record,
                 )
@@ -385,11 +392,19 @@ class Repository:
         quality_flags: list[str],
         detected_type: DocumentType | None,
         type_status: DocumentTypeStatus,
+        declared_type: DocumentType | None = None,
+        ai_type_reason: str | None = None,
     ) -> None:
+        # declared_type/ai_type_reason só existem para o caminho de classificação
+        # por IA. COALESCE preserva o valor atual quando o chamador não os passa
+        # (todo o fluxo determinístico antigo continua igual).
         with connection_for(self.database_path) as connection:
             connection.execute(
                 """UPDATE documents SET status = ?, page_count = ?, pages_extracted = ?,
-                quality_flags = ?, detected_type = ?, type_status = ? WHERE id = ?""",
+                quality_flags = ?, detected_type = ?, type_status = ?,
+                declared_type = COALESCE(?, declared_type),
+                ai_type_reason = COALESCE(?, ai_type_reason)
+                WHERE id = ?""",
                 (
                     status,
                     page_count,
@@ -397,6 +412,8 @@ class Repository:
                     _json(quality_flags),
                     detected_type.value if detected_type else None,
                     type_status.value,
+                    declared_type.value if declared_type else None,
+                    ai_type_reason,
                     document_id,
                 ),
             )
@@ -991,6 +1008,16 @@ class Repository:
                 result = excluded.result, error = excluded.error, created_at = excluded.created_at""", record)
         return {**record, "result": result}
 
+    def get_document_reading(self, document_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT * FROM document_ai_readings WHERE document_id = ?", (document_id,)
+            ).fetchone()
+        record = _row(row)
+        if record is not None:
+            record["result"] = json.loads(record["result"]) if record["result"] else None
+        return record
+
     def list_document_readings(self, case_id: str) -> list[dict]:
         with connection_for(self.database_path) as connection:
             rows = connection.execute(
@@ -1039,6 +1066,84 @@ class Repository:
                 adicionar(row, f"{row['original_filename']}, página {row['page_number']}",
                           _trecho(row["text_content"], termo), row["document_id"], row["page_number"])
         return list(encontrados.values())[:limit]
+
+    def record_audit_event(
+        self, *, actor_user_id: str | None, action: str, entity_type: str, entity_id: str,
+        case_id: str | None = None, reason: str | None = None,
+    ) -> dict:
+        """
+        Grava um evento de auditoria em cadeia (hash encadeado ao anterior).
+
+        A tabela só recebe INSERT — gatilhos no schema barram UPDATE/DELETE. O
+        hash amarra cada linha à anterior pela ordem física de inserção
+        (`rowid`), então reescrever ou apagar uma linha no meio quebra a
+        cadeia a partir dali; `verify_audit_chain` detecta isso.
+        """
+        event_id = str(uuid4())
+        created_at = _now()
+        with connection_for(self.database_path) as connection:
+            previous = connection.execute("SELECT hash FROM audit_events ORDER BY rowid DESC LIMIT 1").fetchone()
+            prev_hash = previous["hash"] if previous else ""
+            payload = "|".join(str(part) for part in (
+                prev_hash, event_id, actor_user_id, action, entity_type, entity_id, case_id, reason, created_at,
+            ))
+            event_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+            record = {
+                "id": event_id, "actor_user_id": actor_user_id, "action": action, "entity_type": entity_type,
+                "entity_id": entity_id, "case_id": case_id, "reason": reason, "created_at": created_at,
+                "prev_hash": prev_hash, "hash": event_hash,
+            }
+            connection.execute(
+                """INSERT INTO audit_events (id, actor_user_id, action, entity_type, entity_id, case_id, reason, created_at, prev_hash, hash)
+                VALUES (:id, :actor_user_id, :action, :entity_type, :entity_id, :case_id, :reason, :created_at, :prev_hash, :hash)""",
+                record,
+            )
+        return record
+
+    def list_audit_events(
+        self, *, limit: int = 100, before_rowid: int | None = None,
+        action: str | None = None, entity_type: str | None = None, case_id: str | None = None,
+    ) -> list[dict]:
+        clauses, parameters = [], []
+        if before_rowid is not None:
+            clauses.append("audit_events.rowid < ?")
+            parameters.append(before_rowid)
+        if action:
+            clauses.append("audit_events.action = ?")
+            parameters.append(action)
+        if entity_type:
+            clauses.append("audit_events.entity_type = ?")
+            parameters.append(entity_type)
+        if case_id:
+            clauses.append("audit_events.case_id = ?")
+            parameters.append(case_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                f"""SELECT audit_events.*, audit_events.rowid AS rowid, users.name AS actor_name
+                FROM audit_events LEFT JOIN users ON users.id = audit_events.actor_user_id
+                {where} ORDER BY audit_events.rowid DESC LIMIT ?""",
+                (*parameters, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def verify_audit_chain(self) -> dict:
+        """Refaz o hash de cada evento, na ordem de inserção, e compara com o gravado."""
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute("SELECT * FROM audit_events ORDER BY rowid ASC").fetchall()
+        expected_prev = ""
+        checked = 0
+        for row in rows:
+            payload = "|".join(str(part) for part in (
+                expected_prev, row["id"], row["actor_user_id"], row["action"], row["entity_type"],
+                row["entity_id"], row["case_id"], row["reason"], row["created_at"],
+            ))
+            expected_hash = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+            if row["prev_hash"] != expected_prev or row["hash"] != expected_hash:
+                return {"valid": False, "checked": checked, "broken_at_id": row["id"]}
+            expected_prev = row["hash"]
+            checked += 1
+        return {"valid": True, "checked": checked, "broken_at_id": None}
 
     @staticmethod
     def _decode_dossie_analysis(record: dict | None) -> dict | None:
