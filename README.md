@@ -1,5 +1,7 @@
 # ENTER | Política de acordos
 
+**[▶ Ver a apresentação](https://htmlpreview.github.io/?https://github.com/felipeCapovilla/HackathonEnter/blob/main/docs/apresentacao/index.html)**
+
 
 ## Link do Vídeo: https://www.youtube.com/watch?v=yI8_-BOWEvU   
 
