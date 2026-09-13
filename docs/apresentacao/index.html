@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Política de Acordos EnterOS</title>
-<meta name="description" content="Defender ou fazer acordo? A mesma resposta, pelo mesmo critério, em cada processo." />
+<title>Radar de Provas EnterOS</title>
+<meta name="description" content="Defender ou fazer acordo? Existe uma terceira resposta." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='5' width='22' height='22' fill='%23FFD400'/%3E%3Crect x='16' y='16' width='7' height='7' fill='%230A0A0A'/%3E%3C/svg%3E" />
 <style>
   :root {
@@ -15,7 +15,7 @@
     --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
     --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
   }
-  /* Tema único, escuro, no mesmo sistema do deck de referência: preto, amarelo e branco cru.
+  /* Tema único, escuro: preto, amarelo e branco cru.
      Coral é derrota e custo; menta é economia; violeta é onde a IA trabalha. */
 
   * { box-sizing: border-box; }
@@ -41,7 +41,8 @@
 
   h1 { font-size: clamp(2.4rem,7.4vw,5.9rem); line-height: .92; letter-spacing: -.05em; font-weight: 800; margin: 0; text-wrap: balance; }
   h2 { font-size: clamp(1.7rem,4.4vw,3.4rem); line-height: 1.02; letter-spacing: -.04em; font-weight: 780; margin: 0; text-wrap: balance; }
-  .lede { font-size: clamp(.98rem,1.5vw,1.22rem); line-height: 1.5; color: var(--dim); max-width: 60ch; margin: 0; }
+  .lede { font-size: clamp(.98rem,1.5vw,1.22rem); line-height: 1.5; color: var(--dim); max-width: 62ch; margin: 0; }
+  .lede b { color: var(--fg); font-weight: 650; }
   p { margin: 0; }
   .y { color: var(--amarelo); } .c { color: var(--coral); } .m { color: var(--menta); } .v { color: var(--violeta); }
   .note { font-family: var(--mono); font-size: .66rem; letter-spacing: .04em; color: var(--faint); line-height: 1.6; }
@@ -50,8 +51,8 @@
   .mark .o { width: .8em; height: .8em; background: var(--amarelo); display: grid; place-items: end; flex: none; }
   .mark .o::after { content: ''; width: .3em; height: .3em; background: var(--preto); }
 
-  /* grade de caixas com filete */
   .agents { display: grid; grid-template-columns: repeat(auto-fit,minmax(215px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 900px) { .agents.t3 { grid-template-columns: repeat(3,1fr); } .agents.t2 { grid-template-columns: repeat(2,1fr); } }
   .agents > div { background: var(--bg); padding: clamp(.9rem,1.7vw,1.2rem); display: flex; flex-direction: column; gap: .4rem; border-top: 2px solid var(--amarelo); }
   .agents .n { font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; color: var(--amarelo); }
   .agents .st { font-size: clamp(.92rem,1.35vw,1.05rem); font-weight: 680; line-height: 1.15; letter-spacing: -.025em; }
@@ -62,17 +63,18 @@
   .agents .gate { border-top-color: var(--cinza); }
   .agents .gate .n { color: var(--faint); }
   .agents .ai { border-top-color: var(--violeta); } .agents .ai .n { color: var(--violeta); }
-  @media (min-width: 900px) { .agents.t3 { grid-template-columns: repeat(3,1fr); } }
 
   .dims { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 800px) { .dims.g2 { grid-template-columns: repeat(2,1fr); } }
   .dims > div { background: var(--bg); padding: clamp(1rem,2vw,1.5rem); display: flex; flex-direction: column; gap: .45rem; border-top: 3px solid; }
-  .dims .d1 { border-color: var(--coral); } .dims .d2 { border-color: var(--menta); } .dims .d3 { border-color: var(--violeta); } .dims .d4 { border-color: var(--amarelo); }
+  .dims .d1 { border-color: var(--coral); } .dims .d2 { border-color: var(--menta); } .dims .d3 { border-color: var(--violeta); } .dims .d4 { border-color: var(--amarelo); } .dims .d5 { border-color: var(--cinza); }
   .dims .k { font-family: var(--mono); font-size: .64rem; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); }
   .dims .v { font-size: clamp(.95rem,1.5vw,1.14rem); line-height: 1.35; color: var(--fg); }
+  .dims .v b { color: var(--amarelo); font-weight: 650; }
   .dims .big { font-size: clamp(1.6rem,3.2vw,2.5rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; }
   .dims.compact .big { font-size: clamp(1.25rem,2.3vw,1.85rem); white-space: nowrap; }
+  .dims .d5 .big, .dims .d5 .v { color: var(--faint); }
 
-  /* funil — cada etapa mostra uma ação */
   .funnel { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
   @media (min-width: 900px) { .funnel { grid-template-columns: repeat(5,1fr); } .funnel.f4 { grid-template-columns: repeat(4,1fr); } }
   .funnel > div { background: var(--bg); padding: clamp(.85rem,1.7vw,1.15rem); display: flex; flex-direction: column; gap: .45rem; }
@@ -91,9 +93,12 @@
   .metrics .k { font-family: var(--mono); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
   .metrics .d { font-size: clamp(.76rem,1.05vw,.84rem); line-height: 1.35; color: var(--dim); }
   .metrics .hi .v { color: var(--amarelo); }
-  .metrics.compact .v { font-size: clamp(1.2rem,2.3vw,1.85rem); white-space: nowrap; }
   .metrics .bom .v { color: var(--menta); }
   .metrics .mau .v { color: var(--coral); }
+  .metrics.compact .v { font-size: clamp(1.2rem,2.3vw,1.85rem); white-space: nowrap; }
+
+  .hero-num { font-size: clamp(2.6rem,7vw,5.6rem); font-weight: 800; letter-spacing: -.055em; line-height: .95; }
+  .hero-num .de { color: var(--faint); }
 
   .receipt { font-family: var(--mono); font-size: clamp(.62rem,.95vw,.72rem); color: var(--faint); line-height: 1.85;
     overflow-x: auto; border-left: 2px solid var(--amarelo); padding-left: 1rem; }
@@ -106,8 +111,7 @@
   .cmp .out { font-size: clamp(1rem,1.85vw,1.34rem); line-height: 1.3; letter-spacing: -.025em; font-weight: 620; }
   .cmp .win { border-top: 3px solid var(--amarelo); }
   .cmp .win .tag { color: var(--amarelo); }
-  .cmp .lose .out { color: var(--faint); }
-  .cmp .verdict { font-size: clamp(1.6rem,3.4vw,2.6rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; }
+  .cmp .verdict { font-size: clamp(1.5rem,3.2vw,2.5rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; }
   .cmp ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
   .cmp li { padding: .55rem 0; border-bottom: 1px solid var(--line-2); font-size: clamp(.84rem,1.2vw,.95rem); line-height: 1.4; color: var(--dim); }
   .cmp li b { color: var(--fg); font-weight: 650; }
@@ -121,19 +125,17 @@
   .rows .val b { color: var(--amarelo); font-weight: 650; }
   .rows .val small { display: block; color: var(--faint); font-size: .82em; margin-top: .15rem; }
 
-  /* telas do produto */
   .shots { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
   @media (min-width: 900px) { .shots { grid-template-columns: 1fr 1fr; } }
   .shots > figure { margin: 0; background: var(--bg); padding: clamp(.8rem,1.6vw,1.1rem); display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
-  .shots figcaption { display: flex; gap: .7rem; align-items: baseline; }
+  .shots figcaption { display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }
   .shots figcaption .n { font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; color: var(--amarelo); }
   .shots figcaption b { font-size: clamp(.92rem,1.35vw,1.05rem); font-weight: 680; letter-spacing: -.02em; }
   .shots figcaption span { font-size: clamp(.78rem,1.1vw,.86rem); color: var(--dim); }
   .shots img, .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
   .split { display: grid; grid-template-columns: 1fr; gap: clamp(1rem,2.4vw,2rem); align-items: start; }
-  @media (min-width: 980px) { .split { grid-template-columns: 1.15fr 1fr; } .split.inv { grid-template-columns: 1fr 1.15fr; } }
+  @media (min-width: 980px) { .split { grid-template-columns: 1.15fr 1fr; } .split.eq { grid-template-columns: 1fr 1fr; } }
 
-  /* mapa de risco dos 16 perfis */
   .heat-wrap { overflow-x: auto; border: 1px solid var(--line); }
   .heat { width: 100%; border-collapse: collapse; min-width: 560px; }
   .heat th { font-family: var(--mono); font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 400; padding: .6rem .5rem; border-bottom: 1px solid var(--line); text-align: center; }
@@ -145,7 +147,6 @@
   .heat td.p b { font-weight: 800; font-size: 1rem; letter-spacing: -.03em; }
   .heat td.p span { font-family: var(--mono); font-size: .58rem; opacity: .75; }
 
-  /* barras */
   .bars { display: flex; flex-direction: column; gap: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
   .bar .lab { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .35rem; }
   .bar .lab span { font-family: var(--mono); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
@@ -153,15 +154,12 @@
   .bar .track { height: clamp(.9rem,2vh,1.3rem); background: var(--line-2); }
   .bar .fill { height: 100%; background: var(--cru); }
   .bar.y .fill { background: var(--amarelo); } .bar.y .lab b { color: var(--amarelo); }
-  .bar.c .fill { background: var(--coral); }
+  .bar.m .fill { background: var(--menta); } .bar.m .lab b { color: var(--menta); }
 
-  /* régua de valores do caso real */
   .ruler { position: relative; height: 150px; margin-top: .4rem; }
   .ruler svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .ruler .tk { position: absolute; font-family: var(--mono); font-size: .6rem; letter-spacing: .04em; color: var(--faint); line-height: 1.35; white-space: nowrap; }
   .ruler .tk b { display: block; font-family: var(--sans); font-size: .95rem; font-weight: 750; letter-spacing: -.03em; color: var(--fg); }
-
-  code { font-family: var(--mono); font-size: .9em; }
 
   .s.gold { background: var(--amarelo); color: var(--preto); }
   .s.gold .eyebrow, .s.gold .meta { color: rgba(10,10,10,.55); }
@@ -169,7 +167,7 @@
   .s.gold .lede { color: rgba(10,10,10,.72); }
   .s.gold .mark .o { background: var(--preto); }
   .s.gold .mark .o::after { background: var(--amarelo); }
-  .s.gold .receipt { color: rgba(10,10,10,.6); border-left-color: var(--preto); }
+  .s.gold .receipt { color: rgba(10,10,10,.62); border-left-color: var(--preto); }
   .s.gold .receipt b { color: var(--preto); }
 
   .ctl { position: fixed; bottom: 1rem; right: 1rem; z-index: 10; display: flex; gap: .4rem; font-family: var(--mono); font-size: .66rem; }
@@ -196,13 +194,14 @@
     .s > * { animation: none !important; max-width: 100%; }
     h1 { font-size: 3rem; } h2 { font-size: 1.9rem; }
     .lede { font-size: .95rem; max-width: 70ch; }
-    .metrics .v { font-size: 1.8rem; }
+    .metrics .v { font-size: 1.8rem; } .hero-num { font-size: 3.4rem; }
     .funnel { grid-template-columns: repeat(5,1fr); } .funnel.f4 { grid-template-columns: repeat(4,1fr); }
-    .shots { grid-template-columns: 1fr 1fr; } .cmp { grid-template-columns: 1fr 1fr; }
+    .shots, .cmp, .dims.g2, .agents.t2 { grid-template-columns: 1fr 1fr; } .agents.t3 { grid-template-columns: repeat(3,1fr); }
     .split { grid-template-columns: 1.15fr 1fr; }
     .shots img, .shot img { max-height: 108mm; object-fit: cover; object-position: top; }
   }
 </style>
+
 </head>
 <body>
 
@@ -212,67 +211,84 @@
 
 <div class="deck" id="deck">
 
-  <!-- 1 · abertura -->
+  <!-- 01 · capa -->
   <section class="s">
-    <span class="meta"><span class="t">0:00–0:20</span><span>01 / 27</span></span>
-    <div class="mark"><span class="o"></span>EnterOS</div>
-    <p class="eyebrow">Política de Acordos · Banco Unicamp · Hackathon Enter × Unicamp</p>
-    <h1>Defender ou fazer acordo?<br /><span class="y">A mesma resposta, pelo mesmo critério, em cada processo.</span></h1>
-    <p class="lede">Para as ações em que o autor diz não reconhecer a contratação de um empréstimo: a política decide, o advogado executa e a empresa acompanha.</p>
+    <span class="meta"><span class="t">0:00–0:20</span><span>01 / 30</span></span>
+    <div class="mark"><span class="o"></span>Radar de Provas</div>
+    <p class="eyebrow">EnterOS · Banco Unicamp · ações de não reconhecimento de empréstimo</p>
+    <h1>Defender ou fazer acordo?<br /><span class="y">Existe uma terceira resposta.</span></h1>
   </section>
 
-  <!-- 2 · problema -->
+  <!-- 02 · problema -->
   <section class="s">
-    <span class="meta"><span class="t">0:20–1:00</span><span>02 / 27</span></span>
+    <span class="meta"><span class="t">0:20–1:10</span><span>02 / 30</span></span>
     <p class="eyebrow">O problema</p>
-    <h2>Todo mês, milhares de advogados respondem à mesma pergunta — <span class="y">cada um do seu jeito.</span></h2>
+    <h2>Milhares de páginas por mês — <span class="y">e cada advogado decide do seu jeito.</span></h2>
     <div class="metrics">
-      <div><span class="k">Processos novos</span><span class="v">15 mil</span><span class="d">por mês no Banco Unicamp</span></div>
-      <div><span class="k">Não reconhecem o empréstimo</span><span class="v">5 mil</span><span class="d">por mês, com o mesmo tipo de alegação</span></div>
+      <div><span class="k">Processos novos</span><span class="v">15 mil</span><span class="d">por mês no Banco Unicamp; 5 mil alegam não reconhecer o empréstimo</span></div>
+      <div><span class="k">Páginas por mês</span><span class="v">≈ 87 mil</span><span class="d">≈ 17 páginas por processo, nos processos de exemplo, × 5 mil</span></div>
+      <div><span class="k">Só para ler</span><span class="v">≈ 18</span><span class="d">advogados em tempo integral, a 2 minutos por página</span></div>
       <div class="hi"><span class="k">Pago na base</span><span class="v">R$ 193 mi</span><span class="d">em acordos e condenações, nas 60 mil sentenças</span></div>
     </div>
+    <div class="dims">
+      <div class="d1"><span class="k">Lento</span><span class="v">Ler autos e subsídios de cada processo, à mão, não acompanha o volume.</span></div>
+      <div class="d1"><span class="k">Sujeito a erro</span><span class="v">A página que decide o caso pode estar no meio de outras vinte.</span></div>
+      <div class="d1"><span class="k">Empírico</span><span class="v">Processos iguais recebem decisões diferentes, conforme quem os analisa.</span></div>
+    </div>
+    <p class="note">Páginas e horas são estimativas a partir dos 2 processos de exemplo.</p>
+  </section>
+
+  <!-- 03 · análises -->
+  <section class="s">
+    <span class="meta"><span class="t">1:10–1:40</span><span>03 / 30</span></span>
+    <p class="eyebrow">Análise de dados sobre as 60 mil sentenças</p>
+    <h2>Seis análises. <span class="y">Um padrão que ninguém estava olhando.</span></h2>
+    <div class="agents t3">
+      <div><span class="n">01</span><span class="st">Efeito de cada documento</span><span class="ro">com × sem</span><span class="ia">Taxa de derrota e custo médio comparados, documento a documento.</span></div>
+      <div><span class="n">02</span><span class="st">Segmentação em perfis</span><span class="ro">tabela de contingência</span><span class="ia">Contrato × extrato × comprovante × alegação: <b>16 perfis</b> com amostra grande.</span></div>
+      <div><span class="n">03</span><span class="st">Agrupamento de estados</span><span class="ro">grupos de risco</span><span class="ia">Estados em três grupos, aplicados como ajuste na chance de perder.</span></div>
+      <div><span class="n">04</span><span class="st">Curva de aceite</span><span class="ro">280 acordos</span><span class="ia">Até que percentual da causa os acordos fecham, para prever a chance de aceite de cada oferta.</span></div>
+      <div><span class="n">05</span><span class="st">Calibração</span><span class="ro">previsto × observado</span><span class="ia">Faixa a faixa, o risco prometido contra o que aconteceu.</span></div>
+      <div><span class="n">06</span><span class="st">Simulação sobre a base</span><span class="ro">sensibilidade</span><span class="ia">O método aplicado a cada sentença, com aceitação de 30% a 60% e recuperação de 25% a 70%.</span></div>
+    </div>
+  </section>
+
+  <!-- 04 · padrão -->
+  <section class="s">
+    <span class="meta"><span class="t">1:40–2:20</span><span>04 / 30</span></span>
+    <p class="eyebrow">O padrão</p>
+    <h2>Alguns documentos quase não mudam nada. <span class="y">Outros decidem o processo.</span></h2>
+    <div class="dims compact">
+      <div class="d1"><span class="k">Contrato · falta em 28%</span><span class="big">12,7% → 75,3%</span><span class="v">de derrota com e sem ele: <b>6 vezes mais</b>. Custo médio de R$ 1.333 → R$ 7.975.</span></div>
+      <div class="d1"><span class="k">Extrato · falta em 19%</span><span class="big">18,8% → 81,7%</span><span class="v">de derrota com e sem ele. Custo médio de R$ 1.985 → R$ 8.640.</span></div>
+      <div class="d4"><span class="k">Comprovante · falta em 39%</span><span class="big">19,9% → 46,7%</span><span class="v">Efeito menor, mas presente.</span></div>
+      <div class="d5"><span class="k">Dossiê e laudo</span><span class="big">30% → 30%</span><span class="v">Sozinhos, não mudam o resultado.</span></div>
+    </div>
+    <div class="metrics">
+      <div class="mau"><span class="k">Pago em processos sem contrato</span><span class="v">R$ 135,7 mi</span><span class="d">70% de tudo que a empresa pagou na base</span></div>
+      <div class="mau"><span class="k">Pago em processos sem extrato</span><span class="v">R$ 95,9 mi</span><span class="d">em 11.105 processos</span></div>
+    </div>
+    <p class="lede">Um modelo preditivo tradicional para aqui: calcula o risco com o que chegou. <b>O Radar de Provas vai um passo além.</b></p>
+  </section>
+
+  <!-- 05 · cinco perguntas -->
+  <section class="s">
+    <span class="meta"><span class="t">2:20–3:00</span><span>05 / 30</span></span>
+    <p class="eyebrow">O método</p>
+    <h2>Dos dados, cinco perguntas. <span class="y">A quinta é onde o resultado vira.</span></h2>
     <div class="funnel">
-      <div><span class="f">Hoje · 1</span><span class="g">Recebe o processo</span><span class="act">Advogado externo, de um escritório, pela plataforma.</span></div>
-      <div><span class="f">Hoje · 2</span><span class="g">Lê autos e subsídios</span><span class="act">Contrato, extrato, comprovante, dossiê, laudo.</span></div>
-      <div><span class="f">Hoje · 3</span><span class="g">Decide sozinho</span><span class="act">Defesa ou acordo, com a política como referência.</span></div>
-      <div><span class="f">Hoje · 4</span><span class="g">Negocia</span><span class="act">Se for acordo, ele mesmo fala com o autor.</span></div>
-      <div class="last"><span class="f">O desafio</span><span class="g">Triplo</span><span class="act"><b>Definir</b> a política, <b>garantir</b> que seja seguida e <b>monitorar</b> o resultado.</span></div>
+      <div><span class="f">1 · Prova</span><span class="g">Dá para provar o empréstimo?</span><span class="act">Sem contrato e sem extrato a empresa vence só <b>2,7%</b> de 6.493 processos. A defesa sai do padrão (art. 373, II, do CPC).</span></div>
+      <div><span class="f">2 · Documentos</span><span class="g">Quais documentos existem?</span><span class="act">Contrato, extrato, comprovante e alegação de golpe formam <b>16 perfis</b>: de 2 a 99 derrotas em cada 100.</span></div>
+      <div><span class="f">3 · Local</span><span class="g">Onde corre o processo?</span><span class="act">Amazonas, Amapá, Bahia, Goiás, Rio de Janeiro e Rio Grande do Sul <b>elevam o risco</b>.</span></div>
+      <div><span class="f">4 · Preço</span><span class="g">Quanto custa cada caminho?</span><span class="act">Oferta dentro da faixa em que acordos fecham (<b>25% a 35%</b> da causa) e o valor máximo, acima do qual defender sai mais barato.</span></div>
+      <div class="last"><span class="f">5 · A terceira resposta</span><span class="g">Vale pedir o documento de novo?</span><span class="act">Quando há sinal de que ele existe e a chegada dele <b>mudaria a decisão</b>.</span></div>
     </div>
   </section>
 
-  <!-- 3 · requisitos -->
+  <!-- 06 · mapa -->
   <section class="s">
-    <span class="meta"><span class="t">1:00–1:30</span><span>03 / 27</span></span>
-    <p class="eyebrow">O que foi pedido e onde está no produto</p>
-    <h2>Os cinco requisitos mínimos, <span class="y">cada um com um lugar na tela.</span></h2>
-    <div class="rows">
-      <div><span class="lbl">01 · Regra de decisão</span><span class="val">Primeiro a prova, depois 16 perfis de documentos e o estado: <b>defender, propor acordo ou pedir o documento que falta</b>.</span></div>
-      <div><span class="lbl">02 · Sugestão de valor</span><span class="val">A oferta com melhor retorno dentro da faixa de mercado, e o limite explícito: <b>acima de R$ X, defender sai mais barato</b>.</span></div>
-      <div><span class="lbl">03 · Acesso</span><span class="val">Fila ordenada pelo que precisa do advogado, análise pronta ao abrir, documentos e conversa com IA no mesmo lugar.</span></div>
-      <div><span class="lbl">04 · Aderência</span><span class="val">Quem segue a recomendação, exceções com motivo e nota de 0 a 100 por advogado e escritório.</span></div>
-      <div><span class="lbl">05 · Efetividade</span><span class="val">Economia observada contra processos parecidos, ticket médio, aceitação e o valor dos documentos que não chegam.</span></div>
-    </div>
-  </section>
-
-  <!-- 4 · como a política decide -->
-  <section class="s">
-    <span class="meta"><span class="t">1:30–2:20</span><span>04 / 27</span></span>
-    <p class="eyebrow">Regra de decisão</p>
-    <h2>Cinco perguntas, na ordem em que um jurídico faria.</h2>
-    <div class="funnel">
-      <div><span class="f">1 · Prova</span><span class="g">Dá para provar o empréstimo?</span><span class="act">Sem contrato e sem extrato a empresa vence <b>2,7%</b> de 6.493 processos. A defesa sai do padrão (art. 373, II, do CPC).</span></div>
-      <div><span class="f">2 · Perfil</span><span class="g">Quais documentos existem?</span><span class="act">Contrato, extrato, comprovante e alegação de golpe formam <b>16 perfis</b>: de 2 a 99 derrotas em cada 100.</span></div>
-      <div><span class="f">3 · Estado</span><span class="g">Onde corre o processo?</span><span class="act"><b>AM, AP, BA, GO, RJ e RS</b> elevam o risco; oito estados reduzem.</span></div>
-      <div><span class="f">4 · Preço</span><span class="g">Quanto custa cada caminho?</span><span class="act">Oferta dentro da faixa de mercado (<b>25% a 35%</b> da causa) e o valor máximo, acima do qual defender sai mais barato.</span></div>
-      <div class="last"><span class="f">5 · Nosso diferencial</span><span class="g">Vale pedir o documento?</span><span class="act">Quando há sinal de que ele existe e a chegada dele <b>mudaria a decisão</b>.</span></div>
-    </div>
-    <p class="lede">A política fala com o jurídico em frequências — “98 em cada 100” — e nunca em siglas ou probabilidades.</p>
-  </section>
-
-  <!-- 5 · mapa de risco -->
-  <section class="s">
-    <span class="meta"><span class="t">2:20–3:00</span><span>05 / 27</span></span>
-    <p class="eyebrow">O que as 60 mil sentenças mostram</p>
+    <span class="meta"><span class="t">3:00–3:30</span><span>06 / 30</span></span>
+    <p class="eyebrow">Os 16 perfis</p>
     <h2>A chance de perder depende, antes de tudo, <span class="y">de quais documentos a empresa tem.</span></h2>
     <div class="heat-wrap">
       <table class="heat" aria-label="Derrotas em cada 100 processos, por perfil de documentos">
@@ -289,20 +305,20 @@
         </tbody>
       </table>
     </div>
-    <p class="note">Derrotas em cada 100 processos. Dossiê e laudo, sozinhos, não mudam o resultado na base — por isso não entram no perfil.</p>
+    <p class="note">Derrotas em cada 100 processos, nas 60 mil sentenças.</p>
   </section>
 
-  <!-- 6 · dois casos reais -->
+  <!-- 07 · dois casos -->
   <section class="s">
-    <span class="meta"><span class="t">3:00–3:40</span><span>06 / 27</span></span>
-    <p class="eyebrow">Os dois processos de exemplo, pela mesma regra</p>
-    <h2>Mesmo critério, respostas opostas — <span class="y">e cada uma se explica.</span></h2>
+    <span class="meta"><span class="t">3:30–4:20</span><span>07 / 30</span></span>
+    <p class="eyebrow">Os dois processos de exemplo, pelo mesmo método</p>
+    <h2>Contrato e extrato decidem: <span class="y">2 derrotas em cada 100, ou 98.</span></h2>
     <div class="cmp">
       <div class="win">
-        <span class="tag">0654321-09.2024.8.04.0001 · Manaus/AM · alega golpe · R$ 25.000</span>
+        <span class="tag">Manaus, Amazonas · alega golpe · causa de R$ 25.000</span>
         <span class="verdict"><span class="c">98 em 100</span> → propor acordo</span>
         <span class="out">Sem contrato e sem extrato. Oferta de <span class="y">R$ 8.750</span>, com 76% de chance de aceite.</span>
-        <div class="ruler" aria-label="Régua de R$ 0 a R$ 25.000">
+        <div class="ruler" aria-label="Valores do processo de Manaus, de R$ 0 a R$ 25.000">
           <svg viewBox="0 0 1000 150" preserveAspectRatio="none" aria-hidden="true">
             <rect x="0" y="68" width="1000" height="10" fill="rgba(243,239,229,.12)"/>
             <rect x="861" y="68" width="139" height="10" fill="rgba(255,102,74,.45)"/>
@@ -310,155 +326,105 @@
             <line x1="767" y1="56" x2="767" y2="90" stroke="#A8A49B" stroke-width="2"/>
             <line x1="861" y1="56" x2="861" y2="96" stroke="#FF664A" stroke-width="3"/>
           </svg>
-          <span class="tk" style="left:25%; top:0">faixa de mercado<b>R$ 6.250–8.750</b></span>
-          <span class="tk" style="left:25%; top:100px">R$ 0 → causa R$ 25.000</span>
-          <span class="tk" style="right:calc(100% - 76.7%); top:0; text-align:right">custo de 645 parecidos<b>R$ 19.185</b></span>
+          <span class="tk" style="left:25%; top:0">acordos fecham entre<b>R$ 6.250–8.750</b></span>
+          <span class="tk" style="left:0; top:100px">R$ 0 → causa R$ 25.000</span>
+          <span class="tk" style="right:calc(100% - 76.7%); top:0; text-align:right">645 parecidos custaram<b>R$ 19.185</b></span>
           <span class="tk" style="right:0; top:100px; text-align:right">acima disso, defender sai mais barato<b class="c">R$ 21.527</b></span>
         </div>
       </div>
-      <div>
-        <span class="tag">0801234-56.2024.8.10.0001 · São Luís/MA · R$ 20.000</span>
+      <div class="win">
+        <span class="tag">São Luís, Maranhão · não reconhece a contratação · causa de R$ 20.000</span>
         <span class="verdict"><span class="m">2 em 100</span> → defender</span>
-        <span class="out">Os 7 documentos presentes, com contrato e extrato.</span>
-        <ul>
-          <li>Tem a <b>prova mínima da contratação</b>.</li>
-          <li>Defender custa <b>R$ 272,85</b> em média, contra <b>R$ 5.800</b> de abertura de acordo.</li>
-          <li>MA está no grupo de menor risco.</li>
-        </ul>
+        <span class="out">Contrato e extrato presentes. Defender custa <span class="y">R$ 273</span> em média, contra R$ 5.800 de um acordo.</span>
+        <div class="ruler" aria-label="Valores do processo de São Luís, de R$ 0 a R$ 20.000">
+          <svg viewBox="0 0 1000 150" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="0" y="68" width="1000" height="10" fill="rgba(243,239,229,.12)"/>
+            <rect x="0" y="62" width="14" height="22" fill="#9FF5D0"/>
+            <rect x="250" y="68" width="100" height="10" fill="rgba(255,212,0,.45)"/>
+            <line x1="290" y1="56" x2="290" y2="96" stroke="#FFD400" stroke-width="3"/>
+          </svg>
+          <span class="tk" style="left:0; top:0">defender custa, em média<b class="m">R$ 273</b></span>
+          <span class="tk" style="left:25%; top:100px">acordo começaria em<b>R$ 5.800</b></span>
+          <span class="tk" style="right:0; top:0; text-align:right">causa<b>R$ 20.000</b></span>
+        </div>
       </div>
     </div>
+    <p class="note">R$ 273 é o custo esperado: a empresa perde só 2 em cada 100 processos assim, e quando perde paga em média 71% da causa. R$ 5.800 é a proposta de abertura: 29% da causa, a mediana dos acordos.</p>
   </section>
 
-  <!-- 7 · premissas -->
+  <!-- 08 · premissas -->
   <section class="s">
-    <span class="meta"><span class="t">3:40–4:10</span><span>07 / 27</span></span>
+    <span class="meta"><span class="t">4:20–4:50</span><span>08 / 30</span></span>
     <p class="eyebrow">Premissas adotadas</p>
     <h2>Toda conta tem premissas. <span class="y">Aqui elas estão à vista.</span></h2>
     <div class="rows">
       <div><span class="lbl base">Da base</span><span class="val">Quando perde, a empresa paga em média <b>71% da causa</b><small>17.987 condenações nas 60 mil sentenças</small></span></div>
-      <div><span class="lbl base">Da base</span><span class="val">Acordos fecham entre <b>25% e 35% da causa</b>, mediana de 29% — a proposta de abertura<small>280 acordos reais</small></span></div>
-      <div><span class="lbl prem">Premissa</span><span class="val">O autor aceita <b>40%</b> das ofertas no começo<small>A base não registra recusas. Com 10 respostas registradas, a taxa real passa a ajustar a recomendação.</small></span></div>
-      <div><span class="lbl prem">Premissa</span><span class="val">O documento que falta é encontrado em <b>70%</b> dos casos com sinal de que existe; 25% sem sinal<small>17.194 processos da base em que o documento comprovadamente existiu</small></span></div>
+      <div><span class="lbl base">Da base</span><span class="val">Acordos fecham entre <b>25% e 35% da causa</b>, mediana de 29%<small>280 acordos reais</small></span></div>
+      <div><span class="lbl prem">Premissa</span><span class="val">O autor aceita <b>40%</b> das ofertas no começo, e a oferta cresce com o risco<small>Numa causa de R$ 20 mil: R$ 5.000 com 35 derrotas em cada 100 · R$ 6.000 com 50 · R$ 7.000 a partir de 65. Com respostas registradas, a taxa real ajusta a oferta.</small></span></div>
+      <div><span class="lbl prem">Premissa</span><span class="val">O documento pedido chega em <b>70%</b> dos casos — só quando há sinal de que ele existe<small>Sem sinal, a chance cai para 25%: pode ser golpe, e o documento pode nunca ter existido</small></span></div>
       <div><span class="lbl prem">Premissa</span><span class="val">O processo custa <b>1% ao mês por 24 meses</b>; honorários de sucumbência de 15%<small>A decisão não muda entre 12 e 36 meses</small></span></div>
     </div>
   </section>
 
-  <!-- 8 · validação -->
-  <section class="s">
-    <span class="meta"><span class="t">4:10–4:40</span><span>08 / 27</span></span>
-    <p class="eyebrow">Validação fora da amostra</p>
-    <h2>O risco que a política mostra <span class="y">é o risco que acontece.</span></h2>
-    <div class="metrics">
-      <div class="hi"><span class="k">Ordena o risco</span><span class="v">92 em 100</span><span class="d">pares de processos — um perdido, um ganho — em que a política aponta qual tinha mais risco (AUC 0,92)</span></div>
-      <div><span class="k">Acerta o número</span><span class="v">0,62 ponto</span><span class="d">maior distância entre o risco previsto e o observado, em qualquer faixa</span></div>
-      <div><span class="k">Reproduz o total</span><span class="v">R$ 192,9 mi</span><span class="d">de condenações previstas, contra R$ 193,0 mi pagos de fato</span></div>
-    </div>
-    <div class="cmp">
-      <div class="lose"><span class="tag">Gradient boosting · LightGBM</span><span class="out">92,15 em 100. Caixa-preta: precisa de treino e é difícil de auditar.</span></div>
-      <div class="win"><span class="tag">Tabela de 16 perfis · escolhida</span><span class="out">91,99 em 100. Empate prático, <span class="y">R$ 68 mil a mais de economia</span> e o jurídico lê cada linha.</span></div>
-    </div>
-  </section>
-
-  <!-- 9 · potencial -->
-  <section class="s">
-    <span class="meta"><span class="t">4:40–5:20</span><span>09 / 27</span></span>
-    <p class="eyebrow">Potencial financeiro · a política aplicada às 60 mil sentenças</p>
-    <h2>Só com a regra, a empresa teria pago <span class="y">R$ 29,5 milhões a menos.</span></h2>
-    <div class="bars">
-      <div class="bar"><div class="lab"><span>O que foi pago de fato</span><b>R$ 193,0 mi</b></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
-      <div class="bar y"><div class="lab"><span>Com a política · 40% de aceitação</span><b>R$ 163,5 mi</b></div><div class="track"><div class="fill" style="width:84.7%"></div></div></div>
-    </div>
-    <div class="metrics">
-      <div class="hi"><span class="k">Economia</span><span class="v">15,3%</span><span class="d">só sabendo quais documentos o processo tem</span></div>
-      <div><span class="k">Se a aceitação variar</span><span class="v">R$ 22–44 mi</span><span class="d">com aceitação entre 30% e 60%</span></div>
-      <div><span class="k">Por mês · estimativa</span><span class="v">≈ R$ 2,5 mi</span><span class="d">≈ R$ 490 por processo nos 5 mil mensais; a base não informa o período</span></div>
-    </div>
-    <p class="lede">E isso é só a regra. <span class="y">O pedido de documento leva a economia a 27,7%.</span></p>
-  </section>
-
-  <!-- 10 · diferencial 1 -->
+  <!-- 09 · terceira resposta -->
   <section class="s gold">
-    <span class="meta"><span class="t">5:20–5:40</span><span>10 / 27</span></span>
-    <p class="eyebrow">Diferencial 1</p>
-    <h1 style="max-width:18ch">O documento que não chegou muda o jogo.</h1>
-    <p class="lede">Quase todo mundo vai modelar a chance de perder. Nós fomos atrás do porquê: o que falta no processo, se isso existe e se dá para buscar de novo.</p>
+    <span class="meta"><span class="t">4:50–5:05</span><span>09 / 30</span></span>
+    <p class="eyebrow">A terceira resposta</p>
+    <h1 style="max-width:17ch">Pedir a prova que falta.</h1>
+    <p class="lede">Quase todo mundo vai prever quem ganha o processo. O Radar de Provas pergunta outra coisa: a prova que falta existe — e dá para buscar?</p>
   </section>
 
-  <!-- 11 · como chegamos lá -->
+  <!-- 10 · janela -->
   <section class="s">
-    <span class="meta"><span class="t">5:40–6:20</span><span>11 / 27</span></span>
-    <p class="eyebrow">Análise de dados sobre as 60 mil sentenças</p>
-    <h2>Seis análises. <span class="y">Um padrão que ninguém estava olhando.</span></h2>
-    <div class="agents t3">
-      <div><span class="n">01</span><span class="st">Efeito de cada documento</span><span class="ro">com × sem</span><span class="ia">Taxa de derrota e custo médio comparados, documento a documento.</span></div>
-      <div><span class="n">02</span><span class="st">Segmentação em perfis</span><span class="ro">tabela de contingência</span><span class="ia">Contrato × extrato × comprovante × alegação: <b>16 perfis</b> com amostra grande.</span></div>
-      <div><span class="n">03</span><span class="st">Agrupamento de estados</span><span class="ro">log-odds</span><span class="ia">Estados em três grupos de risco, aplicados como ajuste na chance de perder.</span></div>
-      <div><span class="n">04</span><span class="st">Modelo de comparação</span><span class="ro">LightGBM · 5 dobras</span><span class="ia">Gradient boosting fora da amostra para medir se a tabela perdia precisão.</span></div>
-      <div><span class="n">05</span><span class="st">Calibração</span><span class="ro">previsto × observado</span><span class="ia">Faixa a faixa, o risco prometido contra o que aconteceu.</span></div>
-      <div><span class="n">06</span><span class="st">Backtest contrafactual</span><span class="ro">sensibilidade</span><span class="ia">A política aplicada à base, com aceitação de 30% a 60% e recuperação de 25% a 70%.</span></div>
-    </div>
-  </section>
-
-  <!-- 12 · o padrão -->
-  <section class="s">
-    <span class="meta"><span class="t">6:20–7:00</span><span>12 / 27</span></span>
-    <p class="eyebrow">O padrão</p>
-    <h2>Sem contrato, a empresa perde <span class="c">6 vezes mais.</span></h2>
-    <div class="dims compact">
-      <div class="d1"><span class="k">Contrato · falta em 28%</span><span class="big">12,7% → 75,3%</span><span class="v">de derrota com e sem ele. Custo médio de R$ 1.333 → R$ 7.975.</span></div>
-      <div class="d1"><span class="k">Extrato · falta em 19%</span><span class="big">18,8% → 81,7%</span><span class="v">de derrota com e sem ele. Custo médio de R$ 1.985 → R$ 8.640.</span></div>
-      <div class="d4"><span class="k">Comprovante · falta em 39%</span><span class="big">19,9% → 46,7%</span><span class="v">Efeito menor, mas presente. Custo de R$ 2.099 → R$ 4.941.</span></div>
-      <div class="d3"><span class="k">Dossiê e laudo</span><span class="big">30% → 30%</span><span class="v">Não mudam o resultado sozinhos — mas <b>provam que o contrato e o extrato existem</b>.</span></div>
-    </div>
+    <span class="meta"><span class="t">5:05–5:40</span><span>10 / 30</span></span>
+    <p class="eyebrow">A janela de oportunidade</p>
+    <h2>Em 7.543 processos, <span class="y">a prova existe — só não chegou.</span></h2>
     <div class="metrics">
-      <div class="mau"><span class="k">Pago em processos sem contrato</span><span class="v">R$ 135,7 mi</span><span class="d">70% de tudo que a empresa pagou na base</span></div>
-      <div class="mau"><span class="k">Pago em processos sem extrato</span><span class="v">R$ 95,9 mi</span><span class="d">em 11.105 processos</span></div>
+      <div class="hi"><span class="k">Processos com sinal</span><span class="v">7.543</span><span class="d">12,6% da base: sem contrato, mas com dossiê que conferiu a assinatura</span></div>
+      <div class="bom"><span class="k">Se o contrato chega</span><span class="v">63 → 10</span><span class="d">derrotas em cada 100, em média</span></div>
+      <div class="bom"><span class="k">Processos revertidos</span><span class="v">≈ 5,3 mil</span><span class="d">voltam a ter defesa viável, com 7 em cada 10 pedidos atendidos</span></div>
     </div>
+    <p class="lede">O dossiê e o laudo não mudam o resultado sozinhos — <b>mas provam que o contrato e o extrato existem</b>. É esse sinal que o Radar procura antes de pedir.</p>
   </section>
 
-  <!-- 13 · cuidado -->
+  <!-- 11 · cuidado -->
   <section class="s">
-    <span class="meta"><span class="t">7:00–7:30</span><span>13 / 27</span></span>
+    <span class="meta"><span class="t">5:40–6:10</span><span>11 / 30</span></span>
     <p class="eyebrow">O cuidado</p>
-    <h2>Documento ausente <span class="y">não é, por si só, falha da empresa.</span></h2>
-    <div class="dims">
-      <div class="d1"><span class="k">Sem contrato</span><span class="big">78%</span><span class="v">alegam golpe — contra 66% dos processos com contrato.</span></div>
-      <div class="d1"><span class="k">Sem contrato e sem extrato</span><span class="big">83%</span><span class="v">alegam golpe. Muitas vezes o documento não existe porque a operação não existiu.</span></div>
-      <div class="d3"><span class="k">Por isso a política só pede com sinal</span><span class="v">O <b>dossiê conferiu a assinatura</b> → o contrato existe. O <b>laudo mostra o crédito na conta</b> → o extrato existe.</span></div>
-      <div class="d2"><span class="k">Sem sinal</span><span class="v">Acordo rápido, e o motivo da falta vai para <b>Prevenção a fraudes</b> revisar a esteira de originação.</span></div>
+    <h2>Sem sinal de que o documento existe, <span class="y">o mais provável é golpe.</span></h2>
+    <div class="dims g2">
+      <div class="d1"><span class="k">Sem contrato e sem extrato</span><span class="big">83%</span><span class="v">dos autores alegam golpe. Muitas vezes a operação nunca existiu.</span></div>
+      <div class="d1"><span class="k">A falta anda junto com a suspeita</span><span class="big">78% × 66%</span><span class="v">alegam golpe nos processos sem contrato, contra os processos com contrato.</span></div>
+      <div class="d2"><span class="k">A resposta do Radar</span><span class="v"><b>Acordo rápido</b>, para não pagar a condenação quase certa e o tempo do processo.</span></div>
+      <div class="d4"><span class="k">E um alerta para o banco</span><span class="v">O caso vai para <b>Prevenção a fraudes</b> do Banco Unicamp revisar a esteira de contratação.</span></div>
     </div>
   </section>
 
-  <!-- 14 · impacto de pedir -->
+  <!-- 12 · impacto -->
   <section class="s">
-    <span class="meta"><span class="t">7:30–8:20</span><span>14 / 27</span></span>
-    <p class="eyebrow">O impacto de pedir de novo</p>
-    <h2>Só ter a opção de pedir o documento <span class="y">vale R$ 23,9 milhões.</span></h2>
+    <span class="meta"><span class="t">6:10–6:50</span><span>12 / 30</span></span>
+    <p class="eyebrow">O impacto de pedir de novo · simulado nas 60 mil sentenças</p>
+    <p class="hero-num"><span class="de">R$ 29,5 mi</span> → <span class="y">R$ 53,4 mi</span></p>
+    <h2>A economia quase dobra só com a opção de pedir o documento.</h2>
     <div class="metrics">
-      <div><span class="k">Processos com sinal</span><span class="v">7.543</span><span class="d">12,6% da base: o dossiê indica que o contrato existe</span></div>
-      <div class="bom"><span class="k">Risco se o contrato chega</span><span class="v">63 → 10</span><span class="d">derrotas em cada 100, em média</span></div>
-      <div class="bom"><span class="k">Processos revertidos</span><span class="v">≈ 5,3 mil</span><span class="d">voltam a ter defesa viável, com 70% de recuperação</span></div>
-      <div class="hi"><span class="k">Economia a mais</span><span class="v">R$ 23,9 mi</span><span class="d">R$ 8,5 mi mesmo se só 25% dos pedidos derem certo</span></div>
+      <div class="hi"><span class="k">A mais de economia</span><span class="v">+81%</span><span class="d">R$ 23,9 mi vêm só dos pedidos de documento</span></div>
+      <div><span class="k">Sobre o que foi pago</span><span class="v">15,3% → 27,7%</span><span class="d">dos R$ 193 mi da base</span></div>
+      <div class="bom"><span class="k">No pior cenário</span><span class="v">+R$ 8,5 mi</span><span class="d">mesmo se só 1 em cada 4 pedidos der certo</span></div>
     </div>
-    <div class="bars">
-      <div class="bar c"><div class="lab"><span>Nesses 7.543 · pago de fato</span><b>R$ 49,5 mi</b></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
-      <div class="bar"><div class="lab"><span>Política sem pedir o documento</span><b>R$ 42,3 mi</b></div><div class="track"><div class="fill" style="width:85.4%"></div></div></div>
-      <div class="bar y"><div class="lab"><span>Política pedindo o documento</span><b>R$ 18,3 mi</b></div><div class="track"><div class="fill" style="width:37%"></div></div></div>
-    </div>
-    <p class="note">Economia total da política: 15,3% → 27,7%. Teto que assume que todo dossiê presente teve a assinatura conferida pela IA; modelado, não observado.</p>
+    <p class="note">Modelado, não observado: supõe que todo dossiê presente teve a assinatura conferida pela IA e que 70% dos pedidos com sinal são atendidos.</p>
   </section>
 
-  <!-- 15 · na operação -->
+  <!-- 13 · operação -->
   <section class="s">
-    <span class="meta"><span class="t">8:20–8:50</span><span>15 / 27</span></span>
+    <span class="meta"><span class="t">6:50–7:15</span><span>13 / 30</span></span>
     <p class="eyebrow">Como o pedido anda na operação</p>
-    <h2>Do pedido do advogado <span class="y">à reavaliação automática.</span></h2>
+    <h2>Do pedido do advogado <span class="y">à nova recomendação.</span></h2>
     <div class="funnel">
-      <div><span class="f">1 · Advogado</span><span class="g">Pede o documento</span><span class="act">A recomendação diz <b>qual documento</b> e por que ele deve existir.</span></div>
-      <div><span class="f">2 · Empresa</span><span class="g">Fila de recuperação</span><span class="act">Ordenada pelo <b>valor em jogo</b> de cada pedido.</span></div>
-      <div><span class="f">3 · Empresa</span><span class="g">Entrega ou justifica</span><span class="act">Se não houver documento, <b>registra o motivo</b>.</span></div>
-      <div><span class="f">4 · IA</span><span class="g">Classifica o motivo</span><span class="act">E aponta a <b>área responsável</b> por resolver a causa.</span></div>
-      <div class="last"><span class="f">5 · Política</span><span class="g">Reavalia sozinha</span><span class="act">O documento chegou: <b>nova recomendação</b> na fila do advogado.</span></div>
+      <div><span class="f">1 · Advogado</span><span class="g">Pede o documento</span><span class="act">O Radar diz <b>qual documento</b> e por que ele deve existir.</span></div>
+      <div><span class="f">2 · Banco</span><span class="g">Fila de recuperação</span><span class="act">Ordenada pelo <b>valor em jogo</b> de cada pedido.</span></div>
+      <div><span class="f">3 · Banco</span><span class="g">Entrega ou justifica</span><span class="act">Se não houver documento, <b>registra o motivo</b>.</span></div>
+      <div><span class="f">4 · IA</span><span class="g">Entende o motivo</span><span class="act">E aponta a <b>área responsável</b> por corrigir a causa.</span></div>
+      <div class="last"><span class="f">5 · Radar</span><span class="g">Reavalia sozinho</span><span class="act">O documento chegou: <b>nova recomendação</b> na fila do advogado.</span></div>
     </div>
     <div class="metrics">
       <div><span class="k">Pedidos na demo</span><span class="v">32</span><span class="d">10 em aberto</span></div>
@@ -468,113 +434,63 @@
     </div>
   </section>
 
-  <!-- 16 · diferencial 2 -->
+  <!-- 14 · contrato -->
   <section class="s gold">
-    <span class="meta"><span class="t">8:50–9:05</span><span>16 / 27</span></span>
+    <span class="meta"><span class="t">7:15–7:25</span><span>14 / 30</span></span>
     <p class="eyebrow">Diferencial 2</p>
-    <h1 style="max-width:17ch">A política se adapta ao contrato de cada escritório.</h1>
-    <p class="lede">O honorário muda o que é mais barato para a empresa — e o que é mais lucrativo para o escritório. A política pesa os dois.</p>
+    <h1 style="max-width:17ch">O Radar se adapta ao contrato de cada escritório.</h1>
+    <p class="lede">O honorário muda o que é mais barato para o banco — e o que é mais lucrativo para o escritório. O Radar pesa os dois.</p>
   </section>
 
-  <!-- 17 · dois contratos -->
+  <!-- 15 · dois contratos -->
   <section class="s">
-    <span class="meta"><span class="t">9:05–10:00</span><span>17 / 27</span></span>
-    <p class="eyebrow">Dois modelos de contrato, a mesma base de 60 mil sentenças</p>
-    <h2>Contrato diferente, recomendação diferente — <span class="y">sempre contra o vício do contrato.</span></h2>
-    <div class="cmp">
-      <div>
-        <span class="tag">Modelo A · êxito na defesa</span>
-        <span class="out">Escritório recebe <span class="y">10% da causa</span> quando a defesa ganha.</span>
-        <ul>
-          <li>Tendência do escritório: <b>defender</b>, porque é quando ele ganha mais.</li>
-          <li>A política soma o prêmio ao custo de defender: <b>1.154 processos passam de defesa para acordo</b>.</li>
-          <li>Processo limítrofe*: <b>acordo</b> · oferta R$ 3.900 · máximo R$ 5.043.</li>
-        </ul>
-      </div>
-      <div>
-        <span class="tag">Modelo B · por acordo fechado</span>
-        <span class="out">Escritório recebe <span class="y">10% da causa</span> por acordo fechado.</span>
-        <ul>
-          <li>Tendência do escritório: <b>fazer acordo</b>, porque é quando ele ganha mais.</li>
-          <li>A política soma o honorário ao custo do acordo: <b>1.049 processos passam de acordo para defesa</b>.</li>
-          <li>Processo limítrofe*: <b>defender</b>. No caso de Manaus, o máximo cai de R$ 21.527 para R$ 19.027.</li>
-        </ul>
-      </div>
+    <span class="meta"><span class="t">7:25–8:15</span><span>15 / 30</span></span>
+    <p class="eyebrow">Dois modelos de contrato, simulados nas 60 mil sentenças</p>
+    <h2>O Radar puxa contra o que remunera o escritório — <span class="y">a favor do banco.</span></h2>
+    <div class="metrics">
+      <div><span class="k">Sem ponderar honorário</span><span class="v">33,4%</span><span class="d">dos processos com recomendação de acordo</span></div>
+      <div class="hi"><span class="k">Modelo A · êxito na defesa</span><span class="v">35,3%</span><span class="d">+1.154 processos de defesa para acordo (1,9% dos 60 mil)</span></div>
+      <div class="hi"><span class="k">Modelo B · por acordo fechado</span><span class="v">31,7%</span><span class="d">+1.049 processos de acordo para defesa (1,7% dos 60 mil)</span></div>
     </div>
-    <p class="note">* São Paulo, causa de R$ 15.000, com contrato e comprovante, sem extrato. No contrato padrão, a recomendação é defender. A economia contra defender a carteira inteira também muda: 15,3% no padrão, 12,5% no modelo A e 9,3% no modelo B — por isso o gestor simula antes de assinar.</p>
+    <div class="cmp">
+      <div><span class="tag">Modelo A · 10% da causa quando a defesa ganha</span><span class="out">O escritório ganha mais defendendo. O Radar soma esse prêmio ao custo de defender e <span class="y">recomenda mais acordos</span> onde a defesa ficou cara.</span></div>
+      <div><span class="tag">Modelo B · 10% da causa por acordo fechado</span><span class="out">O escritório ganha mais fechando acordo. O Radar soma o honorário ao custo do acordo e <span class="y">recomenda mais defesa</span> onde o acordo ficou caro.</span></div>
+    </div>
+    <p class="lede">A recomendação segue o menor custo para o banco, <b>não a escolha que paga melhor o escritório</b>.</p>
   </section>
 
-  <!-- 18 · customizável -->
+  <!-- 16 · métricas do contrato -->
   <section class="s">
-    <span class="meta"><span class="t">10:00–10:25</span><span>18 / 27</span></span>
+    <span class="meta"><span class="t">8:15–8:35</span><span>16 / 30</span></span>
     <p class="eyebrow">Métricas do contrato, definidas pelo cliente</p>
     <h2>O gestor muda o contrato; <span class="y">a estratégia se recalcula.</span></h2>
-    <div class="split">
-      <div class="rows">
-        <div><span class="lbl">Honorários</span><span class="val">Se a defesa ganha, se perde e por acordo fechado — <b>fixo, % da causa ou % da condenação</b></span></div>
-        <div><span class="lbl">Tempo</span><span class="val">Custo mensal do processo aberto e duração esperada</span></div>
-        <div><span class="lbl">Alçada</span><span class="val">Teto de oferta autorizado, como % da causa, e quanto ceder na negociação</span></div>
-        <div><span class="lbl">Por escritório</span><span class="val">Cada escritório pode ter o próprio contrato; sem ele, vale o padrão da empresa</span></div>
-        <div><span class="lbl">Com rastro</span><span class="val">Cada mudança é <b>uma nova versão com justificativa</b>, simulada na carteira antes de salvar; cada análise grava a versão usada</span></div>
-      </div>
-      <div class="receipt">
-        <b>simular impacto na carteira</b><br />
-        amostra: 12 mil processos da base<br />
-        contrato vigente → proposto<br />
-        decisões que mudam: <b>quantas e em que direção</b><br />
-        economia: <b>antes × depois</b><br />
-        premissas: aceitação 40% · recuperação 70%<br />
-        <br />
-        <b>exemplo na demo</b><br />
-        Nogueira Prado · aditivo de 2026<br />
-        10% da causa quando a defesa perde<br />
-        → defender fica mais caro<br />
-        → processos no limite passam a acordo
-      </div>
+    <div class="rows">
+      <div><span class="lbl">Honorários</span><span class="val">Se a defesa ganha, se perde e por acordo fechado — <b>valor fixo, % da causa ou % da condenação</b></span></div>
+      <div><span class="lbl">Tempo</span><span class="val">Custo mensal do processo aberto e duração esperada</span></div>
+      <div><span class="lbl">Alçada</span><span class="val">Teto de oferta autorizado e quanto ceder na negociação</span></div>
+      <div><span class="lbl">Por escritório</span><span class="val">Cada escritório pode ter o próprio contrato; sem ele, vale o padrão do banco</span></div>
+      <div><span class="lbl">Com rastro</span><span class="val">Cada mudança vira <b>nova versão com justificativa</b>, e cada análise grava a versão usada</span></div>
+    </div>
+    <p class="lede">Antes de salvar, o gestor <b>simula o impacto na carteira</b>: quantas decisões mudam e quanto muda a economia.</p>
+  </section>
+
+  <!-- 17 · requisitos -->
+  <section class="s">
+    <span class="meta"><span class="t">8:35–8:55</span><span>17 / 30</span></span>
+    <p class="eyebrow">Do método ao produto</p>
+    <h2>Os cinco requisitos, <span class="y">cada um com um lugar na tela.</span></h2>
+    <div class="rows">
+      <div><span class="lbl">01 · Regra de decisão</span><span class="val">As cinco perguntas do Radar: <b>defender, propor acordo ou pedir o documento que falta</b></span></div>
+      <div><span class="lbl">02 · Sugestão de valor</span><span class="val">Oferta dentro da faixa de mercado e o limite explícito: <b>acima de R$ X, defender sai mais barato</b></span></div>
+      <div><span class="lbl">03 · Acesso</span><span class="val">Fila por próxima ação, análise pronta ao abrir, documentos e conversa com IA no mesmo lugar</span></div>
+      <div><span class="lbl">04 · Aderência</span><span class="val">Quem segue a recomendação, exceções com motivo e ranking de advogados e escritórios</span></div>
+      <div><span class="lbl">05 · Efetividade</span><span class="val">Economia observada, ticket médio, aceitação e recomendações de melhoria por área do banco</span></div>
     </div>
   </section>
 
-  <!-- 19 · valor executivo -->
+  <!-- 18 · advogado 1 -->
   <section class="s">
-    <span class="meta"><span class="t">10:25–11:05</span><span>19 / 27</span></span>
-    <p class="eyebrow">Diferencial 3 · valor entregue · nível executivo</p>
-    <h2>Para a diretoria: <span class="y">quanto a política economiza e onde o dinheiro vaza.</span></h2>
-    <div class="split">
-      <div class="shot"><img src="img/empresa-geral.jpg" alt="Painel da empresa com economia, ticket médio, aceitação e aderência" /></div>
-      <div class="metrics compact" style="grid-template-columns:1fr 1fr">
-        <div class="bom"><span class="k">Quem seguiu a política</span><span class="v">+R$ 186 mil</span><span class="d">200 processos, contra parecidos</span></div>
-        <div class="mau"><span class="k">Quem divergiu</span><span class="v">−R$ 90 mil</span><span class="d">46 processos custaram mais</span></div>
-        <div><span class="k">Ticket médio</span><span class="v">36,6%</span><span class="d">da causa, contra 29,8% na base: acordos acima do mercado</span></div>
-        <div><span class="k">Aceitação</span><span class="v">62,2%</span><span class="d">contra a premissa inicial de 40%</span></div>
-        <div><span class="k">Aderência</span><span class="v">85,8%</span><span class="d">de 515 decisões</span></div>
-        <div class="hi"><span class="k">Pior caso × gasto real</span><span class="v">3,6 × 0,9 mi</span><span class="d">lado a lado, sem inflar a diferença</span></div>
-      </div>
-    </div>
-    <p class="note">Casos da base colocados na demo. Só valores observados; o que é estimativa aparece marcado.</p>
-  </section>
-
-  <!-- 20 · valor operacional -->
-  <section class="s">
-    <span class="meta"><span class="t">11:05–11:45</span><span>20 / 27</span></span>
-    <p class="eyebrow">Diferencial 3 · valor entregue · nível operacional</p>
-    <h2>Para o time: <span class="y">o que mudar no processo para ter prova no próximo.</span></h2>
-    <div class="agents">
-      <div><span class="n">CANAIS</span><span class="st">Correspondente não enviou</span><span class="ro">canais e correspondentes</span><span class="ia">Condicionar a comissão ao envio do contrato e do comprovante no ato da contratação.</span></div>
-      <div><span class="n">OPERAÇÕES + TI</span><span class="st">Contrato físico não digitalizado</span><span class="ro">operações de crédito</span><span class="ia">Repositório único indexado pela operação, com assinatura eletrônica na originação.</span></div>
-      <div><span class="n">FRAUDES</span><span class="st">Operação não existe</span><span class="ro">prevenção a fraudes</span><span class="ia">Sinal de golpe: acordo rápido e revisão da esteira onde esses casos se concentram.</span></div>
-      <div><span class="n">JURÍDICO + TI</span><span class="st">Documento falta sem motivo</span><span class="ro">jurídico interno</span><span class="ia">Registrar o motivo de cada ausência para descobrir a causa e a área dona.</span></div>
-      <div class="gate"><span class="n">SUPRIMENTOS</span><span class="st">Dossiê que não muda o resultado</span><span class="ro">gestão de fornecedores</span><span class="ia">Pedir à terceira o dossiê focado na assinatura, quando falta o contrato.</span></div>
-    </div>
-    <div class="metrics">
-      <div><span class="k">Exceções para revisar</span><span class="v">88</span><span class="d">73 decisões diferentes, com motivo · 15 sem abrir os documentos</span></div>
-      <div><span class="k">Nota por advogado</span><span class="v">0–100</span><span class="d">comparada com processos parecidos; ranking só com 20 encerrados</span></div>
-      <div><span class="k">Fila de recuperação</span><span class="v">32</span><span class="d">pedidos ordenados pelo valor em jogo</span></div>
-    </div>
-  </section>
-
-  <!-- 21 · advogado 1 -->
-  <section class="s">
-    <span class="meta"><span class="t">11:45–12:20</span><span>21 / 27</span></span>
+    <span class="meta"><span class="t">8:55–9:25</span><span>18 / 30</span></span>
     <p class="eyebrow">Experiência do advogado · acesso à recomendação</p>
     <h2>O advogado abre o processo <span class="y">e a análise já está pronta.</span></h2>
     <div class="shots">
@@ -583,88 +499,190 @@
     </div>
   </section>
 
-  <!-- 22 · advogado 2 -->
+  <!-- 19 · advogado 2 -->
   <section class="s">
-    <span class="meta"><span class="t">12:20–12:50</span><span>22 / 27</span></span>
+    <span class="meta"><span class="t">9:25–9:50</span><span>19 / 30</span></span>
     <p class="eyebrow">Experiência do advogado · garantir a implementação</p>
-    <h2>Seguir a política é um clique. <span class="y">Divergir deixa rastro.</span></h2>
+    <h2>Seguir o Radar é um clique. <span class="y">Divergir deixa rastro.</span></h2>
     <div class="shots">
       <figure><figcaption><span class="n">03</span><b>Decisão</b><span>seguir não pede justificativa; divergir pede o motivo</span></figcaption><img src="img/advogado-decisao.jpg" alt="Decisão com propor acordo, seguir com a defesa e pedir documento" /></figure>
       <figure><figcaption><span class="n">04</span><b>Documentos com IA</b><span>respostas com fonte e página</span></figcaption><img src="img/advogado-chat.jpg" alt="Conversa com os documentos com fontes e páginas" /></figure>
     </div>
   </section>
 
-  <!-- 23 · IA -->
+  <!-- 20 · executivo -->
   <section class="s">
-    <span class="meta"><span class="t">12:50–13:15</span><span>23 / 27</span></span>
-    <p class="eyebrow">Uso de IA</p>
-    <h2>A IA lê, resume e responde. <span class="y">O valor sai de uma regra auditável.</span></h2>
-    <div class="agents">
-      <div class="ai"><span class="n">LEITURA</span><span class="st">Lê cada documento</span><span class="ia">Resumo, número do contrato, valores e pontos de atenção.</span><span class="rt">gpt-4o-mini</span></div>
-      <div class="ai"><span class="n">DOSSIÊ</span><span class="st">Confere a assinatura</span><span class="ia">E cita a página — é o sinal que libera o pedido do contrato.</span><span class="rt">gpt-4o-mini</span></div>
-      <div class="ai"><span class="n">CONVERSA</span><span class="st">Responde sobre os autos</span><span class="ia">Com fonte e página em cada resposta.</span><span class="rt">text-embedding-3-small</span></div>
-      <div class="ai"><span class="n">MOTIVOS</span><span class="st">Entende por que faltou</span><span class="ia">O texto da empresa vira categoria e área responsável.</span><span class="rt">gpt-4o-mini</span></div>
-      <div class="gate"><span class="n">NÃO DECIDE</span><span class="st">Defender, acordar e quanto</span><span class="ia">Saem de 60 mil sentenças, versionados e iguais para todos. <b>Sem a chave de IA, a política continua funcionando.</b></span></div>
+    <span class="meta"><span class="t">9:50–10:30</span><span>20 / 30</span></span>
+    <p class="eyebrow">Valor entregue · nível executivo</p>
+    <h2>Para a diretoria: <span class="y">cada divergência custa o dobro do que seguir economiza.</span></h2>
+    <div class="split">
+      <div class="shot"><img src="img/empresa-geral.jpg" alt="Painel do banco com economia, ticket médio, aceitação e aderência" /></div>
+      <div class="metrics compact" style="grid-template-columns:1fr 1fr">
+        <div class="bom"><span class="k">Seguiu o Radar</span><span class="v">+R$ 930</span><span class="d">por processo · R$ 186 mil em 200 encerrados</span></div>
+        <div class="mau"><span class="k">Divergiu</span><span class="v">−R$ 1.950</span><span class="d">por processo · R$ 90 mil em 46 encerrados</span></div>
+        <div><span class="k">Ticket médio</span><span class="v">36,6%</span><span class="d">da causa, contra 29,8% na base</span></div>
+        <div><span class="k">Aceitação</span><span class="v">62,2%</span><span class="d">contra a premissa inicial de 40%</span></div>
+        <div><span class="k">Aderência</span><span class="v">85,8%</span><span class="d">de 515 decisões</span></div>
+        <div class="hi"><span class="k">Pior caso × gasto real</span><span class="v">3,6 × 0,9 mi</span><span class="d">lado a lado, sem inflar a diferença</span></div>
+      </div>
+    </div>
+    <p class="note">Economia = quanto processos parecidos custaram na base − quanto este custou, nos processos encerrados. Casos da base colocados na demo.</p>
+  </section>
+
+  <!-- 21 · ticket -->
+  <section class="s">
+    <span class="meta"><span class="t">10:30–11:00</span><span>21 / 30</span></span>
+    <p class="eyebrow">Ticket médio × aceitação · processo de Manaus</p>
+    <h2>Oferecer pouco parece economia. <span class="y">Custa quase R$ 9 mil a mais.</span></h2>
+    <div class="metrics">
+      <div class="mau"><span class="k">Oferta de R$ 5.000 · 20%</span><span class="v">R$ 20.701</span><span class="d">custo esperado · só 5% de chance de aceite</span></div>
+      <div><span class="k">Oferta de R$ 7.250 · 29%</span><span class="v">R$ 14.246</span><span class="d">custo esperado · 51% de chance de aceite</span></div>
+      <div class="bom"><span class="k">Oferta de R$ 8.750 · 35%</span><span class="v">R$ 11.816</span><span class="d">custo esperado · 76% de chance de aceite</span></div>
+    </div>
+    <p class="lede">Quando o autor recusa, o banco segue para uma condenação quase certa. <b>O ticket médio do painel abre a conversa certa:</b> quanto oferecer para ser aceito, contra quanto se perde oferecendo menos.</p>
+  </section>
+
+  <!-- 22 · operacional -->
+  <section class="s">
+    <span class="meta"><span class="t">11:00–11:40</span><span>22 / 30</span></span>
+    <p class="eyebrow">Valor entregue · nível operacional</p>
+    <h2>Para o time: <span class="y">o que mudar no processo para ter prova no próximo.</span></h2>
+    <div class="split eq">
+      <div class="shot"><img src="img/empresa-recomendacoes.jpg" alt="Recomendações da plataforma por área responsável" /></div>
+      <div class="agents t2">
+        <div><span class="n">CANAIS</span><span class="st">Correspondente não enviou</span><span class="ia">Comissão só com contrato e comprovante enviados na contratação.</span></div>
+        <div><span class="n">OPERAÇÕES + TI</span><span class="st">Contrato físico não digitalizado</span><span class="ia">Repositório único pela operação, com assinatura eletrônica.</span></div>
+        <div><span class="n">FRAUDES</span><span class="st">Operação não existe</span><span class="ia">Acordo rápido e revisão da esteira onde os casos se concentram.</span></div>
+        <div><span class="n">TI</span><span class="st">Sistema sem exportação</span><span class="ia">Exportar o extrato pelo número da operação, sem busca manual.</span></div>
+        <div><span class="n">JURÍDICO</span><span class="st">Falta sem motivo registrado</span><span class="ia">Registrar o motivo de cada ausência para achar a causa.</span></div>
+        <div><span class="n">SUPRIMENTOS</span><span class="st">Dossiê que não muda nada</span><span class="ia">Pedir à empresa terceira o dossiê focado na assinatura.</span></div>
+      </div>
     </div>
   </section>
 
-  <!-- 24 · arquitetura -->
+  <!-- 23 · escritórios -->
   <section class="s">
-    <span class="meta"><span class="t">13:15–13:50</span><span>24 / 27</span></span>
+    <span class="meta"><span class="t">11:40–12:10</span><span>23 / 30</span></span>
+    <p class="eyebrow">Valor entregue · gerência dos escritórios</p>
+    <h2>Qual escritório entrega mais — <span class="y">comparado com processos parecidos.</span></h2>
+    <div class="split">
+      <div class="shot"><img src="img/empresa-escritorios.jpg" alt="Ranking de escritórios com nota geral e comparação com o mercado" /></div>
+      <div class="rows">
+        <div><span class="lbl">Nota de 0 a 100</span><span class="val"><b>Economia 50</b> · valor dos acordos 20 · segue o Radar 20 · aceitos 10</span></div>
+        <div><span class="lbl">Justa</span><span class="val">Cada processo comparado com parecidos; ranking só com 20 encerrados</span></div>
+        <div><span class="lbl">Mercado anônimo</span><span class="val">O mesmo escritório em outros clientes, sem identificar ninguém</span></div>
+        <div><span class="lbl">Exceções</span><span class="val"><b>88 para revisar</b>: 73 decisões diferentes com motivo, 15 sem abrir os documentos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 24 · validação -->
+  <section class="s">
+    <span class="meta"><span class="t">12:10–12:40</span><span>24 / 30</span></span>
+    <p class="eyebrow">Validação em processos que o método não viu</p>
+    <h2>O risco que o Radar mostra <span class="y">é o risco que acontece.</span></h2>
+    <div class="metrics">
+      <div class="hi"><span class="k">Ordena o risco</span><span class="v">92 em 100</span><span class="d">Sorteie um processo perdido e um ganho: em 92 de cada 100 duplas, o Radar dá mais risco ao perdido. No chute, seriam 50.</span></div>
+      <div><span class="k">Acerta o número</span><span class="v">0,62 ponto</span><span class="d">Quando o Radar diz 30 em cada 100, na base aconteceram entre 29,4 e 30,6.</span></div>
+      <div><span class="k">Não infla a conta</span><span class="v">R$ 192,9 mi</span><span class="d">de condenações previstas, contra R$ 193,0 mi pagos: a base da economia é fiel ao real.</span></div>
+    </div>
+  </section>
+
+  <!-- 25 · potencial -->
+  <section class="s">
+    <span class="meta"><span class="t">12:40–13:15</span><span>25 / 30</span></span>
+    <p class="eyebrow">Potencial financeiro</p>
+    <h2>Aplicado às 60 mil sentenças, <span class="y">o banco teria pago R$ 53,4 mi a menos.</span></h2>
+    <div class="bars">
+      <div class="bar"><div class="lab"><span>O que foi pago de fato</span><b>R$ 193,0 mi</b></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+      <div class="bar y"><div class="lab"><span>Radar · defender ou acordar</span><b>R$ 163,5 mi</b></div><div class="track"><div class="fill" style="width:84.7%"></div></div></div>
+      <div class="bar m"><div class="lab"><span>Radar · pedindo o documento</span><b>R$ 139,6 mi</b></div><div class="track"><div class="fill" style="width:72.3%"></div></div></div>
+    </div>
+    <div class="split eq">
+      <div class="metrics compact">
+        <div class="hi"><span class="k">Por mês</span><span class="v">≈ R$ 4,5 mi</span><span class="d">nos 5 mil processos mensais, com o pedido de documento</span></div>
+        <div><span class="k">Só a regra</span><span class="v">≈ R$ 2,5 mi</span><span class="d">por mês, sem pedir documento</span></div>
+      </div>
+      <div class="receipt">
+        <b>como calculamos</b><br />
+        cada sentença passa pelo Radar<br />
+        defender → vale o que foi pago de fato<br />
+        acordo → 4 em cada 10 aceitam a oferta; os outros seguem para a condenação real<br />
+        pedir documento → 7 em cada 10 chegam, quando há sinal de que existem
+      </div>
+    </div>
+  </section>
+
+  <!-- 26 · IA -->
+  <section class="s">
+    <span class="meta"><span class="t">13:15–13:40</span><span>26 / 30</span></span>
+    <p class="eyebrow">Uso de IA</p>
+    <h2>A IA lê o que nenhum time conseguiria. <span class="y">E encontra o sinal que libera a terceira resposta.</span></h2>
+    <div class="agents t3">
+      <div class="ai"><span class="n">LEITURA</span><span class="st">Lê as ≈ 87 mil páginas do mês</span><span class="ia">Resumo, número do contrato, valores e pontos de atenção de cada documento.</span><span class="rt">GPT 5.6 Luna</span></div>
+      <div class="ai"><span class="n">DOSSIÊ</span><span class="st">Confere a assinatura</span><span class="ia">E cita a página. <b>É o sinal de que o contrato existe</b> e pode ser pedido.</span><span class="rt">GPT 5.6 Luna</span></div>
+      <div class="ai"><span class="n">CONVERSA</span><span class="st">Responde sobre os autos</span><span class="ia">Com fonte e página em cada resposta.</span><span class="rt">GPT 5.6 Luna · busca nos documentos</span></div>
+      <div class="ai"><span class="n">MOTIVOS</span><span class="st">Entende por que faltou</span><span class="ia">O texto do banco vira categoria e área responsável.</span><span class="rt">GPT 5.6 Luna</span></div>
+      <div class="ai"><span class="n">PROPOSTA</span><span class="st">Redige a mensagem</span><span class="ia">Proposta pronta para o advogado do autor, com o valor decidido.</span><span class="rt">GPT 5.6 Luna</span></div>
+      <div class="gate"><span class="n">AUDITÁVEL</span><span class="st">O valor sai dos dados</span><span class="ia">Defender, acordar e quanto oferecer vêm das 60 mil sentenças: <b>iguais para todos e rastreáveis</b>.</span></div>
+    </div>
+  </section>
+
+  <!-- 27 · arquitetura -->
+  <section class="s">
+    <span class="meta"><span class="t">13:40–14:00</span><span>27 / 30</span></span>
     <p class="eyebrow">Arquitetura e solução técnica</p>
-    <h2>Uma aplicação, três perfis, <span class="y">um motor de política no centro.</span></h2>
+    <h2>Uma aplicação, três perfis, <span class="y">o Radar no centro.</span></h2>
     <div class="funnel">
-      <div><span class="f">Quem usa</span><span class="g">Três perfis</span><span class="act">Advogado externo, gestor da empresa e administrador.</span></div>
+      <div><span class="f">Quem usa</span><span class="g">Três perfis</span><span class="act">Advogado externo, gestor do banco e administrador.</span></div>
       <div><span class="f">Interface</span><span class="g">React · Vite</span><span class="act">Fila, avaliação, painel, contrato, auditoria.</span></div>
       <div><span class="f">API</span><span class="g">FastAPI · Python</span><span class="act">Login por perfil; cada advogado vê <b>só os seus</b> processos; fluxo de fases.</span></div>
       <div><span class="f">Dados</span><span class="g">SQLite</span><span class="act">Processos, decisões, negociações, sentenças e <b>auditoria só de inserção</b>.</span></div>
-      <div class="last"><span class="f">Núcleo</span><span class="g">Motor de política</span><span class="act">Prova → perfis → estado → preço → <b>pedir documento</b>, com a versão gravada.</span></div>
+      <div class="last"><span class="f">Núcleo</span><span class="g">Radar de Provas</span><span class="act">Prova → documentos → local → preço → <b>pedir documento</b>, com a versão gravada.</span></div>
     </div>
     <div class="receipt">
-      <b>base histórica</b> 60 mil sentenças → tabela de 16 perfis · grupos de estado · curva dos 280 acordos · referências de custo<br />
-      <b>serviços de IA</b> OpenAI · leitura · dossiê · motivos · proposta · conversa com fontes<br />
-      <b>qualidade</b> 225 testes automatizados no backend · funciona sem chamada externa
+      <b>base histórica</b> 60 mil sentenças → 16 perfis · grupos de estado · curva dos 280 acordos · custo de processos parecidos<br />
+      <b>serviços de IA</b> OpenAI · GPT 5.6 Luna · leitura · dossiê · motivos · proposta · conversa com fontes<br />
+      <b>qualidade</b> 225 testes automatizados no backend
     </div>
   </section>
 
-  <!-- 25 · limitações -->
+  <!-- 28 · limitações -->
   <section class="s">
-    <span class="meta"><span class="t">13:50–14:20</span><span>25 / 27</span></span>
+    <span class="meta"><span class="t">14:00–14:20</span><span>28 / 30</span></span>
     <p class="eyebrow">Limitações conhecidas</p>
-    <h2>O que a solução <span class="y">ainda não resolve.</span></h2>
+    <h2>O que o Radar <span class="y">ainda não resolve.</span></h2>
     <div class="rows">
-      <div><span class="lbl">Premissas</span><span class="val">Aceitação de 40% e recuperação de 70% são premissas: <b>a base não registra ofertas recusadas nem pedidos de documento</b>.</span></div>
-      <div><span class="lbl">Dados</span><span class="val">Custas processuais e honorários reais dos escritórios não estão na base.</span></div>
-      <div><span class="lbl">Documentos</span><span class="val">A base diz se o documento existe, não o que ele diz; só o dossiê é lido a fundo.</span></div>
-      <div><span class="lbl">Leitura</span><span class="val">PDF escaneado sem texto depende da leitura por IA; não há OCR próprio.</span></div>
-      <div><span class="lbl">Demo</span><span class="val">Pegamos casos da base e colocamos na demo; respostas de advogados e autores são simuladas para exercitar o painel.</span></div>
-      <div><span class="lbl">Infraestrutura</span><span class="val">Feita para o hackathon: SQLite, processamento no mesmo servidor, documentos sem criptografia.</span></div>
+      <div><span class="lbl">Aceitação</span><span class="val">A base não registra ofertas recusadas: <b>os 40% de aceitação são premissa</b>.</span></div>
+      <div><span class="lbl">Recuperação</span><span class="val">A base não registra pedidos de documento: <b>os 70% e 25% são premissa</b> — e sustentam os R$ 53,4 mi.</span></div>
+      <div><span class="lbl">Escopo</span><span class="val">Um banco e um tipo de ação: outros clientes ou assuntos pedem recalibrar os 16 perfis.</span></div>
+      <div><span class="lbl">Granularidade</span><span class="val">Risco por estado, não por comarca ou juiz — e sem acompanhar mudanças de entendimento ao longo do tempo.</span></div>
     </div>
   </section>
 
-  <!-- 26 · próximos passos -->
+  <!-- 29 · próximos passos -->
   <section class="s">
-    <span class="meta"><span class="t">14:20–14:45</span><span>26 / 27</span></span>
+    <span class="meta"><span class="t">14:20–14:45</span><span>29 / 30</span></span>
     <p class="eyebrow">Com mais um mês, nesta ordem</p>
-    <h2>Trocar premissa por dado <span class="y">e preparar para muitos clientes.</span></h2>
+    <h2>Transformar a simulação <span class="y">em resultado medido.</span></h2>
     <div class="funnel f4">
-      <div><span class="f">1</span><span class="g">Aprender com o advogado</span><span class="act">Quando ele diverge e acerta, a política aprende. <b>O saldo de cada divergência já é gravado.</b></span></div>
-      <div><span class="f">2</span><span class="g">Aceitação e recuperação reais</span><span class="act">Cada oferta e cada pedido de documento viram curvas por faixa de valor e estado.</span></div>
-      <div><span class="f">3</span><span class="g">Infra multi-cliente</span><span class="act">AWS, Kubernetes, PostgreSQL, fila de processamento, isolamento por cliente e criptografia.</span></div>
-      <div class="last"><span class="f">4</span><span class="g">Mais contexto do negócio</span><span class="act">Custas e honorários reais na conta; <b>outros tipos de ação</b> além do empréstimo não reconhecido.</span></div>
+      <div><span class="f">1</span><span class="g">Piloto controlado</span><span class="act">Parte da carteira segue o Radar, parte não, com escritórios reais: <b>mede aceitação e recuperação de verdade</b>.</span></div>
+      <div><span class="f">2</span><span class="g">Pedido nos sistemas do banco</span><span class="act">O documento pedido direto na origem, sem depender de busca manual.</span></div>
+      <div><span class="f">3</span><span class="g">Infra multi-cliente</span><span class="act">AWS, Kubernetes, PostgreSQL, fila de processamento e isolamento por cliente.</span></div>
+      <div class="last"><span class="f">4</span><span class="g">Mais contexto</span><span class="act">Comarca e juiz no modelo, com <b>custas e honorários reais</b> na conta.</span></div>
     </div>
   </section>
 
-  <!-- 27 · fecho -->
+  <!-- 30 · fecho -->
   <section class="s gold">
-    <span class="meta"><span class="t">14:45–15:00</span><span>27 / 27</span></span>
-    <div class="mark"><span class="o"></span>EnterOS</div>
+    <span class="meta"><span class="t">14:45–15:00</span><span>30 / 30</span></span>
+    <div class="mark"><span class="o"></span>Radar de Provas</div>
     <h1 style="max-width:16ch">Mesma justiça. Mais impacto.</h1>
     <div class="receipt">
-      <b>definir</b> prova → 16 perfis → preço · validada em 60 mil sentenças · 15,3%<br />
-      <b>buscar a prova</b> pedir o documento certo · R$ 23,9 mi a mais · 27,7%<br />
-      <b>adaptar</b> a estratégia ao contrato de cada escritório<br />
-      <b>monitorar</b> o executivo vê o dinheiro; o time vê o que corrigir
+      <b>decidir</b> prova → documentos → local → preço · validado em 60 mil sentenças<br />
+      <b>buscar a prova</b> pedir o documento certo · R$ 29,5 mi → R$ 53,4 mi<br />
+      <b>adaptar</b> ao contrato de cada escritório, contra o viés de remuneração<br />
+      <b>monitorar</b> a diretoria vê o dinheiro; o time vê o que corrigir
     </div>
   </section>
 
@@ -676,7 +694,7 @@
     <div class="rows">
       <div><span class="lbl">Pior caso exagera</span><span class="val">“Perder tudo pelo valor da causa” nunca acontece. Por isso <b>pior caso e gasto real ficam lado a lado</b>, sem um número de diferença.</span></div>
       <div><span class="lbl">Parecido de verdade</span><span class="val">Economia = <b>custo médio real de processos parecidos − custo real</b>. Mesmos documentos, mesma alegação, mesmo grupo de estados; com menos de 30, o grupo se amplia.</span></div>
-      <div><span class="lbl">Só o observado</span><span class="val">O painel mostra o que foi pago. Estimativas, como o valor em jogo dos documentos, vêm marcadas e com a conta ao lado.</span></div>
+      <div><span class="lbl">Só o observado</span><span class="val">O painel mostra o que foi pago. Estimativas, como o valor em jogo dos documentos, vêm marcadas.</span></div>
     </div>
   </section>
 
@@ -686,8 +704,8 @@
     <h2>Por que a oferta fica entre 25% e 35% da causa</h2>
     <div class="rows">
       <div><span class="lbl">Curva de aceite</span><span class="val">Dos 280 acordos, a chance de aceite de uma oferta é a fração que fechou até aquele percentual, <b>entre 5% e 85%</b>.</span></div>
-      <div><span class="lbl">Melhor equilíbrio</span><span class="val">A oferta maximiza <b>chance de aceite × economia até o valor máximo</b>. Fora da faixa, a conta às vezes pagaria mais para subir a aceitação — acima do mercado.</span></div>
-      <div><span class="lbl">Aprende</span><span class="val">Com 10 respostas registradas, a aceitação real ajusta a curva (fator de 0,5 a 1,5).</span></div>
+      <div><span class="lbl">Melhor equilíbrio</span><span class="val">A oferta maximiza <b>chance de aceite × economia até o valor máximo</b>. Fora da faixa, a conta às vezes pagaria mais — acima do mercado.</span></div>
+      <div><span class="lbl">Aprende</span><span class="val">Com 10 respostas registradas, a aceitação real ajusta a curva.</span></div>
     </div>
   </section>
 
@@ -696,16 +714,16 @@
     <p class="eyebrow">Apêndice · aderência</p>
     <h2>Ranquear advogados não é injusto?</h2>
     <div class="rows">
-      <div><span class="lbl">O que entra</span><span class="val"><b>Economia nos processos 50</b> · valor dos acordos 20 · segue a recomendação 20 · acordos aceitos 10. Divergir com motivo vale metade; sem motivo, zero.</span></div>
-      <div><span class="lbl">O que protege</span><span class="val">Cada processo é comparado com parecidos; a nota é puxada para a média da empresa com peso de 10 processos e só ranqueia com 20 encerrados.</span></div>
-      <div><span class="lbl">Mercado anônimo</span><span class="val">O escritório é comparado com ele mesmo em outros clientes, sem identificar ninguém, com ao menos 2 clientes e 50 encerrados. Tempo não entra.</span></div>
+      <div><span class="lbl">O que entra</span><span class="val"><b>Economia 50</b> · valor dos acordos 20 · segue o Radar 20 · aceitos 10. Divergir com motivo vale metade; sem motivo, zero.</span></div>
+      <div><span class="lbl">O que protege</span><span class="val">Cada processo comparado com parecidos; nota puxada para a média do banco com peso de 10 processos; ranking só com 20 encerrados.</span></div>
+      <div><span class="lbl">Mercado anônimo</span><span class="val">Com ao menos 2 outros clientes e 50 encerrados, sem identificar ninguém. Tempo gasto não entra.</span></div>
     </div>
   </section>
 
   <section class="s">
     <span class="meta"><span class="t">apêndice</span><span>A4</span></span>
     <p class="eyebrow">Apêndice · implementação</p>
-    <h2>O advogado pode discordar da política?</h2>
+    <h2>O advogado pode discordar do Radar?</h2>
     <div class="rows">
       <div><span class="lbl">Pode, com motivo</span><span class="val">Fato novo, entendimento local do juízo, prova mais fraca, prova mais forte, sinal do autor ou outro. <b>Seguir nunca pede texto.</b></span></div>
       <div><span class="lbl">Vira exceção</span><span class="val">Acordo acima do valor máximo, decisão diferente da recomendação e decisão sem abrir os documentos.</span></div>
@@ -716,7 +734,7 @@
   <section class="s">
     <span class="meta"><span class="t">apêndice</span><span>A5</span></span>
     <p class="eyebrow">Apêndice · base histórica</p>
-    <h2>Os números por trás da política</h2>
+    <h2>Os números por trás do Radar</h2>
     <div class="metrics compact">
       <div><span class="k">Sentenças</span><span class="v">60.000</span></div>
       <div><span class="k">Derrota geral</span><span class="v">30 em 100</span></div>
