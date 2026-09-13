@@ -199,6 +199,18 @@ CREATE TABLE IF NOT EXISTS engagement_events (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS divergence_balances (
+    decision_id TEXT PRIMARY KEY REFERENCES lawyer_decisions(id),
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    recommended_action TEXT NOT NULL,
+    chosen_action TEXT NOT NULL,
+    divergence_reason TEXT,
+    recommended_path_cost REAL NOT NULL,
+    real_cost REAL NOT NULL,
+    balance REAL NOT NULL,
+    computed_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS document_ai_readings (
     document_id TEXT PRIMARY KEY REFERENCES documents(id),
     model TEXT NOT NULL,

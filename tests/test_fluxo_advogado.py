@@ -104,6 +104,11 @@ def test_acordo_recusado_vira_defesa_e_sentenca_encerra(ambiente):
     assert advogado.post(rota, json={"result": "NAO_EXITO"}).status_code == 422
     assert advogado.post(rota, json={"result": "NAO_EXITO", "condemnation_value": 9000}).status_code == 201
     assert _fase(advogado, case_id)["codigo"] == "ENCERRADO"
+    with app.state.repository.database_path.open("rb"):
+        pass
+    import sqlite3
+    with sqlite3.connect(app.state.repository.database_path) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM divergence_balances").fetchone()[0] == 0, "seguiu a recomendação: sem saldo"
     assert empresa.get("/api/cases").json()[0]["condemnation_value"] == 9000
 
 
@@ -133,6 +138,9 @@ def test_divergir_exige_motivo_e_pedir_documento_cria_pedido(ambiente):
                            json={"action": "DEFESA", "divergence_reason": "PROVA_MAIS_FORTE"})
     assert defesa.status_code == 201
     assert _fase(advogado, case_id)["codigo"] == "EM_DEFESA"
+    assert advogado.post(f"/api/cases/{case_id}/judicial-outcomes", json={"result": "EXITO"}).status_code == 201
+    saldo = app.state.repository.refresh_divergence_balance(case_id)
+    assert saldo["chosen_action"] == "DEFESA" and saldo["real_cost"] == 0 and saldo["balance"] > 0, "divergiu e ganhou: saldo positivo"
 
 
 def test_documento_novo_depois_da_avaliacao_pede_reavaliacao(ambiente):
@@ -142,23 +150,25 @@ def test_documento_novo_depois_da_avaliacao_pede_reavaliacao(ambiente):
     enviado = empresa.post(f"/api/cases/{case_id}/documents", data={"declared_type": "CONTRATO", "source_party": "BANCO"},
                            files={"file": ("contrato.txt", b"Contrato de emprestimo assinado", "text/plain")})
     assert enviado.status_code == 201
-    assert _fase(advogado, case_id)["codigo"] == "REAVALIAR"
+    detalhe = advogado.get(f"/api/cases/{case_id}").json()
+    assert detalhe["fase"]["codigo"] == "PRONTO_PARA_DECIDIR", "documento novo reavalia sozinho"
+    assert detalhe["analyses"][0]["id"] != analysis["id"]
     assert advogado.post(f"/api/cases/{case_id}/lawyer-decisions?analysis_id={analysis['id']}",
-                         json={"action": "ACORDO", "proposed_value": 1000}).status_code == 409
+                         json={"action": "ACORDO", "proposed_value": 1000}).status_code == 409, "avaliação antiga"
 
 
 def test_pdf_abre_na_pagina_e_mensagem_de_proposta_sem_ia(ambiente):
     app, empresa, advogado, lawyer_id = ambiente
     case_id = _caso(app, lawyer_id)
+    assert advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).status_code == 409
     pdf = empresa.post(f"/api/cases/{case_id}/documents", data={"declared_type": "AUTOS", "source_party": "BANCO"},
                        files={"file": ("autos.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")}).json()
     na_pagina = advogado.get(f"/api/documents/{pdf['id']}/file", params={"inline": 1})
     assert na_pagina.status_code == 200 and na_pagina.headers["content-disposition"].startswith("inline")
     assert advogado.get(f"/api/documents/{pdf['id']}/file").headers["content-disposition"].startswith("attachment")
 
-    assert advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).status_code == 409
     analysis = _avaliar(advogado, case_id)
     mensagem = advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).json()
     numero = advogado.get(f"/api/cases/{case_id}").json()["case"]["case_number"]
     assert mensagem["fonte"] == "MODELO" and numero in mensagem["mensagem"]
-    assert mensagem["valor"] == analysis["pricing"]["opening_value"]
+    assert mensagem["valor"] == analysis["pricing"]["recommended_value"]

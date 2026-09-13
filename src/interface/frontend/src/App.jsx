@@ -8,7 +8,6 @@ import BankDashboard from "./banco/BankDashboard";
 import { DocumentRequestsPanel } from "./banco/DocumentRequestsPanel";
 import { BuscaProcessos } from "./banco/BuscaProcessos";
 import { ResultadoProcesso } from "./banco/ResultadoProcesso";
-import { useActiveTime } from "./useActiveTime";
 import { MinhaFila } from "./advogado/MinhaFila";
 import CasoAdvogadoRota from "./advogado/CasoAdvogado";
 
@@ -379,7 +378,6 @@ function OutcomeForm({ caseId, decision, onRegistered }) {
 function CaseDetail({ caseId, user }) {
   const resource = useResource(`/cases/${caseId}`);
   const lawyers = useResource(user.role === "BANCO" ? "/bank/lawyers" : null);
-  useActiveTime(caseId, user.role === "ADVOGADO_EXTERNO");
   const action = useAction();
   const detail = resource.data;
   const recommendation = detail?.analyses?.[0];
@@ -454,7 +452,7 @@ function CaseDetail({ caseId, user }) {
           <div className={`recommendation ${recommendationClass[recommendation.recommendation] || "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation] || recommendation.recommendation}</strong></div>
           <p><b>O que fazer:</b> {actionText[recommendation.recommendation] || recommendation.recommendation}</p>
           {recommendation.recommendation === "RECUPERAR" && recommendation.policy_output?.recuperacao && <div className="price-block"><span>Documento que falta · economia esperada se ele chegar</span><strong>{documentoFaltante[recommendation.policy_output.recuperacao.documento] || recommendation.policy_output.recuperacao.documento} · {money(recommendation.policy_output.recuperacao.ganho_estimado)}</strong></div>}
-          {recommendation.pricing?.target_value != null && <div className="price-block"><span>{recommendation.pricing.negotiable === false ? "Valor único para propor" : "Quanto oferecer"}</span><strong>{recommendation.pricing.negotiable === false ? money(recommendation.pricing.target_value) : `${money(recommendation.pricing.opening_value)} a ${money(recommendation.pricing.walk_away_value)}`}</strong>{recommendation.pricing.negotiable !== false && <small>Comece em {money(recommendation.pricing.opening_value)}{recommendation.pricing.target_value > recommendation.pricing.opening_value + 0.01 ? ` · meta ${money(recommendation.pricing.target_value)}` : ""} · acima de {money(recommendation.pricing.walk_away_value)}, defender sai mais barato</small>}</div>}
+          {recommendation.pricing?.target_value != null && <div className="price-block"><span>Valor recomendado</span><strong>{money(recommendation.pricing.recommended_value ?? recommendation.pricing.target_value)}</strong><small>{recommendation.pricing.market_low != null ? `Acordos parecidos fecham entre ${money(recommendation.pricing.market_low)} e ${money(recommendation.pricing.market_high)} · ` : ""}acima de {money(recommendation.pricing.walk_away_value)}, acordo não compensa: defender sai mais barato</small></div>}
           <ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
         </> : <div className="empty-state"><Icon name="spark" /><p>Ainda sem recomendação</p><span>{isLawyer ? "Use “Avaliar risco e recomendação” para calcular o caminho mais barato." : "O advogado responsável ainda não avaliou este processo."}</span></div>}
       </article></div>

@@ -61,7 +61,7 @@ class PolicyService:
         documents = self.repository.list_documents(case_id)
         features, provenance = self._build_features(case, documents)
         contrato = self.contract_provider(case.get("bank_id"), self._law_firm_of(case))
-        recomendacao = decidir(features, contrato)
+        recomendacao = decidir(features, contrato, fator_aceite=self._fator_aceite(case.get("bank_id")))
         documentary_status, limitations = self._documentary_status(documents, features)
         record = {
             "id": str(uuid4()),
@@ -85,6 +85,17 @@ class PolicyService:
             "created_at": datetime.now(UTC).isoformat(),
         }
         return self.repository.create_analysis(record)
+
+    def _fator_aceite(self, bank_id: str | None) -> float:
+        """Corrige a curva de aceite pela aceitação observada na operação (a partir de 10 respostas)."""
+        from src.policy.referencia import chance_aceite
+
+        respostas = self.repository.observed_acceptance(bank_id) if bank_id else []
+        if len(respostas) < 10:
+            return 1.0
+        esperada = sum(chance_aceite(oferta, causa) for oferta, causa, _ in respostas) / len(respostas)
+        observada = sum(aceito for *_, aceito in respostas) / len(respostas)
+        return min(1.5, max(0.5, observada / esperada)) if esperada else 1.0
 
     def _law_firm_of(self, case: dict) -> str | None:
         lawyer = self.repository.get_user(case["assigned_lawyer_id"]) if case.get("assigned_lawyer_id") else None
@@ -158,6 +169,12 @@ class PolicyService:
             "savings_at_target": r.economia_no_alvo,
             "loss_probability": r.p_perda,
             "indifference_probability": r.p_estrela,
+            "recommended_value": r.valor_recomendado,
+            "acceptance_chance": r.chance_aceite,
+            "market_low": r.faixa_mercado[0] if r.faixa_mercado else None,
+            "market_high": r.faixa_mercado[1] if r.faixa_mercado else None,
+            "similar_cases_cost": r.custo_parecidos,
+            "similar_cases_n": r.parecidos_n,
         }
 
     @staticmethod

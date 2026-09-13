@@ -4,6 +4,8 @@
   "pago_total": 192982862.07,
   "documentos": [
     {
+      "custo_medio_com": 1332.55,
+      "custo_medio_sem": 7974.74,
       "tipo": "CONTRATO",
       "nome": "Contrato",
       "casos_sem": 17017,
@@ -15,6 +17,8 @@
       "valor_em_jogo": 56768240.53
     },
     {
+      "custo_medio_com": 1984.68,
+      "custo_medio_sem": 8639.54,
       "tipo": "EXTRATO",
       "nome": "Extrato",
       "casos_sem": 11105,
@@ -26,6 +30,8 @@
       "valor_em_jogo": 31803696.63
     },
     {
+      "custo_medio_com": 2099.38,
+      "custo_medio_sem": 4940.9,
       "tipo": "COMPROVANTE_CREDITO",
       "nome": "Comprovante de crédito",
       "casos_sem": 23586,
@@ -37,6 +43,8 @@
       "valor_em_jogo": 24068995.62
     },
     {
+      "custo_medio_com": 2926.7,
+      "custo_medio_sem": 4187.55,
       "tipo": "DEMONSTRATIVO_DIVIDA",
       "nome": "Demonstrativo de evolução da dívida",
       "casos_sem": 13785,
@@ -48,6 +56,8 @@
       "valor_em_jogo": null
     },
     {
+      "custo_medio_com": 3216.26,
+      "custo_medio_sem": 3216.67,
       "tipo": "DOSSIE",
       "nome": "Dossiê",
       "casos_sem": 18014,
@@ -59,6 +69,8 @@
       "valor_em_jogo": null
     },
     {
+      "custo_medio_com": 3226.43,
+      "custo_medio_sem": 3175.94,
       "tipo": "LAUDO_REFERENCIADO",
       "nome": "Laudo referenciado",
       "casos_sem": 11941,
@@ -75,6 +87,377 @@
     "pct": 0.1082,
     "derrota": 0.973,
     "pago": 67055414.38
+  },
+  "custo_parecidos": {
+    "C0E0CC0|Generico|*": {
+      "n": 664,
+      "custo_sobre_causa": 0.6414
+    },
+    "C0E0CC0|Generico|alto": {
+      "n": 250,
+      "custo_sobre_causa": 0.7042
+    },
+    "C0E0CC0|Generico|baixo": {
+      "n": 127,
+      "custo_sobre_causa": 0.5714
+    },
+    "C0E0CC0|Generico|medio": {
+      "n": 287,
+      "custo_sobre_causa": 0.6177
+    },
+    "C0E0CC0|Golpe|*": {
+      "n": 3216,
+      "custo_sobre_causa": 0.7129
+    },
+    "C0E0CC0|Golpe|alto": {
+      "n": 1002,
+      "custo_sobre_causa": 0.7853
+    },
+    "C0E0CC0|Golpe|baixo": {
+      "n": 779,
+      "custo_sobre_causa": 0.6681
+    },
+    "C0E0CC0|Golpe|medio": {
+      "n": 1435,
+      "custo_sobre_causa": 0.6867
+    },
+    "C0E0CC1|Generico|*": {
+      "n": 455,
+      "custo_sobre_causa": 0.5931
+    },
+    "C0E0CC1|Generico|alto": {
+      "n": 147,
+      "custo_sobre_causa": 0.6666
+    },
+    "C0E0CC1|Generico|baixo": {
+      "n": 92,
+      "custo_sobre_causa": 0.5036
+    },
+    "C0E0CC1|Generico|medio": {
+      "n": 216,
+      "custo_sobre_causa": 0.5813
+    },
+    "C0E0CC1|Golpe|*": {
+      "n": 2158,
+      "custo_sobre_causa": 0.6916
+    },
+    "C0E0CC1|Golpe|alto": {
+      "n": 645,
+      "custo_sobre_causa": 0.7674
+    },
+    "C0E0CC1|Golpe|baixo": {
+      "n": 518,
+      "custo_sobre_causa": 0.638
+    },
+    "C0E0CC1|Golpe|medio": {
+      "n": 995,
+      "custo_sobre_causa": 0.6705
+    },
+    "C0E1CC0|Generico|*": {
+      "n": 1149,
+      "custo_sobre_causa": 0.3966
+    },
+    "C0E1CC0|Generico|alto": {
+      "n": 339,
+      "custo_sobre_causa": 0.5297
+    },
+    "C0E1CC0|Generico|baixo": {
+      "n": 276,
+      "custo_sobre_causa": 0.2642
+    },
+    "C0E1CC0|Generico|medio": {
+      "n": 534,
+      "custo_sobre_causa": 0.3806
+    },
+    "C0E1CC0|Golpe|*": {
+      "n": 3964,
+      "custo_sobre_causa": 0.5801
+    },
+    "C0E1CC0|Golpe|alto": {
+      "n": 1076,
+      "custo_sobre_causa": 0.6797
+    },
+    "C0E1CC0|Golpe|baixo": {
+      "n": 1160,
+      "custo_sobre_causa": 0.5173
+    },
+    "C0E1CC0|Golpe|medio": {
+      "n": 1728,
+      "custo_sobre_causa": 0.5603
+    },
+    "C0E1CC1|Generico|*": {
+      "n": 1454,
+      "custo_sobre_causa": 0.1906
+    },
+    "C0E1CC1|Generico|alto": {
+      "n": 379,
+      "custo_sobre_causa": 0.2925
+    },
+    "C0E1CC1|Generico|baixo": {
+      "n": 426,
+      "custo_sobre_causa": 0.1225
+    },
+    "C0E1CC1|Generico|medio": {
+      "n": 649,
+      "custo_sobre_causa": 0.1758
+    },
+    "C0E1CC1|Golpe|*": {
+      "n": 3957,
+      "custo_sobre_causa": 0.3863
+    },
+    "C0E1CC1|Golpe|alto": {
+      "n": 932,
+      "custo_sobre_causa": 0.5022
+    },
+    "C0E1CC1|Golpe|baixo": {
+      "n": 1142,
+      "custo_sobre_causa": 0.3028
+    },
+    "C0E1CC1|Golpe|medio": {
+      "n": 1883,
+      "custo_sobre_causa": 0.3795
+    },
+    "C1E0CC0|Generico|*": {
+      "n": 472,
+      "custo_sobre_causa": 0.3911
+    },
+    "C1E0CC0|Generico|alto": {
+      "n": 129,
+      "custo_sobre_causa": 0.5857
+    },
+    "C1E0CC0|Generico|baixo": {
+      "n": 112,
+      "custo_sobre_causa": 0.2876
+    },
+    "C1E0CC0|Generico|medio": {
+      "n": 231,
+      "custo_sobre_causa": 0.3327
+    },
+    "C1E0CC0|Golpe|*": {
+      "n": 1748,
+      "custo_sobre_causa": 0.552
+    },
+    "C1E0CC0|Golpe|alto": {
+      "n": 486,
+      "custo_sobre_causa": 0.6465
+    },
+    "C1E0CC0|Golpe|baixo": {
+      "n": 458,
+      "custo_sobre_causa": 0.4915
+    },
+    "C1E0CC0|Golpe|medio": {
+      "n": 804,
+      "custo_sobre_causa": 0.5293
+    },
+    "C1E0CC1|Generico|*": {
+      "n": 650,
+      "custo_sobre_causa": 0.1922
+    },
+    "C1E0CC1|Generico|alto": {
+      "n": 145,
+      "custo_sobre_causa": 0.3121
+    },
+    "C1E0CC1|Generico|baixo": {
+      "n": 209,
+      "custo_sobre_causa": 0.1205
+    },
+    "C1E0CC1|Generico|medio": {
+      "n": 296,
+      "custo_sobre_causa": 0.1841
+    },
+    "C1E0CC1|Golpe|*": {
+      "n": 1742,
+      "custo_sobre_causa": 0.3719
+    },
+    "C1E0CC1|Golpe|alto": {
+      "n": 419,
+      "custo_sobre_causa": 0.4687
+    },
+    "C1E0CC1|Golpe|baixo": {
+      "n": 525,
+      "custo_sobre_causa": 0.3303
+    },
+    "C1E0CC1|Golpe|medio": {
+      "n": 798,
+      "custo_sobre_causa": 0.3484
+    },
+    "C1E1CC0|Generico|*": {
+      "n": 4177,
+      "custo_sobre_causa": 0.0418
+    },
+    "C1E1CC0|Generico|alto": {
+      "n": 877,
+      "custo_sobre_causa": 0.0781
+    },
+    "C1E1CC0|Generico|baixo": {
+      "n": 1390,
+      "custo_sobre_causa": 0.0266
+    },
+    "C1E1CC0|Generico|medio": {
+      "n": 1910,
+      "custo_sobre_causa": 0.0361
+    },
+    "C1E1CC0|Golpe|*": {
+      "n": 8196,
+      "custo_sobre_causa": 0.1198
+    },
+    "C1E1CC0|Golpe|alto": {
+      "n": 1776,
+      "custo_sobre_causa": 0.1756
+    },
+    "C1E1CC0|Golpe|baixo": {
+      "n": 2630,
+      "custo_sobre_causa": 0.0865
+    },
+    "C1E1CC0|Golpe|medio": {
+      "n": 3790,
+      "custo_sobre_causa": 0.1169
+    },
+    "C1E1CC1|Generico|*": {
+      "n": 9351,
+      "custo_sobre_causa": 0.0141
+    },
+    "C1E1CC1|Generico|alto": {
+      "n": 1935,
+      "custo_sobre_causa": 0.0276
+    },
+    "C1E1CC1|Generico|baixo": {
+      "n": 2999,
+      "custo_sobre_causa": 0.0051
+    },
+    "C1E1CC1|Generico|medio": {
+      "n": 4417,
+      "custo_sobre_causa": 0.0142
+    },
+    "C1E1CC1|Golpe|*": {
+      "n": 16647,
+      "custo_sobre_causa": 0.037
+    },
+    "C1E1CC1|Golpe|alto": {
+      "n": 3309,
+      "custo_sobre_causa": 0.0643
+    },
+    "C1E1CC1|Golpe|baixo": {
+      "n": 5618,
+      "custo_sobre_causa": 0.0256
+    },
+    "C1E1CC1|Golpe|medio": {
+      "n": 7720,
+      "custo_sobre_causa": 0.0335
+    }
+  },
+  "acordos": {
+    "n": 280,
+    "ticket_medio": 4539.68,
+    "ticket_mediano": 4373.21,
+    "sobre_causa_medio": 0.2978,
+    "p25": 0.25,
+    "p50": 0.29,
+    "p75": 0.35,
+    "p90": 0.39,
+    "quantis": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.21,
+      0.21,
+      0.21,
+      0.21,
+      0.22,
+      0.22,
+      0.22,
+      0.22,
+      0.22,
+      0.23,
+      0.23,
+      0.23,
+      0.23,
+      0.23,
+      0.24,
+      0.24,
+      0.24,
+      0.24,
+      0.24,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.25,
+      0.26,
+      0.26,
+      0.26,
+      0.26,
+      0.26,
+      0.27,
+      0.27,
+      0.27,
+      0.27,
+      0.27,
+      0.28,
+      0.28,
+      0.28,
+      0.28,
+      0.28,
+      0.28,
+      0.29,
+      0.29,
+      0.29,
+      0.29,
+      0.29,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.31,
+      0.31,
+      0.32,
+      0.32,
+      0.32,
+      0.32,
+      0.32,
+      0.33,
+      0.33,
+      0.33,
+      0.33,
+      0.33,
+      0.34,
+      0.34,
+      0.34,
+      0.34,
+      0.34,
+      0.35,
+      0.35,
+      0.35,
+      0.35,
+      0.36,
+      0.36,
+      0.36,
+      0.36,
+      0.37,
+      0.37,
+      0.37,
+      0.37,
+      0.37,
+      0.37,
+      0.38,
+      0.38,
+      0.38,
+      0.39,
+      0.39,
+      0.39,
+      0.39,
+      0.39,
+      0.39,
+      0.4,
+      0.4,
+      0.4,
+      0.4,
+      0.4
+    ]
   },
   "premissas": "Valor em jogo = (P(derrota) sem o documento − com ele) pela tabela de segmentos × condenação média (71.08% da causa) × chance de recuperar (70%). O valor pago nos casos sem o documento é correlação: parte deles é golpe real, sem documento que exista."
 }

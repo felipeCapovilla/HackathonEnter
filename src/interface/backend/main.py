@@ -116,6 +116,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return repository_.save_document_reading(document_id, modelo, "FAILED", None, str(exc))
             return repository_.save_document_reading(document_id, modelo, "COMPLETED", leitura.model_dump(mode="json"), None)
 
+        def avaliar_quando_documentos_prontos(document_id: str) -> None:
+            """O advogado abre o processo com a recomendação pronta: avalia quando o último documento termina."""
+            repository_ = app.state.repository
+            document = repository_.get_document_internal(document_id)
+            if document is None:
+                return
+            case_id = document["case_id"]
+            if any(item["status"] in {"UPLOADED", "EXTRACTING"} for item in repository_.list_documents(case_id)):
+                return
+            if repository_.case_flow(case_id)["codigo"] in {"AGUARDANDO_AVALIACAO", "REAVALIAR"}:
+                try:
+                    app.state.policy.evaluate(case_id)
+                except Exception:  # noqa: BLE001 - a avaliação automática não pode derrubar o envio
+                    logger.exception("Avaliação automática do processo %s falhou", case_id)
+
         def ao_extrair(document_id: str) -> None:
             analisar_dossie_ao_extrair(document_id)
             if app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip():
@@ -123,6 +138,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     ler_com_ia(document_id)
                 except Exception:  # noqa: BLE001 - a leitura é complemento; o documento já está processado
                     logger.exception("Leitura por IA do documento %s falhou", document_id)
+            avaliar_quando_documentos_prontos(document_id)
 
         app.state.leitor = ler_documento
         app.state.ler_com_ia = ler_com_ia
@@ -765,15 +781,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/cases/{case_id}/engagement", status_code=204)
     def record_engagement(case_id: str, payload: EngagementEventCreate, request: Request) -> Response:
-        """Tela do advogado: tempo ativo (aba visível) e abertura de documento pelo visualizador."""
+        """Tela do advogado: abertura de documento pelo visualizador (tempo de tela não é coletado)."""
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         require_case(case_id, request)
         if payload.document_id:
             document = repository().get_document(payload.document_id)
             if document is None or document["case_id"] != case_id:
                 raise HTTPException(422, "Documento não pertence a este processo.")
-        if user["role"] == UserRole.ADVOGADO_EXTERNO.value and (payload.active_seconds or payload.event_type == "DOCUMENT_OPENED"):
-            repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id, payload.active_seconds)
+        if user["role"] == UserRole.ADVOGADO_EXTERNO.value:
+            repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id)
         return Response(status_code=204)
 
     @app.post("/api/cases/{case_id}/lawyer-decisions/{decision_id}/outcome", status_code=201)
@@ -823,7 +839,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pricing = analises[0].get("pricing") if analises else None
         if not pricing:
             raise HTTPException(409, "Avalie o processo antes de redigir a proposta: ainda não há valor sugerido.")
-        valor = payload.valor or pricing["opening_value"]
+        valor = payload.valor or pricing.get("recommended_value") or pricing["opening_value"]
         texto, fonte = redigir_mensagem(numero=case["case_number"], empresa=user.get("bank_name") or "a empresa",
                                         advogado=user.get("name") or "", valor=valor, prazo_dias=payload.prazo_dias)
         return {"mensagem": texto, "fonte": fonte, "valor": valor}

@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import { request } from "../api";
 import { useAction, useResource } from "../hooks";
 import { Icon } from "../Brand";
-import { useActiveTime } from "../useActiveTime";
 import { LinhaDoTempo, PainelDaFase } from "./PainelDaFase";
 import { Recomendacao } from "./Recomendacao";
 import { VisualizadorDocumentos } from "./VisualizadorDocumentos";
@@ -28,7 +27,6 @@ const NEXT_LABEL = {
 export function CasoAdvogado({ caseId }) {
   const recurso = useResource(`/cases/${caseId}`);
   const acao = useAction();
-  useActiveTime(caseId, true);
   const [tabChoice, setTabChoice] = useState(null);
   const [mobileView, setMobileView] = useState("documents");
   const [reveal, setReveal] = useState(null);
@@ -39,7 +37,7 @@ export function CasoAdvogado({ caseId }) {
   const fase = detalhe?.fase;
   const recomendacao = detalhe?.analyses?.[0];
   const processando = detalhe?.documents.some((d) => ["UPLOADED", "EXTRACTING"].includes(d.status));
-  const precisaAvaliar = fase && (fase.codigo === "REAVALIAR" || (fase.documentos_novos && fase.codigo !== "ENCERRADO"));
+  const precisaAvaliar = fase && fase.documentos_novos && fase.codigo !== "ENCERRADO";
   const needsEvaluation = !recomendacao || ["AGUARDANDO_AVALIACAO", "REAVALIAR"].includes(fase?.codigo);
   const preferredTab = needsEvaluation && fase?.codigo !== "ENCERRADO" ? "evaluation" : "action";
   const activeTab = tabChoice && tabChoice.phase === fase?.codigo ? tabChoice.tab : preferredTab;
@@ -77,6 +75,17 @@ export function CasoAdvogado({ caseId }) {
   const readyCount = detalhe?.documents.filter((d) => ["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(d.status)).length || 0;
   const pendingCount = detalhe?.documents.filter((d) => ["UPLOADED", "EXTRACTING"].includes(d.status)).length || 0;
 
+  // O advogado não aperta botão para ver a recomendação: sem avaliação (ou com documentos novos antes da
+  // decisão), a tela pede sozinha, uma vez por mudança de documentos.
+  const tentativa = useRef(null);
+  useEffect(() => {
+    if (!detalhe || processando || acao.pending) return;
+    const chave = `${detalhe.fase.codigo}-${detalhe.analyses.length}-${detalhe.documents.length}`;
+    if (["AGUARDANDO_AVALIACAO", "REAVALIAR"].includes(detalhe.fase.codigo) && detalhe.documents.length > 0 && tentativa.current !== chave) {
+      tentativa.current = chave;
+      avaliar();
+    }
+  }, [detalhe, processando, acao.pending]);
   return <section className="caso-advogado case-workspace">
     <nav className="case-breadcrumb" aria-label="Localização"><Link className="voltar" to="/advogado"><Icon name="chevronLeft" />Minha fila</Link><span>/</span><span>Detalhe do processo</span></nav>
     {recurso.error && <div className="warning" role="alert"><p>{recurso.error}</p><button type="button" onClick={recurso.reload}>Tentar novamente</button></div>}
