@@ -44,7 +44,7 @@ def _linhas() -> list[dict]:
             linhas.append({
                 "uf": r["UF"], "sub_assunto": "Golpe" if r["Sub-assunto"] == "Golpe" else "Generico",
                 "causa": float(r["Valor da causa"]), "pago": float(r["Valor da condenação/indenização"] or 0),
-                "perdeu": r["Resultado macro"] != "Êxito",
+                "perdeu": r["Resultado macro"] != "Êxito", "micro": r["Resultado micro"],
                 "Contrato": flag("Contrato"), "Extrato": flag("Extrato"),
                 "Comprovante de crédito": flag("Comprovante de crédito"), "Dossiê": flag("Dossiê"),
                 "Demonstrativo de evolução da dívida": flag("Demonstrativo de evolução da dívida"),
@@ -76,7 +76,9 @@ def gerar() -> dict:
             jogo = sum(valor_em_jogo({"contrato": x["Contrato"], "extrato": x["Extrato"],
                                       "comprovante": x["Comprovante de crédito"]},
                                      critico, x["sub_assunto"], x["uf"], x["causa"]) for x in sem)
+        media_pago = lambda grupo: sum(x["pago"] for x in grupo) / len(grupo) if grupo else 0.0
         documentos.append({
+            "custo_medio_com": round(media_pago(com), 2), "custo_medio_sem": round(media_pago(sem), 2),
             "tipo": tipo, "nome": nome, "casos_sem": len(sem), "ausente_pct": round(len(sem) / n, 4),
             "derrota_com": round(derrota(com), 4), "derrota_sem": round(derrota(sem), 4),
             "pago_nos_casos_sem": round(sum(x["pago"] for x in sem), 2),
@@ -84,6 +86,20 @@ def gerar() -> dict:
             "valor_em_jogo": round(jogo, 2) if jogo is not None else None,
         })
     nenhum = [x for x in linhas if not x["Contrato"] and not x["Extrato"]]
+
+    # Custo médio REAL de processos parecidos, como fração da causa: é a base da economia observada.
+    grupos: dict[str, list[float]] = {}
+    for x in linhas:
+        flags = (x["Contrato"], x["Extrato"], x["Comprovante de crédito"])
+        for grupo in (table.cluster_uf(x["uf"]), "*"):
+            chave = f"C{int(flags[0])}E{int(flags[1])}CC{int(flags[2])}|{x['sub_assunto']}|{grupo}"
+            grupos.setdefault(chave, []).append(x["pago"] / x["causa"] if x["causa"] else 0.0)
+    custo_parecidos = {k: {"n": len(v), "custo_sobre_causa": round(sum(v) / len(v), 4)} for k, v in sorted(grupos.items())}
+
+    # Preço dos acordos da base: referência do ticket médio e curva de aceite pela oferta.
+    acordos = [x for x in linhas if x["micro"] == "Acordo"]
+    razoes = sorted(x["pago"] / x["causa"] for x in acordos)
+    quantil = lambda q: razoes[round(q * (len(razoes) - 1))]
     return {
         "versao": carregar()["versao"],
         "casos": n,
@@ -93,6 +109,14 @@ def gerar() -> dict:
             "casos": len(nenhum), "pct": round(len(nenhum) / n, 4),
             "derrota": round(sum(x["perdeu"] for x in nenhum) / len(nenhum), 4),
             "pago": round(sum(x["pago"] for x in nenhum), 2),
+        },
+        "custo_parecidos": custo_parecidos,
+        "acordos": {
+            "n": len(acordos), "ticket_medio": round(sum(x["pago"] for x in acordos) / len(acordos), 2),
+            "ticket_mediano": round(sorted(x["pago"] for x in acordos)[len(acordos) // 2], 2),
+            "sobre_causa_medio": round(sum(razoes) / len(razoes), 4),
+            "p25": quantil(.25), "p50": quantil(.5), "p75": quantil(.75), "p90": quantil(.9),
+            "quantis": [round(quantil(i / 100), 4) for i in range(101)],
         },
         "premissas": (f"Valor em jogo = (P(derrota) sem o documento − com ele) pela tabela de segmentos × "
                       f"condenação média ({RATIO_CONDENACAO.valor:.2%} da causa) × chance de recuperar ({P4.valor:.0%}). "

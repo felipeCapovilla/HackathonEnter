@@ -14,6 +14,7 @@ from . import table
 from .constants import CUSTO_MENSAL_TEMPO, DURACAO_MESES, P4, P5, POLICY_VERSION, RATIO_CONDENACAO
 from .gate import avaliar_gate, contrato_efetivo
 from .linguagem import descrever_caso, frequencia, nivel_de_risco
+from .referencia import acordos as referencia_acordos, custo_parecidos, faixa_mercado, valor_recomendado
 from .valor_acordo import avaliar_acordo, brl
 
 
@@ -90,7 +91,7 @@ def _plano_recuperacao(c: CaseFeatures, valor_causa: float, contrato: Parametros
 
 
 def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
-            p_perda: float | None = None) -> Recomendacao:
+            p_perda: float | None = None, fator_aceite: float = 1.0) -> Recomendacao:
     """
     Recomendação para um caso.
 
@@ -121,6 +122,30 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
             f"{frequencia(p)}{fonte}. O acordo compensa a partir de {frequencia(veredito.p_estrela)}."]
     premissas = [*veredito.premissas_usadas, CUSTO_MENSAL_TEMPO.id, DURACAO_MESES.id]
 
+    # Valor recomendado, faixa de mercado e argumentos: o que o advogado leva para a mesa.
+    parecidos = (custo_parecidos(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto, c.uf, valor_causa)
+                 if valor_informado else None)
+    oferta = chance = mercado = None
+    if veredito.faixa is not None and valor_informado:
+        resultado = valor_recomendado(valor_causa, veredito.faixa.walk_away, fator_aceite)
+        if resultado:
+            oferta, chance = resultado
+            mercado = faixa_mercado(valor_causa)
+    argumentos = [f"Em casos parecidos, a empresa perde {frequencia(p)}."]
+    if oferta is not None:
+        base = referencia_acordos()
+        argumentos.append(f"Acordos assim fecham entre {round(base['p25'] * 100)}% e {round(base['p75'] * 100)}% da causa "
+                          f"(R$ {brl(mercado[0])} a R$ {brl(mercado[1])}).")
+        argumentos.append(f"Oferecendo R$ {brl(oferta)}, a chance estimada de aceite é de {round(chance * 100)}%.")
+        if parecidos and parecidos["valor"] > oferta:
+            argumentos.append(f"Se aceito, economiza R$ {brl(parecidos['valor'] - oferta)} sobre o custo médio de "
+                              f"processos parecidos (R$ {brl(parecidos['valor'])}).")
+        elif parecidos:
+            argumentos.append(f"Processos parecidos custaram em média R$ {brl(parecidos['valor'])}.")
+        argumentos.append(f"Acima de R$ {brl(veredito.faixa.walk_away)}, acordo não compensa: defender sai mais barato.")
+    elif parecidos:
+        argumentos.append(f"Processos parecidos custaram em média R$ {brl(parecidos['valor'])}.")
+
     if rec and rec.confianca == "alta":
         acao = "RECUPERAR"
         just.append(f"{rec.fundamento} Se ele chegar, a economia esperada é de R$ {brl(rec.ganho_estimado)} "
@@ -129,7 +154,10 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
         premissas.append(P4.id)
     elif veredito.decisao == "ACORDO":
         acao = "ACORDAR"
-        just.append(veredito.motivo)
+        just.append(veredito.motivo if oferta is None else
+                    f"Ofereça R$ {brl(oferta)} (chance estimada de aceite de {round(chance * 100)}%). "
+                    f"Defender custaria R$ {brl(veredito.custo_defesa)}, em média. "
+                    f"Acima de R$ {brl(veredito.faixa.walk_away)}, acordo não compensa: defender sai mais barato.")
     else:
         acao = "DEFENDER"
         just.append(veredito.motivo)
@@ -148,6 +176,9 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
         acordo=veredito.faixa if valor_informado else None,
         economia_no_alvo=veredito.economia_no_alvo if valor_informado else 0.0,
         recuperacao=rec,
+        valor_recomendado=oferta, chance_aceite=chance, faixa_mercado=list(mercado) if mercado else None,
+        custo_parecidos=parecidos["valor"] if parecidos else None, parecidos_n=parecidos["n"] if parecidos else None,
+        argumentos=argumentos,
         justificativa=just, alertas=alertas, premissas_usadas=list(dict.fromkeys(premissas)),
         versao_politica=f"{POLICY_VERSION}+{table._ARTEFATO['versao']}",
         versao_contrato=contrato.versao,

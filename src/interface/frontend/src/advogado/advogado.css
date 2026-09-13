@@ -95,3 +95,18 @@
   .visualizador-quadro { height: 70vh; }
   .fila-item { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Valor recomendado, faixa de mercado e limite explícito */
+.valores { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+.valor-recomendado { display: grid; gap: 2px; }
+.valor-recomendado span { font-size: var(--text-xs); color: var(--muted); }
+.valor-recomendado strong { font-family: var(--font-display); font-size: var(--text-xl); color: var(--primary-text); line-height: 1.1; }
+.valor-recomendado small { color: var(--fg-soft); }
+.faixa-mercado { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: var(--text-sm); }
+.faixa-mercado span { color: var(--muted); }
+.limite { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--danger-soft); border: 1px solid var(--danger-border); color: var(--danger); font-size: var(--text-sm); }
+.limite .icon { width: 16px; height: 16px; margin-top: 2px; }
+.argumentos { border-top: 1px solid var(--border); padding-top: 12px; }
+.argumentos h4 { margin: 0 0 6px; font-size: var(--text-sm); }
+.argumentos ul { font-size: var(--text-sm) !important; margin: 0 !important; }

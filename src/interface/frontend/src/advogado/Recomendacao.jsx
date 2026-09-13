@@ -13,15 +13,16 @@ function Risco({ p, limiar, segmento }) {
   </div>;
 }
 
-function Faixa({ pricing }) {
-  const meta = pricing.target_value > pricing.opening_value + 0.01;
-  return <div className="faixa">
-    {pricing.negotiable === false ? <div><span>Valor único para propor</span><strong>{moeda(pricing.target_value)}</strong></div> : <>
-      <div><span>Comece em</span><strong>{moeda(pricing.opening_value)}</strong></div>
-      {meta && <div><span>Meta</span><strong>{moeda(pricing.target_value)}</strong></div>}
-      <div><span>Pode subir até</span><strong>{moeda(pricing.walk_away_value)}</strong></div>
-    </>}
-    <p className="muted">Acima de {moeda(pricing.walk_away_value)}, defender sai mais barato: a defesa custaria {moeda(pricing.expected_defense_cost)}, em média.</p>
+function Valores({ pricing }) {
+  const recomendado = pricing.recommended_value ?? pricing.target_value;
+  return <div className="valores">
+    <div className="valor-recomendado">
+      <span>Ofereça</span>
+      <strong>{moeda(recomendado)}</strong>
+      {pricing.acceptance_chance != null && <small>Chance estimada de o autor aceitar: {Math.round(pricing.acceptance_chance * 100)}%</small>}
+    </div>
+    {pricing.market_low != null && <div className="faixa-mercado"><span>Acordos parecidos fecham entre</span><b>{moeda(pricing.market_low)} e {moeda(pricing.market_high)}</b></div>}
+    <p className="limite"><Icon name="lock" /><span>Acima de <b>{moeda(pricing.walk_away_value)}</b>, acordo não compensa: defender sai mais barato.</span></p>
   </div>;
 }
 
@@ -41,7 +42,8 @@ export function Recomendacao({ recomendacao, precisaAvaliar, onAvaliar, ocupado 
     <span className="pill amber"><Icon name="spark" />Recomendação da política</span>
     <h3 className="display">{ACOES[acao]?.titulo || acao}</h3>
     {po.p_perda != null && <Risco p={po.p_perda} limiar={po.p_estrela} segmento={po.segmento} />}
-    {acao !== "DEFESA" && recomendacao.pricing?.target_value != null && <Faixa pricing={recomendacao.pricing} />}
+    {acao !== "DEFESA" && recomendacao.pricing?.target_value != null && <Valores pricing={recomendacao.pricing} />}
+    {po.argumentos?.length > 0 && <div className="argumentos"><h4>Por que este caminho</h4><ul>{po.argumentos.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
     {acao === "RECUPERAR" && plano && <p className="plano">Peça o <b>{DOCUMENTOS[DOCUMENTO_DO_PLANO[plano.documento]] || plano.documento}</b>. {plano.fundamento} Se ele chegar, a economia esperada é de {moeda(plano.ganho_estimado)}.</p>}
     {recomendacao.limitations?.length > 0 && <ul className="ressalvas">{recomendacao.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul>}
     <details className="como-chegamos"><summary>Como chegamos nisso</summary><ul>{recomendacao.reasons.map((item, index) => <li key={index}>{item}</li>)}</ul></details>

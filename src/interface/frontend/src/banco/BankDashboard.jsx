@@ -4,7 +4,7 @@ import { useResource } from "../hooks";
 import { ContractManager } from "./ContractManager";
 import { WeeklyChart } from "./WeeklyChart";
 import { Bar, Kpi, Notice, Pill, SectionHeader } from "./ui";
-import { brl, brlCompact, date, index as fmtIndex, indexTone, minutes, num, pct, segmentLabel } from "./format";
+import { brl, brlCompact, date, num, pct } from "./format";
 import "./banco.css";
 
 const TABS = [
@@ -13,10 +13,11 @@ const TABS = [
   ["recomendacoes", "Recomendações"],
   ["escritorios", "Escritórios"],
   ["advogados", "Advogados"],
-  ["engajamento", "Engajamento"],
   ["excecoes", "Exceções"],
   ["contrato", "Contrato"],
 ];
+const COMPONENTES = [["resultado", "Resultado"], ["preco", "Preço do acordo"], ["aderencia", "Aderência"], ["aceitacao", "Aceitação"]];
+const tomDoScore = (nota) => nota == null ? "neutral" : nota >= 70 ? "good" : nota >= 50 ? "warn" : "bad";
 
 export default function BankDashboard({ user }) {
   const [params, setParams] = useSearchParams();
@@ -45,7 +46,6 @@ export default function BankDashboard({ user }) {
       {data && tab === "recomendacoes" && <Recommendations data={data} />}
       {data && tab === "escritorios" && <Firms data={data} />}
       {data && tab === "advogados" && <Lawyers data={data} />}
-      {data && tab === "engajamento" && <Engagement data={data} />}
       {data && tab === "excecoes" && <Exceptions data={data} />}
     </>}
   </section>;
@@ -53,37 +53,45 @@ export default function BankDashboard({ user }) {
 
 function Overview({ data }) {
   const e = data.efetividade;
-  const j = e.desfechos_judiciais;
-  const [low, high] = e.aceitacao_intervalo;
-  const maxCondenacao = Math.max(1, j.condenacao_esperada, j.condenacao_realizada);
+  const t = e.ticket;
+  const d = e.defendidos;
+  const maxDefesa = Math.max(1, d.custo_parecidos, d.condenacoes_comparaveis);
   return <div className="bank-stack">
     <SectionHeader eyebrow="EFETIVIDADE DA POLÍTICA" title="O que a política entregou até agora">
-      Cada número é comparado com o que a própria política esperava para aquele processo. Índice 1,0 significa que a operação entregou exatamente a economia prometida.
+      Só valores observados: o que foi pago de fato e quanto processos parecidos custaram na base de 60 mil sentenças. A economia é a soma, nos processos encerrados, de "custo médio de processos parecidos − custo real".
     </SectionHeader>
     <div className="kpi-grid">
-      <Kpi tone={indexTone(e.indice)} label="Economia realizada" value={brlCompact(e.economia_realizada)}
-        hint={e.indice == null ? "Ainda sem acordos com resultado" : `Índice ${fmtIndex(e.indice)} · esperado ${brlCompact(e.economia_esperada)}`} />
-      <Kpi label="Aceitação dos acordos" value={pct(e.aceitacao)}
-        hint={`Premissa ${pct(e.aceitacao_premissa, 0)} · aprendida ${pct(e.aceitacao_posterior, 0)} (${pct(low, 0)} a ${pct(high, 0)})`} />
-      <Kpi tone={indexTone(e.aderencia)} label="Aderência à política" value={pct(e.aderencia)} hint={`${num(e.decisoes)} decisões registradas`} />
-      <Kpi tone={e.custo_divergencias > 0 ? "bad" : "good"} label="Custo das divergências" value={brlCompact(e.custo_divergencias)}
-        hint="Economia esperada perdida quando a recomendação não foi seguida" />
-      <Kpi tone={e.pago_acima_do_alvo > 0 ? "warn" : "good"} label="Pago acima do alvo" value={brlCompact(e.pago_acima_do_alvo)}
-        hint={`${num(e.fechados_acima_walk_away)} acordo(s) acima do valor máximo`} />
-      <Kpi label="Acordos fechados" value={`${num(e.acordos_fechados)} de ${num(e.acordos_propostos)}`}
-        hint={`${num(e.negociacoes_pendentes)} em negociação · ${pct(e.valor_fechado_sobre_causa)} da causa, em média`} />
+      <Kpi tone={e.economia.total >= 0 ? "good" : "bad"} label="Economia" value={brlCompact(e.economia.total)}
+        hint={`${num(e.economia.processos)} processos encerrados, contra o custo médio real de processos parecidos`} />
+      <Kpi tone={e.economia.seguiu >= 0 ? "good" : "bad"} label="Quando seguiu a recomendação" value={brlCompact(e.economia.seguiu)}
+        hint={`${num(e.economia.seguiu_processos)} processos encerrados`} />
+      <Kpi tone={e.economia.divergiu >= 0 ? "good" : "bad"} label="Quando divergiu" value={brlCompact(e.economia.divergiu)}
+        hint={`${num(e.economia.divergiu_processos)} processos encerrados`} />
+      <Kpi label="Ticket médio dos acordos" value={brl(t.ticket_medio)}
+        hint={t.ticket_medio == null ? "Ainda sem acordo fechado" : `${pct(t.sobre_causa_medio)} da causa · na base: ${pct(t.referencia.sobre_causa_medio)} (${brl(t.referencia.ticket_medio)})`} />
+      <Kpi label="Aceitação dos acordos" value={pct(e.aceitacao.taxa)}
+        hint={`${num(e.acordos.fechados)} acordos fechados de ${num(e.acordos.propostos)} propostos · ${num(e.acordos.em_negociacao)} em negociação · premissa inicial ${pct(e.aceitacao.premissa, 0)}`} />
+      <Kpi label="Aderência à política" value={pct(e.aderencia.taxa)} hint={`${num(e.aderencia.decisoes)} decisões`} />
     </div>
+    <article className="panel">
+      <h3>Pior caso e gasto real</h3>
+      <p className="muted">Nos {num(e.economia.processos)} processos encerrados com valor registrado.</p>
+      <div className="lado-a-lado">
+        <div><span>Se a empresa perdesse todos pelo valor da causa</span><strong>{brl(e.pior_caso)}</strong></div>
+        <div><span>Gasto real (acordos + condenações)</span><strong>{brl(e.gasto_real)}</strong></div>
+      </div>
+    </article>
     <div className="bank-columns">
       <article className="panel"><h3>Economia por semana</h3><WeeklyChart series={e.serie_semanal} /></article>
-      <article className="panel"><h3>Frente às condenações</h3>
-        <p className="muted">Processos defendidos que já têm sentença, contra o que a política projetava para eles.</p>
-        <Bar label="Condenação projetada pela política" value={j.condenacao_esperada} max={maxCondenacao} display={brlCompact(j.condenacao_esperada)} tone="muted" />
-        <Bar label="Condenação realizada" value={j.condenacao_realizada} max={maxCondenacao} display={brlCompact(j.condenacao_realizada)}
-          tone={j.condenacao_realizada <= j.condenacao_esperada ? "good" : "bad"} />
+      <article className="panel"><h3>Processos defendidos</h3>
+        <p className="muted">Sentenças registradas, contra o custo médio real de processos parecidos.</p>
+        <Bar label="Custo médio de processos parecidos" value={d.custo_parecidos} max={maxDefesa} display={brlCompact(d.custo_parecidos)} tone="muted" />
+        <Bar label="Condenações pagas" value={d.condenacoes_comparaveis} max={maxDefesa} display={brlCompact(d.condenacoes_comparaveis)}
+          tone={d.condenacoes_comparaveis <= d.custo_parecidos ? "good" : "bad"} />
         <dl className="facts">
-          <div><dt>Sentenças</dt><dd>{num(j.casos)}</dd></div>
-          <div><dt>Êxito</dt><dd>{pct(j.exito)}</dd></div>
-          <div><dt>Aguardando sentença</dt><dd>{num(j.aguardando_desfecho)}</dd></div>
+          <div><dt>Sentenças</dt><dd>{num(d.sentencas)}</dd></div>
+          <div><dt>Êxito</dt><dd>{pct(d.exito)}</dd></div>
+          <div><dt>Em andamento</dt><dd>{num(e.pendentes)}</dd></div>
         </dl>
       </article>
     </div>
@@ -93,23 +101,21 @@ function Overview({ data }) {
 function Documents({ data }) {
   const d = data.documentos;
   const base = d.base_historica;
-  const max = Math.max(1, ...d.carteira.por_documento.map((doc) => doc.valor_em_jogo));
+  const max = Math.max(1, ...d.carteira.por_documento.map((doc) => doc.casos_sem));
   return <div className="bank-stack">
-    <SectionHeader eyebrow="DOCUMENTOS · A ALAVANCA DA EMPRESA" title="Quanto custa o documento que não chega">
-      Contrato e extrato mudam o resultado do processo, e quem entrega os dois é o empresa. Esta é a economia que depende só da sua operação.
+    <SectionHeader eyebrow="DOCUMENTOS · A ALAVANCA DA EMPRESA" title="O documento que não chega">
+      Contrato e extrato mudam o resultado do processo, e quem entrega os dois é a empresa.
     </SectionHeader>
     <div className="bank-columns">
       <article className="panel hero-panel">
-        <p className="eyebrow">VALOR EM JOGO NA CARTEIRA ANALISADA</p>
-        <strong className="hero-value">{brl(d.carteira.valor_em_jogo_total)}</strong>
-        <p className="muted">{num(d.carteira.casos_analisados)} processos analisados, já descontada a chance de o documento não ser encontrado.</p>
-        {d.carteira.por_documento.map((doc) => <Bar key={doc.tipo} label={doc.nome} value={doc.valor_em_jogo} max={max}
-          display={brlCompact(doc.valor_em_jogo)} caption={`${num(doc.casos_sem)} processos sem o documento`} />)}
+        <p className="eyebrow">PROCESSOS SEM O DOCUMENTO NA CARTEIRA</p>
+        <p className="muted">{num(d.carteira.casos_analisados)} processos analisados.</p>
+        {d.carteira.por_documento.map((doc) => <Bar key={doc.tipo} label={doc.nome} value={doc.casos_sem} max={max} display={`${num(doc.casos_sem)} processos`} />)}
       </article>
       <article className="panel"><h3>Por que o documento não veio</h3>
         {d.motivos.length ? <ul className="reason-list">{d.motivos.map((m) => <li key={`${m.documento}-${m.motivo}`}>
-          <div><strong>{m.motivo_nome}</strong><span>{m.documento_nome} · {num(m.casos)} pedido(s){m.classificados_por_ia ? ` · ${num(m.classificados_por_ia)} classificado(s) por IA` : ""}</span></div>
-          <b>{brlCompact(m.valor_em_jogo)}</b>
+          <div><strong>{m.motivo_nome}</strong><span>{m.documento_nome}{m.classificados_por_ia ? ` · ${num(m.classificados_por_ia)} classificado(s) por IA` : ""}</span></div>
+          <b>{num(m.casos)} pedido(s)</b>
         </li>)}</ul> : <p className="empty-line">Nenhum pedido declarado indisponível ainda.</p>}
         <dl className="facts">
           <div><dt>Pedidos</dt><dd>{num(d.pedidos.total)}</dd></div>
@@ -119,33 +125,34 @@ function Documents({ data }) {
       </article>
     </div>
     <article className="panel">
-      <div className="panel-title-row"><h3>Fila de recuperação</h3><span className="count-badge">{num(d.fila_total)} em aberto · {brlCompact(d.fila_valor_em_jogo)} em jogo</span></div>
-      <p className="muted">Pedidos dos advogados, do maior para o menor valor que o documento pode economizar.</p>
+      <div className="panel-title-row"><h3>Fila de recuperação</h3><span className="count-badge">{num(d.fila_total)} em aberto</span></div>
+      <p className="muted">Pedidos dos advogados, dos processos de maior valor para os de menor.</p>
       {d.fila_recuperacao.length ? <div className="table-scroll"><table className="data-table">
-        <thead><tr><th>Processo</th><th>Documento</th><th>Advogado</th><th className="num">Em aberto</th><th className="num">Valor em jogo</th></tr></thead>
+        <thead><tr><th>Processo</th><th>Documento</th><th>Advogado</th><th className="num">Valor da causa</th><th className="num">Em aberto</th></tr></thead>
         <tbody>{d.fila_recuperacao.map((item) => <tr key={item.id}>
           <td><Link to={`/banco/casos/${item.case_id}`}>{item.case_number}</Link></td>
           <td>{item.documento_nome}</td>
           <td>{item.advogado || "—"}</td>
+          <td className="num">{brl(item.valor_causa)}</td>
           <td className="num"><Pill tone={item.dias_em_aberto > 10 ? "bad" : item.dias_em_aberto > 5 ? "warn" : "neutral"}>{num(item.dias_em_aberto)} dias</Pill></td>
-          <td className="num"><b>{brl(item.valor_em_jogo)}</b></td>
         </tr>)}</tbody>
       </table></div> : <p className="empty-line">Nenhum pedido em aberto.</p>}
     </article>
     {base && <article className="panel">
       <h3>O que a base histórica mostra</h3>
-      <p className="muted">Em {num(base.casos)} sentenças, sem contrato e sem extrato a empresa perde {pct(base.sem_contrato_e_extrato.derrota)} das vezes: são {pct(base.sem_contrato_e_extrato.pct)} dos processos e {brlCompact(base.sem_contrato_e_extrato.pago)} pagos.</p>
+      <p className="muted">Em {num(base.casos)} sentenças, sem contrato e sem extrato a empresa perde {pct(base.sem_contrato_e_extrato.derrota)} das vezes.</p>
       <div className="table-scroll"><table className="data-table">
-        <thead><tr><th>Documento</th><th className="num">Falta em</th><th className="num">Derrota com</th><th className="num">Derrota sem</th><th className="num">Valor em jogo</th></tr></thead>
+        <thead><tr><th>Documento</th><th className="num">Falta em</th><th className="num">Derrota com</th><th className="num">Derrota sem</th><th className="num">Custo médio com</th><th className="num">Custo médio sem</th></tr></thead>
         <tbody>{base.documentos.map((doc) => <tr key={doc.tipo} className={doc.muda_resultado ? "" : "row-muted"}>
           <td>{doc.nome}{!doc.muda_resultado && <small className="cell-sub">não muda o resultado</small>}</td>
           <td className="num">{pct(doc.ausente_pct)}</td>
           <td className="num">{pct(doc.derrota_com)}</td>
           <td className="num">{pct(doc.derrota_sem)}</td>
-          <td className="num">{doc.valor_em_jogo == null ? "—" : brlCompact(doc.valor_em_jogo)}</td>
+          <td className="num">{brl(doc.custo_medio_com)}</td>
+          <td className="num">{brl(doc.custo_medio_sem)}</td>
         </tr>)}</tbody>
       </table></div>
-      <p className="footnote">{base.premissas}</p>
+      <p className="footnote">Custo médio = valor pago por processo na base, incluindo os que a empresa ganhou. Parte dos processos sem documento é golpe real, sem documento que exista.</p>
     </article>}
   </div>;
 }
@@ -156,7 +163,7 @@ function Recommendations({ data }) {
   const cards = data.recomendacoes.filter((card) => !area || card.area === area);
   return <div className="bank-stack">
     <SectionHeader eyebrow="RECOMENDAÇÕES PARA A OPERAÇÃO DA EMPRESA" title="O que construir, e quem constrói">
-      Cada recomendação nasce dos motivos que o seu time registrou ao não entregar um documento, ou da base histórica. O valor em jogo vem do motor; a IA só classifica respostas escritas em texto livre.
+      Cada recomendação nasce dos motivos que o seu time registrou ao não entregar um documento, ou da base histórica.
     </SectionHeader>
     <div className="chips" role="group" aria-label="Filtrar por área responsável">
       <button type="button" className={area ? "chip" : "chip active"} onClick={() => setArea("")}>Todas as áreas</button>
@@ -170,101 +177,85 @@ function Recommendations({ data }) {
       <h3>{card.titulo}</h3>
       <p className="rec-area">Responsável: <b>{card.area}</b></p>
       <p>{card.acao}</p>
-      <dl className="facts">
-        <div><dt>Valor em jogo</dt><dd>{card.valor_em_jogo ? brlCompact(card.valor_em_jogo) : "—"}</dd></div>
-        <div><dt>Processos</dt><dd>{num(card.casos)}</dd></div>
-      </dl>
+      <dl className="facts"><div><dt>Processos</dt><dd>{num(card.casos)}</dd></div></dl>
       <p className="footnote"><b>Como medir:</b> {card.indicador}. {card.evidencia}</p>
     </article>)}</div>
   </div>;
+}
+
+function Componentes({ score, mercado }) {
+  return <div className="componentes">{COMPONENTES.map(([chave, rotulo]) => <Bar key={chave} label={rotulo}
+    value={score.componentes[chave] ?? 0} max={100} tone={tomDoScore(score.componentes[chave])}
+    display={score.componentes[chave] == null ? "—" : `${score.componentes[chave]}`}
+    caption={mercado ? `mercado: ${mercado.componentes[chave] ?? "—"}` : undefined} />)}</div>;
 }
 
 function Firms({ data }) {
   const { regras } = data;
   return <div className="bank-stack">
     <SectionHeader eyebrow="ESCRITÓRIOS CONTRATADOS" title="Com você e no mercado">
-      O índice compara a economia realizada com a esperada para os casos que cada escritório recebeu, por isso carteiras diferentes ficam comparáveis. O mercado é anônimo: nenhum outro cliente é identificado.
+      Score de 0 a 100 que mistura resultado, preço do acordo, aderência e aceitação. Cada processo é comparado com processos parecidos, então carteiras de valores diferentes ficam comparáveis. O mercado é anônimo.
     </SectionHeader>
     {data.escritorios.length ? <div className="firm-grid">{data.escritorios.map((firm) => {
-      const mercado = firm.mercado;
-      const max = Math.max(1.2, firm.indice ?? 0, mercado?.indice ?? 0);
-      const gap = mercado?.indice != null && firm.indice != null ? firm.indice - mercado.indice : 0;
+      const { score, mercado } = firm;
+      const diferenca = mercado?.nota != null && score.nota != null ? score.nota - mercado.nota : 0;
       return <article key={firm.id} className="panel firm-card">
         <div className="firm-head">
-          <div><h3>{firm.nome}</h3><p className="muted">{num(firm.advogados)} advogado(s) · {num(firm.decisoes)} decisões</p></div>
-          <Pill tone={indexTone(firm.indice)}>Índice {fmtIndex(firm.indice)}</Pill>
+          <div><h3>{firm.nome}</h3><p className="muted">{num(firm.advogados)} advogado(s) · {num(score.encerrados)} processos encerrados</p></div>
+          <Pill tone={tomDoScore(score.nota)}>Score {score.nota ?? "—"}</Pill>
         </div>
-        <Bar label="Com você" value={firm.indice ?? 0} max={max} display={fmtIndex(firm.indice)} tone={indexTone(firm.indice)} />
-        {mercado ? <Bar label="No mercado (anônimo)" value={mercado.indice ?? 0} max={max} display={fmtIndex(mercado.indice)}
-          tone="muted" caption={`${num(mercado.decisoes)} decisões em outros clientes`} />
-          : <p className="footnote">{firm.motivo_sem_mercado}</p>}
-        {firm.leitura && <p className={`reading tone-${gap < -0.1 ? "bad" : gap > 0.1 ? "good" : "neutral"}`}>{firm.leitura}</p>}
+        <Bar label="Com você" value={score.nota ?? 0} max={100} display={score.nota ?? "—"} tone={tomDoScore(score.nota)} />
+        {mercado ? <Bar label="No mercado (anônimo)" value={mercado.nota ?? 0} max={100} display={mercado.nota ?? "—"} tone="muted"
+          caption={`${num(mercado.encerrados)} processos encerrados em outros clientes`} /> : <p className="footnote">{firm.motivo_sem_mercado}</p>}
+        {firm.leitura && <p className={`reading tone-${diferenca < -5 ? "bad" : diferenca > 5 ? "good" : "neutral"}`}>{firm.leitura}</p>}
+        <Componentes score={score} mercado={mercado} />
         <dl className="facts">
-          <div><dt>Aderência</dt><dd>{pct(firm.aderencia)}{mercado && <small> · mercado {pct(mercado.aderencia)}</small>}</dd></div>
-          <div><dt>Aceitação</dt><dd>{pct(firm.aceitacao)}{mercado && <small> · mercado {pct(mercado.aceitacao)}</small>}</dd></div>
-          <div><dt>Pago acima do alvo</dt><dd>{brlCompact(firm.pago_acima_do_alvo)}</dd></div>
-          <div><dt>Custo das divergências</dt><dd>{brlCompact(firm.custo_divergencias)}</dd></div>
+          <div><dt>Ticket médio</dt><dd>{brl(score.ticket_medio)}{score.ticket_sobre_causa != null && <small> · {pct(score.ticket_sobre_causa)} da causa</small>}</dd></div>
+          <div><dt>Economia</dt><dd>{brlCompact(score.economia_total)}</dd></div>
         </dl>
       </article>;
     })}</div> : <p className="empty-line">Nenhum escritório com decisões registradas.</p>}
-    <p className="footnote">O mercado só aparece quando o escritório atende ao menos {regras.min_outros_clientes} outros clientes e soma {regras.min_decisoes_mercado} decisões fora desta empresa.</p>
+    <p className="footnote">O mercado só aparece com ao menos {regras.min_outros_clientes} outros clientes e {regras.min_encerrados_mercado} processos encerrados fora desta empresa.</p>
   </div>;
 }
 
 function Lawyers({ data }) {
+  const { pesos } = data.regras;
   return <div className="bank-stack">
     <SectionHeader eyebrow="ADVOGADOS NOS SEUS PROCESSOS" title="Quem executa a política">
-      Ranking pelo índice ajustado ao risco, nunca por taxa de vitória. Com menos de {data.regras.min_decisoes_ranking} decisões, o advogado aparece sem nota.
+      Ranking pelo score de 0 a 100. Cada processo é comparado com processos parecidos antes de entrar na média, e com poucos processos encerrados o score fica perto da média da empresa. Com menos de {data.regras.min_encerrados_ranking} encerrados, o advogado aparece sem posição.
     </SectionHeader>
     <article className="panel">
       {data.advogados.length ? <div className="table-scroll"><table className="data-table">
-        <thead><tr><th>#</th><th>Advogado</th><th className="num">Decisões</th><th className="num">Índice</th><th className="num">Aderência</th><th className="num">Aceitação</th>
-          <th className="num">Acima do alvo</th><th className="num">Divergências</th><th className="num">Tempo por caso</th><th className="num">Sem abrir documento</th></tr></thead>
-        <tbody>{data.advogados.map((lawyer, index) => <tr key={lawyer.id} className={lawyer.amostra_suficiente ? "" : "row-muted"}>
-          <td>{lawyer.amostra_suficiente ? index + 1 : "—"}</td>
-          <td><strong>{lawyer.nome}</strong><small className="cell-sub">{lawyer.escritorio || "Sem escritório"}</small></td>
-          <td className="num">{num(lawyer.decisoes)}</td>
-          <td className="num">{lawyer.amostra_suficiente ? <Pill tone={indexTone(lawyer.indice)}>{fmtIndex(lawyer.indice)}</Pill> : <small>amostra insuficiente</small>}</td>
-          <td className="num">{pct(lawyer.aderencia)}</td>
-          <td className="num">{pct(lawyer.aceitacao)}</td>
-          <td className="num">{brlCompact(lawyer.pago_acima_do_alvo)}</td>
-          <td className="num">{brlCompact(lawyer.custo_divergencias)}</td>
-          <td className="num">{minutes(lawyer.tempo_ativo_mediano_min)}</td>
-          <td className="num">{lawyer.decisoes_sem_abrir_documento > 0.3 ? <Pill tone="bad">{pct(lawyer.decisoes_sem_abrir_documento, 0)}</Pill> : pct(lawyer.decisoes_sem_abrir_documento, 0)}</td>
-        </tr>)}</tbody>
+        <thead><tr><th>#</th><th>Advogado</th><th className="num">Encerrados</th><th className="num">Score</th>
+          {COMPONENTES.map(([chave, rotulo]) => <th key={chave} className="num">{rotulo}</th>)}
+          <th className="num">Ticket médio</th><th className="num">Economia</th></tr></thead>
+        <tbody>{data.advogados.map((lawyer, index) => {
+          const s = lawyer.score;
+          return <tr key={lawyer.id} className={s.amostra_suficiente ? "" : "row-muted"}>
+            <td>{s.amostra_suficiente ? index + 1 : "—"}</td>
+            <td><strong>{lawyer.nome}</strong><small className="cell-sub">{lawyer.escritorio || "Sem escritório"}</small></td>
+            <td className="num">{num(s.encerrados)}</td>
+            <td className="num">{s.amostra_suficiente ? <Pill tone={tomDoScore(s.nota)}>{s.nota ?? "—"}</Pill> : <small>{s.nota ?? "—"} · poucos encerrados</small>}</td>
+            {COMPONENTES.map(([chave]) => <td key={chave} className="num">{s.componentes[chave] ?? "—"}</td>)}
+            <td className="num">{brl(s.ticket_medio)}{s.ticket_sobre_causa != null && <small className="cell-sub">{pct(s.ticket_sobre_causa)} da causa</small>}</td>
+            <td className="num">{brlCompact(s.economia_total)}</td>
+          </tr>;
+        })}</tbody>
       </table></div> : <p className="empty-line">Nenhuma decisão registrada ainda.</p>}
-      <p className="footnote">Índice = economia realizada ÷ economia esperada para os casos que o advogado recebeu. "Acima do alvo" soma o que foi pago além do alvo em acordos fechados; "Divergências" é a economia esperada perdida ao não seguir a recomendação.</p>
-    </article>
-  </div>;
-}
-
-function Engagement({ data }) {
-  const g = data.engajamento;
-  const max = Math.max(1, ...g.por_segmento.map((segment) => segment.tempo_ativo_mediano_min || 0));
-  return <div className="bank-stack">
-    <SectionHeader eyebrow="ENGAJAMENTO" title="Onde vai o tempo do advogado">
-      O tempo ativo só conta com a tela do processo visível. Menos tempo com o mesmo índice é a IA funcionando; o alerta é decidir sem abrir documento quando o motor pediu conferência.
-    </SectionHeader>
-    <div className="kpi-grid">
-      <Kpi label="Tempo ativo por caso" value={minutes(g.tempo_ativo_mediano_min)} hint="Mediana" />
-      <Kpi label="Casos com ressalva do motor" value={minutes(g.tempo_com_ressalva_min)} hint={`Sem ressalva: ${minutes(g.tempo_sem_ressalva_min)}`} />
-      <Kpi label="Documentos abertos por caso" value={num(g.documentos_abertos_medio, 1)} hint="Média" />
-      <Kpi label="Da abertura à decisão" value={g.horas_ate_decisao_mediana == null ? "—" : `${num(g.horas_ate_decisao_mediana, 1)} h`} hint="Mediana" />
-      <Kpi tone={g.decisoes_sem_abrir_documento > 0.15 ? "bad" : "good"} label="Decisões sem abrir documento" value={pct(g.decisoes_sem_abrir_documento)} />
-    </div>
-    <article className="panel"><h3>Tempo por tipo de caso</h3>
-      <p className="muted">Os tipos que mais consomem tempo mesmo com a recomendação pronta mostram onde o motor pode melhorar.</p>
-      <div className="segment-list">{g.por_segmento.map((segment) => <Bar key={segment.segmento} label={segmentLabel(segment.segmento)}
-        value={segment.tempo_ativo_mediano_min || 0} max={max} display={minutes(segment.tempo_ativo_mediano_min)}
-        caption={`${num(segment.casos)} casos · ${pct(segment.com_ressalva, 0)} com ressalva · aderência ${pct(segment.aderencia, 0)}`} />)}</div>
+      <p className="footnote">
+        Score = resultado {pct(pesos.resultado, 0)} + preço do acordo {pct(pesos.preco, 0)} + aderência {pct(pesos.aderencia, 0)} + aceitação {pct(pesos.aceitacao, 0)}.
+        Resultado: quanto o processo custou contra processos parecidos. Preço: onde o valor fechado ficou entre os acordos da base (mais barato, nota maior).
+        Aderência: seguiu a recomendação (100), divergiu com motivo (50), sem motivo (0). Aceitação: acordos propostos que o autor aceitou.
+      </p>
     </article>
   </div>;
 }
 
 const EXCEPTION_TYPES = {
-  ACORDO_ACIMA_WALK_AWAY: { label: "Acordo acima do valor máximo", impact: "Pago além do valor máximo", tone: "bad" },
-  DIVERGENCIA_CARA: { label: "Divergência cara", impact: "Custo esperado da divergência", tone: "warn" },
-  DECISAO_SEM_CONFERENCIA: { label: "Decisão sem conferência", impact: "Custo esperado do caso", tone: "neutral" },
+  ACORDO_ACIMA_DO_LIMITE: { label: "Acordo acima do limite", tone: "bad" },
+  DECISAO_DIFERENTE: { label: "Decisão diferente da recomendação", tone: "warn" },
+  DECISAO_SEM_CONFERENCIA: { label: "Decisão sem conferência", tone: "neutral" },
 };
 
 function Exceptions({ data }) {
@@ -273,7 +264,7 @@ function Exceptions({ data }) {
   const items = x.itens.filter((item) => !type || item.tipo === type);
   return <div className="bank-stack">
     <SectionHeader eyebrow="GESTÃO POR EXCEÇÃO" title="O que fugiu da política">
-      Em vez de acompanhar tudo, olhe o que saiu do combinado: acordo acima do valor máximo, divergência com custo esperado acima de {brl(x.limiar_divergencia)} e decisão sem abrir documento quando o motor pediu conferência.
+      Em vez de acompanhar tudo, olhe o que saiu do combinado: acordo acima do limite, decisão diferente da recomendação e decisão sem abrir documento quando o motor pediu conferência.
     </SectionHeader>
     <div className="chips" role="group" aria-label="Filtrar exceções">
       <button type="button" className={type ? "chip" : "chip active"} onClick={() => setType("")}>Todas · {num(x.total)}</button>
@@ -287,12 +278,12 @@ function Exceptions({ data }) {
           <div className="exception-main">
             <div className="exception-line"><Pill tone={meta.tone}>{meta.label}</Pill><Link to={`/banco/casos/${item.case_id}`}>{item.case_number}</Link></div>
             <span className="muted">{item.advogado || "—"} · {item.escritorio || "sem escritório"} · {date(item.data)}</span>
-            <p>{item.detalhe}</p>
+            <p>{item.detalhe}{item.motivo ? ` Motivo: ${item.motivo}.` : ""}</p>
           </div>
-          <div className="exception-impact"><small>{meta.impact}</small><strong>{brl(item.impacto)}</strong></div>
+          <div className="exception-impact"><small>Valor da causa</small><strong>{brl(item.valor_causa)}</strong></div>
         </li>;
       })}</ul> : <p className="empty-line">Nenhuma exceção.</p>}
-      {x.total > x.itens.length && <p className="footnote">Mostrando as {num(x.itens.length)} de maior impacto, de {num(x.total)}.</p>}
+      {x.total > x.itens.length && <p className="footnote">Mostrando {num(x.itens.length)} de {num(x.total)}, dos processos de maior valor.</p>}
     </article>
   </div>;
 }

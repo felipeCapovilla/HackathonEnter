@@ -33,7 +33,7 @@ CASOS = (
 TIPOS = (("Autos", DocumentType.AUTOS), ("Contrato", DocumentType.CONTRATO), ("Extrato", DocumentType.EXTRATO),
          ("Comprovante", DocumentType.COMPROVANTE_CREDITO), ("Dossie", DocumentType.DOSSIE),
          ("Demonstrativo", DocumentType.DEMONSTRATIVO_DIVIDA), ("Laudo", DocumentType.LAUDO_REFERENCIADO))
-TABELAS_POR_CASO = ("engagement_events", "negotiation_outcomes", "judicial_outcomes", "document_requests",
+TABELAS_POR_CASO = ("divergence_balances", "engagement_events", "negotiation_outcomes", "judicial_outcomes", "document_requests",
                     "lawyer_decisions", "analyses")
 
 
