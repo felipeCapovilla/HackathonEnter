@@ -20,6 +20,7 @@ from src.interface.backend.config import Settings
 from src.interface.backend.database import connection_for
 from src.interface.backend.repository import Repository
 from src.interface.backend.schemas import CaseCreate, DocumentType, SourceParty
+from src.policy.service import PolicyService
 from src.utils.document_service import DocumentService
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,7 @@ def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
             documentos.process_document(documento["id"])
             processado = repository.get_document(documento["id"])
             tipos.append(f"{processado['declared_type']}:{processado['type_status']}")
+        PolicyService(repository).evaluate(registro["id"])  # a advogada abre o processo com a recomendação pronta
         resumo.append({"numero": caso["numero"], "situacao": "criado", "documentos": tipos})
     return resumo
 

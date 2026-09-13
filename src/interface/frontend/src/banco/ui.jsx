@@ -50,3 +50,11 @@ export function Pill({ tone = "neutral", children }) {
 export function SectionHeader({ eyebrow, title, children }) {
   return <header className="section-header">{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h2>{title}</h2>{children && <p>{children}</p>}</header>;
 }
+
+/** Ícone "i" com a explicação da métrica ao passar o mouse ou focar pelo teclado. */
+export function InfoTip({ texto }) {
+  return <span className="info-tip" tabIndex={0} aria-label={texto}>
+    <span aria-hidden="true">i</span>
+    <span className="info-tip-texto" role="tooltip">{texto}</span>
+  </span>;
+}

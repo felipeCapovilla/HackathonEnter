@@ -114,6 +114,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return repository_.save_document_reading(document_id, modelo, "FAILED", None, str(exc))
             return repository_.save_document_reading(document_id, modelo, "COMPLETED", leitura.model_dump(mode="json"), None)
 
+        def avaliar_quando_documentos_prontos(document_id: str) -> None:
+            """O advogado abre o processo com a recomendação pronta: avalia quando o último documento termina."""
+            repository_ = app.state.repository
+            document = repository_.get_document_internal(document_id)
+            if document is None:
+                return
+            case_id = document["case_id"]
+            if any(item["status"] in {"UPLOADED", "EXTRACTING"} for item in repository_.list_documents(case_id)):
+                return
+            if repository_.case_flow(case_id)["codigo"] in {"AGUARDANDO_AVALIACAO", "REAVALIAR"}:
+                try:
+                    app.state.policy.evaluate(case_id)
+                except Exception:  # noqa: BLE001 - a avaliação automática não pode derrubar o envio
+                    logger.exception("Avaliação automática do processo %s falhou", case_id)
+
         def ao_extrair(document_id: str) -> None:
             analisar_dossie_ao_extrair(document_id)
             # Upload sem tipo declarado já leu com IA para classificar (document_service.py).
@@ -125,6 +140,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     ler_com_ia(document_id)
                 except Exception:  # noqa: BLE001 - a leitura é complemento; o documento já está processado
                     logger.exception("Leitura por IA do documento %s falhou", document_id)
+            avaliar_quando_documentos_prontos(document_id)
 
         app.state.leitor = ler_documento
         app.state.ler_com_ia = ler_com_ia
