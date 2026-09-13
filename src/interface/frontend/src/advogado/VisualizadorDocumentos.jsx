@@ -2,48 +2,87 @@ import { useEffect, useState } from "react";
 import { documentDownloadUrl, request } from "../api";
 import { Icon } from "../Brand";
 import { DOCUMENTOS, ORDEM_DOCUMENTOS } from "./textos";
+import { PainelRecolhivel } from "./PainelRecolhivel";
 
 function TextoExtraido({ documento }) {
-  const [paginas, setPaginas] = useState(null);
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const total = Math.max(documento.page_count || 1, 1);
   useEffect(() => {
-    let ativo = true;
-    const total = Math.min(documento.page_count || 1, 20);
-    Promise.all(Array.from({ length: total }, (_, index) => request(`/documents/${documento.id}/pages/${index + 1}`).catch(() => null)))
-      .then((resultado) => { if (ativo) setPaginas(resultado.filter(Boolean)); });
-    return () => { ativo = false; };
-  }, [documento.id, documento.page_count]);
-  if (!paginas) return <p role="status" className="muted">Carregando texto…</p>;
-  return <div className="texto-extraido">{paginas.map((pagina) => <section key={pagina.page_number}><span className="muted">Página {pagina.page_number}</span><p>{pagina.text_content}</p></section>)}</div>;
+    const controller = new AbortController();
+    setResult(null);
+    setError("");
+    request(`/documents/${documento.id}/pages/${page}`, { signal: controller.signal })
+      .then(setResult)
+      .catch((e) => { if (!controller.signal.aborted) setError(e.message); });
+    return () => controller.abort();
+  }, [documento.id, page, attempt]);
+  return <div className="text-reader">
+    <div className="text-reader-pages" aria-label="Paginação do texto">
+      <button type="button" title="Página anterior" aria-label="Página anterior" disabled={page === 1} onClick={() => setPage((value) => value - 1)}><Icon name="chevronLeft" /></button>
+      <span>Página {page} de {total}</span>
+      <button type="button" title="Próxima página" aria-label="Próxima página" disabled={page >= total} onClick={() => setPage((value) => value + 1)}><Icon name="chevronRight" /></button>
+    </div>
+    <div className="texto-extraido" tabIndex={0} aria-label={`Texto da página ${page}`}>
+      {error ? <div role="alert"><p>{error}</p><button type="button" className="subtle" onClick={() => setAttempt((value) => value + 1)}>Tentar novamente</button></div>
+        : !result ? <p role="status">Carregando página…</p>
+          : <p>{result.text_content || "Não há texto extraído nesta página."}</p>}
+    </div>
+  </div>;
 }
 
-/** Documentos do processo lidos na própria tela: PDF no leitor do navegador, texto para os demais. */
-export function VisualizadorDocumentos({ documentos, leituras = [] }) {
+function documentState(document) {
+  if (document.status === "FAILED") return ["danger", "Falha na leitura"];
+  if (["UPLOADED", "EXTRACTING"].includes(document.status)) return ["info", "Processando"];
+  if (["UNCONFIRMED", "MISMATCH"].includes(document.type_status)) return ["amber", "Tipo a conferir"];
+  if (document.status === "COMPLETED_WITH_WARNINGS") return ["amber", "Leitura com ressalvas"];
+  return ["success", "Texto disponível"];
+}
+
+/** Documentos do processo com navegação por abas e estado real de processamento. */
+export function VisualizadorDocumentos({ documentos, leituras = [], children }) {
   const ordenados = [...documentos].sort((a, b) => ORDEM_DOCUMENTOS.indexOf(a.declared_type) - ORDEM_DOCUMENTOS.indexOf(b.declared_type));
   const [ativoId, setAtivoId] = useState(null);
   const documento = ordenados.find((item) => item.id === ativoId) || ordenados[0];
   if (!documento) {
-    return <article className="panel visualizador"><div className="empty-state"><Icon name="files" /><p>Nenhum documento ainda</p><span>Os documentos enviados pela empresa aparecem aqui.</span></div></article>;
+    return <PainelRecolhivel group="documents" titulo="Documentos do processo" resumo="Nenhum arquivo enviado" afterHeader={children}>
+      <article className="panel visualizador"><div className="empty-state"><Icon name="files" /><p>Nenhum documento ainda</p><span>Os arquivos enviados pela empresa aparecerão aqui.</span></div></article>
+    </PainelRecolhivel>;
   }
   const leitura = leituras.find((item) => item.document_id === documento.id && item.status === "COMPLETED")?.result;
   const pdf = /\.pdf$/i.test(documento.original_filename);
   const pronto = ["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(documento.status);
-  return <article className="panel visualizador">
-    <div className="visualizador-abas" role="tablist" aria-label="Documentos do processo">
-      {ordenados.map((item) => <button key={item.id} type="button" role="tab" aria-selected={item.id === documento.id}
-        className={item.id === documento.id ? "ativa" : ""} onClick={() => setAtivoId(item.id)}>{DOCUMENTOS[item.declared_type] || item.declared_type}</button>)}
-    </div>
-    {leitura && <div className="visualizador-resumo">
-      <p><Icon name="spark" className="tiny" /> <b>{documento.declared_type === "AUTOS" ? "Resumo da petição" : "O que diz"}:</b> {leitura.resumo}</p>
-      {leitura.pontos_de_atencao?.length > 0 && <ul>{leitura.pontos_de_atencao.map((ponto, index) => <li key={index}>{ponto}</li>)}</ul>}
-    </div>}
-    <div className="visualizador-quadro">
-      {!pronto ? <p role="status" className="muted">Documento em processamento…</p>
-        : pdf ? <iframe key={documento.id} title={documento.original_filename} src={`${documentDownloadUrl(documento.id)}?inline=1`} />
-          : <TextoExtraido documento={documento} />}
-    </div>
-    <div className="visualizador-rodape">
-      <span className="muted">{documento.original_filename}{documento.page_count ? ` · ${documento.page_count} página(s)` : ""}</span>
-      <a href={documentDownloadUrl(documento.id)} target="_blank" rel="noopener noreferrer">Baixar original</a>
-    </div>
-  </article>;
+  const [tone, state] = documentState(documento);
+  return <PainelRecolhivel group="documents" titulo="Documentos do processo" resumo={`${documentos.length} arquivo(s) · ${documento.original_filename}`} afterHeader={children}>
+    <article className="panel visualizador">
+      <div className="visualizador-abas" role="tablist" aria-label="Documentos do processo">
+        {ordenados.map((item, index) => <button key={item.id} type="button" role="tab" aria-selected={item.id === documento.id}
+          tabIndex={item.id === documento.id ? 0 : -1} title={item.original_filename}
+          className={item.id === documento.id ? "ativa" : ""} onClick={() => setAtivoId(item.id)}
+          onKeyDown={(event) => {
+            const next = { ArrowRight: (index + 1) % ordenados.length, ArrowLeft: (index - 1 + ordenados.length) % ordenados.length, Home: 0, End: ordenados.length - 1 }[event.key];
+            if (next == null) return;
+            event.preventDefault();
+            setAtivoId(ordenados[next].id);
+            event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next].focus();
+          }}>{DOCUMENTOS[item.declared_type] || item.declared_type}</button>)}
+      </div>
+      <div className="viewer-document-meta"><span className={`pill ${tone}`}>{state}</span><span>{DOCUMENTOS[documento.declared_type] || documento.declared_type}{documento.page_count ? ` · ${documento.page_count} página(s)` : ""}</span>
+        <a href={documentDownloadUrl(documento.id)} target="_blank" rel="noopener noreferrer"><Icon name="external" />Abrir original</a></div>
+      {leitura && <details className="viewer-summary" key={documento.id}><summary><Icon name="spark" />Resumo e pontos de atenção<Icon name="chevronDown" /></summary>
+        <p>{leitura.resumo}</p>
+        {leitura.pontos_de_atencao?.length > 0 && <ul>{leitura.pontos_de_atencao.map((ponto, position) => <li key={position}>{ponto}</li>)}</ul>}
+      </details>}
+      <div className="visualizador-quadro">
+        {documento.status === "FAILED" ? <div className="viewer-state" role="status"><Icon name="files" /><h3>Não foi possível extrair este documento</h3><p>Abra o original para conferir o arquivo ou peça um novo envio à empresa.</p></div>
+          : !pronto ? <div className="viewer-state" role="status"><Icon name="clock" /><h3>Preparando a leitura</h3><p>Você pode consultar os outros documentos enquanto este arquivo é processado.</p></div>
+            : pdf ? <iframe key={documento.id} title={documento.original_filename} src={`${documentDownloadUrl(documento.id)}?inline=1`} />
+              : <TextoExtraido key={documento.id} documento={documento} />}
+      </div>
+      <div className="visualizador-rodape"><span title={documento.original_filename}>{documento.original_filename}</span>
+        <a href={documentDownloadUrl(documento.id)} target="_blank" rel="noopener noreferrer">Baixar</a></div>
+    </article>
+  </PainelRecolhivel>;
 }

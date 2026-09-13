@@ -3,6 +3,7 @@ import { sendJson } from "../api";
 import { useAction } from "../hooks";
 import { Icon } from "../Brand";
 import { ResultadoProcesso } from "../banco/ResultadoProcesso";
+import { PainelRecolhivel } from "./PainelRecolhivel";
 import { ACOES, DOCUMENTOS, DOCUMENTO_DO_PLANO, MOTIVOS_DIVERGENCIA, data, moeda } from "./textos";
 
 function Erro({ mensagem }) {
@@ -200,23 +201,24 @@ export function PainelDaFase({ caseId, detalhe, fase, recomendacao, onChange }) 
   const pricingDaDecisao = detalhe.analyses.find((analise) => analise.id === fase.decisao?.analysis_id)?.pricing || recomendacao?.pricing;
   switch (fase.codigo) {
     case "PRONTO_PARA_DECIDIR":
-      return recomendacao ? <FormDecisao key={recomendacao.id} caseId={caseId} recomendacao={recomendacao} onChange={onChange} /> : null;
+      return recomendacao ? <PainelRecolhivel group="action" titulo="Decisão" resumo="Registrar o próximo passo"><FormDecisao key={recomendacao.id} caseId={caseId} recomendacao={recomendacao} onChange={onChange} /></PainelRecolhivel> : null;
     case "AGUARDANDO_DOCUMENTO":
-      return <AguardandoDocumento fase={fase} />;
+      return <PainelRecolhivel group="action" titulo="Solicitação de documento" resumo="Aguardando a empresa"><AguardandoDocumento fase={fase} /></PainelRecolhivel>;
     case "EM_NEGOCIACAO":
-      return <><Roteiro caseId={caseId} decisao={fase.decisao} pricing={pricingDaDecisao} /><FormResposta caseId={caseId} decisao={fase.decisao} pricing={pricingDaDecisao} onChange={onChange} /></>;
+      return <><PainelRecolhivel group="action" titulo="Negociação" resumo="Roteiro e proposta"><Roteiro caseId={caseId} decisao={fase.decisao} pricing={pricingDaDecisao} /></PainelRecolhivel>
+        <PainelRecolhivel group="action" titulo="Resposta do autor" resumo="Registrar o retorno da negociação"><FormResposta caseId={caseId} decisao={fase.decisao} pricing={pricingDaDecisao} onChange={onChange} /></PainelRecolhivel></>;
     case "CONTRAPROPOSTA":
-      return <FormContraproposta caseId={caseId} fase={fase} pricing={pricingDaDecisao} onChange={onChange} />;
+      return <PainelRecolhivel group="action" titulo="Contraproposta" resumo={`O autor pediu ${moeda(fase.negociacao.counter_value)}`}><FormContraproposta caseId={caseId} fase={fase} pricing={pricingDaDecisao} onChange={onChange} /></PainelRecolhivel>;
     case "EM_DEFESA":
-      return <FormSentenca caseId={caseId} fase={fase} onChange={onChange} />;
+      return <PainelRecolhivel group="action" titulo="Sentença" resumo="Registrar o resultado do processo"><FormSentenca caseId={caseId} fase={fase} onChange={onChange} /></PainelRecolhivel>;
     case "ENCERRADO":
-      return <ResultadoProcesso detail={detalhe} decision={detalhe.lawyer_decisions[0]} recommendation={recomendacao} />;
+      return <PainelRecolhivel group="action" titulo="Resultado do processo" resumo="Processo encerrado"><ResultadoProcesso detail={detalhe} decision={detalhe.lawyer_decisions[0]} recommendation={recomendacao} /></PainelRecolhivel>;
     default:
       return null;
   }
 }
 
-export function LinhaDoTempo({ detalhe }) {
+export function LinhaDoTempo({ detalhe, initiallyCollapsed = true }) {
   const eventos = [
     ...detalhe.analyses.map((analise) => ({ quando: analise.created_at, texto: `Avaliação: ${ACOES[analise.recommendation]?.titulo || analise.recommendation}` })),
     ...detalhe.lawyer_decisions.map((decisao) => ({ quando: decisao.created_at, texto: `Decisão: ${ACOES[decisao.action]?.titulo || decisao.action}${decisao.proposed_value ? ` de ${moeda(decisao.proposed_value)}` : ""}${decisao.divergence_reason ? " (diferente da recomendação)" : ""}` })),
@@ -224,6 +226,6 @@ export function LinhaDoTempo({ detalhe }) {
     ...(detalhe.negotiation_outcomes || []).map((item) => ({ quando: item.created_at, texto: { ACEITO: `Acordo fechado em ${moeda(item.closed_value)}`, CONTRAPROPOSTA: `Autor pediu ${moeda(item.counter_value)}`, RECUSADO: "Autor recusou", SEM_RESPOSTA: "Autor não respondeu" }[item.status] })),
     ...(detalhe.judicial_outcomes || []).map((item) => ({ quando: item.created_at, texto: item.result === "EXITO" ? "Sentença favorável" : `Sentença desfavorável: ${moeda(item.condemnation_value)}` })),
   ].sort((a, b) => new Date(b.quando) - new Date(a.quando));
-  if (!eventos.length) return null;
-  return <article className="panel linha-do-tempo"><h3>Histórico</h3><ol>{eventos.map((evento, index) => <li key={index}><span className="muted">{data(evento.quando)}</span>{evento.texto}</li>)}</ol></article>;
+  if (!eventos.length) return <PainelRecolhivel group="history" titulo="Histórico" resumo="Nenhum registro ainda"><article className="panel case-empty-panel"><Icon name="clock" /><h3>A história começa aqui</h3><p>Avaliações, decisões e respostas aparecerão nesta área.</p></article></PainelRecolhivel>;
+  return <PainelRecolhivel group="history" titulo="Histórico" resumo={`${eventos.length} registro(s) · ${eventos[0].texto}`} initiallyCollapsed={initiallyCollapsed}><article className="panel linha-do-tempo"><ol>{eventos.map((evento, index) => <li key={index}><span className="muted">{data(evento.quando)}</span>{evento.texto}</li>)}</ol></article></PainelRecolhivel>;
 }

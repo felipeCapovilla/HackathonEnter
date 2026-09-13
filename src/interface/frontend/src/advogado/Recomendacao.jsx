@@ -1,4 +1,5 @@
 import { Icon } from "../Brand";
+import { PainelRecolhivel } from "./PainelRecolhivel";
 import { ACOES, DOCUMENTOS, DOCUMENTO_DO_PLANO, descreverCaso, frequencia, moeda, nivelDeRisco } from "./textos";
 
 function Risco({ p, limiar, segmento }) {
@@ -27,18 +28,17 @@ function Faixa({ pricing }) {
 
 export function Recomendacao({ recomendacao, precisaAvaliar, onAvaliar, ocupado }) {
   if (!recomendacao) {
-    return <article className="panel recomendacao">
-      <span className="pill amber"><Icon name="spark" />Recomendação</span>
+    return <PainelRecolhivel group="evaluation" titulo="Recomendação" resumo="Ainda não avaliado"><article className="panel recomendacao">
       <h3>Ainda não avaliado</h3>
       <p className="muted">Quando os documentos estiverem no processo, peça a avaliação: a política calcula o caminho mais barato para a empresa.</p>
       <button className="primary" disabled={ocupado} onClick={onAvaliar}><Icon name="spark" />{ocupado ? "Avaliando…" : "Avaliar o processo"}</button>
-    </article>;
+    </article></PainelRecolhivel>;
   }
   const po = recomendacao.policy_output || {};
   const acao = recomendacao.recommendation;
   const plano = po.recuperacao;
-  return <article className={`panel recomendacao acao-${acao.toLowerCase()}`}>
-    <span className="pill amber"><Icon name="spark" />Recomendação da política</span>
+  return <PainelRecolhivel group="evaluation" titulo="Recomendação" resumo={ACOES[acao]?.titulo || acao}><article className={`panel recomendacao acao-${acao.toLowerCase()}`}>
+    {precisaAvaliar && <p className="recommendation-stale"><Icon name="clock" />Há documentos novos. Reavalie antes de decidir.</p>}
     <h3 className="display">{ACOES[acao]?.titulo || acao}</h3>
     {po.p_perda != null && <Risco p={po.p_perda} limiar={po.p_estrela} segmento={po.segmento} />}
     {acao !== "DEFESA" && recomendacao.pricing?.target_value != null && <Faixa pricing={recomendacao.pricing} />}
@@ -46,5 +46,5 @@ export function Recomendacao({ recomendacao, precisaAvaliar, onAvaliar, ocupado 
     {recomendacao.limitations?.length > 0 && <ul className="ressalvas">{recomendacao.limitations.map((item, index) => <li key={index}>{item}</li>)}</ul>}
     <details className="como-chegamos"><summary>Como chegamos nisso</summary><ul>{recomendacao.reasons.map((item, index) => <li key={index}>{item}</li>)}</ul></details>
     {precisaAvaliar && <button className="primary" disabled={ocupado} onClick={onAvaliar}><Icon name="spark" />{ocupado ? "Avaliando…" : "Reavaliar com os documentos novos"}</button>}
-  </article>;
+  </article></PainelRecolhivel>;
 }
