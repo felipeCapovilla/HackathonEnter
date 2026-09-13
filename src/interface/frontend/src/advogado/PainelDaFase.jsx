@@ -11,6 +11,11 @@ function Erro({ mensagem }) {
 }
 
 /** Só aparece quando a escolha foge da recomendação ou do valor máximo. */
+/** Campo de valor em reais: o prefixo deixa claro que o número é dinheiro. */
+function CampoMoeda(props) {
+  return <span className="campo-moeda"><span aria-hidden="true">R$</span><input type="number" step="0.01" inputMode="decimal" {...props} /></span>;
+}
+
 function Motivo({ titulo, motivo, setMotivo }) {
   return <fieldset className="motivo">
     <legend>{titulo}</legend>
@@ -55,7 +60,7 @@ function FormDecisao({ caseId, recomendacao, onChange }) {
         </label>)}
       </div>
       {escolha === "ACORDO" && <label>Valor da proposta
-        <input type="number" min="1" step="0.01" required value={valor} onChange={(event) => setValor(event.target.value)} />
+        <CampoMoeda min="1" required value={valor} onChange={(event) => setValor(event.target.value)} />
         {pricing && <small className="muted">Recomendado: {moeda(pricing.recommended_value ?? pricing.opening_value)}{pricing.market_low != null ? `. Acordos parecidos fecham entre ${moeda(pricing.market_low)} e ${moeda(pricing.market_high)}` : ""}. Acima de {moeda(maximo)}, acordo não compensa.</small>}
       </label>}
       {acima && <p className="alerta-valor">Esse valor passa do máximo ({moeda(maximo)}): defender sai mais barato para a empresa.</p>}
@@ -126,7 +131,7 @@ function FormResposta({ caseId, decisao, pricing, onChange }) {
         <input type="radio" name="status" value={codigo} checked={resposta === codigo} onChange={() => { setResposta(codigo); setValor(codigo === "ACEITO" ? decisao.proposed_value ?? "" : ""); }} /><span><b>{texto}</b></span>
       </label>)}</div>
       {(resposta === "ACEITO" || resposta === "CONTRAPROPOSTA") && <label>{resposta === "ACEITO" ? "Valor fechado" : "Valor que o autor pediu"}
-        <input type="number" min="1" step="0.01" required value={valor} onChange={(event) => setValor(event.target.value)} /></label>}
+        <CampoMoeda min="1" required value={valor} onChange={(event) => setValor(event.target.value)} /></label>}
       {resposta === "CONTRAPROPOSTA" && valor !== "" && maximo != null && <p className={Number(valor) <= maximo + 0.01 ? "dentro-limite" : "alerta-valor"}>
         {Number(valor) <= maximo + 0.01 ? `Dentro do valor máximo (${moeda(maximo)}): depois de registrar, você pode aceitar.` : `Passa do valor máximo (${moeda(maximo)}): defender sai mais barato.`}</p>}
       {acima && <Motivo titulo="Por que fechar acima do valor máximo?" motivo={motivo} setMotivo={setMotivo} />}
@@ -183,7 +188,7 @@ function FormSentenca({ caseId, fase, onChange }) {
     <form onSubmit={enviar}><fieldset className="form-fields" disabled={acao.pending}>
       <div className="opcoes-acao compacta">{[["EXITO", "Favorável à empresa"], ["NAO_EXITO", "Desfavorável à empresa"]].map(([codigo, texto]) => <label key={codigo} className={`opcao-acao ${resultado === codigo ? "marcada" : ""}`}>
         <input type="radio" name="result" value={codigo} checked={resultado === codigo} onChange={() => setResultado(codigo)} /><span><b>{texto}</b></span></label>)}</div>
-      {resultado === "NAO_EXITO" && <label>Valor da condenação<input name="valor" type="number" min="0" step="0.01" required /></label>}
+      {resultado === "NAO_EXITO" && <label>Valor da condenação<CampoMoeda name="valor" min="0" required /></label>}
       <Erro mensagem={acao.error} />
       <button className="primary">{acao.pending ? "Registrando…" : "Registrar sentença"}</button>
     </fieldset></form>
