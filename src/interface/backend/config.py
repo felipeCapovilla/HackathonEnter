@@ -29,6 +29,13 @@ class Settings:
     auth_required: bool = True
     dossie_auto_analysis: bool = True
     leitura_ia: bool = True
+    rag_enabled: bool = True
+    rag_full_context_chars: int = 24_000
+    rag_chunk_chars: int = 4_800
+    rag_chunk_overlap_chars: int = 600
+    rag_max_chunks: int = 10
+    rag_max_context_chars: int = 40_000
+    rag_embedding_model: str = "text-embedding-3-small"
 
 
 def get_settings() -> Settings:
@@ -50,4 +57,11 @@ def get_settings() -> Settings:
         auth_required=os.getenv("ENTERAGREE_AUTH_REQUIRED", "true").lower() not in {"0", "false", "no"},
         dossie_auto_analysis=os.getenv("ENTERAGREE_DOSSIE_AUTO", "true").lower() not in {"0", "false", "no"},
         leitura_ia=os.getenv("ENTERAGREE_LEITURA_IA", "true").lower() not in {"0", "false", "no"},
+        rag_enabled=os.getenv("ENTERAGREE_RAG_ENABLED", "true").lower() not in {"0", "false", "no"},
+        rag_full_context_chars=int(os.getenv("ENTERAGREE_RAG_FULL_CONTEXT_CHARS", "24000")),
+        rag_chunk_chars=int(os.getenv("ENTERAGREE_RAG_CHUNK_CHARS", "4800")),
+        rag_chunk_overlap_chars=int(os.getenv("ENTERAGREE_RAG_CHUNK_OVERLAP_CHARS", "600")),
+        rag_max_chunks=int(os.getenv("ENTERAGREE_RAG_MAX_CHUNKS", "10")),
+        rag_max_context_chars=int(os.getenv("ENTERAGREE_RAG_MAX_CONTEXT_CHARS", "40000")),
+        rag_embedding_model=os.getenv("ENTERAGREE_RAG_EMBEDDING_MODEL", "text-embedding-3-small"),
     )

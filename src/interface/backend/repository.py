@@ -372,6 +372,8 @@ class Repository:
                 "UPDATE documents SET deleted_at = ?, deleted_by_user_id = ? WHERE id = ?",
                 (_now(), user_id, document_id),
             )
+            # The audit retains chunk identifiers in chat retrievals, but not source text after deletion.
+            connection.execute("DELETE FROM document_chunks WHERE document_id = ?", (document_id,))
         return row["file_path"]
 
     def update_document_extraction(
@@ -945,6 +947,83 @@ class Repository:
                 """SELECT r.* FROM document_ai_readings r JOIN documents d ON d.id = r.document_id
                 WHERE d.case_id = ? AND d.deleted_at IS NULL ORDER BY r.created_at""", (case_id,)).fetchall()
         return [{**dict(row), "result": json.loads(row["result"]) if row["result"] else None} for row in rows]
+
+    def replace_document_chunks(self, document: dict, chunks: list[dict]) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.execute("DELETE FROM document_chunks WHERE document_id = ?", (document["id"],))
+            connection.executemany("""INSERT INTO document_chunks
+                (id, document_id, sha256, chunk_index, page_start, page_end, text_content, token_estimate, created_at)
+                VALUES (:id, :document_id, :sha256, :chunk_index, :page_start, :page_end, :text_content, :token_estimate, :created_at)""", chunks)
+
+    def list_case_chunks(self, case_id: str, document_ids: list[str] | None = None) -> list[dict]:
+        params: list[object] = [case_id]
+        extra = ""
+        if document_ids:
+            extra = " AND d.id IN (" + ",".join("?" for _ in document_ids) + ")"
+            params.extend(document_ids)
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute("""SELECT c.*, d.original_filename FROM document_chunks c
+                JOIN documents d ON d.id = c.document_id
+                WHERE d.case_id = ? AND d.deleted_at IS NULL
+                  AND d.status IN ('COMPLETED', 'COMPLETED_WITH_WARNINGS')""" + extra +
+                " ORDER BY d.created_at, c.chunk_index", params).fetchall()
+        return [dict(row) for row in rows]
+
+    def document_chunk_count(self, document_id: str) -> int:
+        with connection_for(self.database_path) as connection:
+            return int(connection.execute("SELECT COUNT(*) FROM document_chunks WHERE document_id = ?", (document_id,)).fetchone()[0])
+
+    def save_chunk_embeddings(self, chunks: list[dict], model: str, vectors: list[list[float]]) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.executemany("UPDATE document_chunks SET embedding_model = ?, embedding_json = ? WHERE id = ?",
+                [(model, _json(vector), chunk["id"]) for chunk, vector in zip(chunks, vectors, strict=True)])
+
+    def create_chat_conversation(self, case_id: str, user_id: str, document_ids: list[str]) -> dict:
+        record = {"id": str(uuid4()), "case_id": case_id, "created_by_user_id": user_id,
+                  "document_filter": _json(document_ids), "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            connection.execute("""INSERT INTO document_chat_conversations
+                (id, case_id, created_by_user_id, document_filter, created_at)
+                VALUES (:id, :case_id, :created_by_user_id, :document_filter, :created_at)""", record)
+        record["document_filter"] = document_ids
+        return record
+
+    def get_chat_conversation(self, conversation_id: str, case_id: str, user_id: str | None = None) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            query, params = "SELECT * FROM document_chat_conversations WHERE id = ? AND case_id = ?", [conversation_id, case_id]
+            if user_id is not None:
+                query += " AND created_by_user_id = ?"; params.append(user_id)
+            row = connection.execute(query, params).fetchone()
+        record = _row(row)
+        if record: record["document_filter"] = json.loads(record["document_filter"])
+        return record
+
+    def list_chat_conversations(self, case_id: str, user_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute("SELECT * FROM document_chat_conversations WHERE case_id = ? AND created_by_user_id = ? ORDER BY created_at DESC", (case_id, user_id)).fetchall()
+        return [{**dict(row), "document_filter": json.loads(row["document_filter"])} for row in rows]
+
+    def list_chat_messages(self, conversation_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute("SELECT * FROM document_chat_messages WHERE conversation_id = ? ORDER BY created_at", (conversation_id,)).fetchall()
+        return [{**dict(row), "citations": json.loads(row["citations"])} for row in rows]
+
+    def save_chat_message(self, conversation_id: str, role: str, content: str, citations: list[dict] | None = None,
+                          retrieval_mode: str | None = None, model: str | None = None) -> dict:
+        record = {"id": str(uuid4()), "conversation_id": conversation_id, "role": role, "content": content,
+                  "citations": _json(citations or []), "retrieval_mode": retrieval_mode, "model": model,
+                  "prompt_version": "rag-chat-v1", "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            connection.execute("""INSERT INTO document_chat_messages
+                (id, conversation_id, role, content, citations, retrieval_mode, model, prompt_version, created_at)
+                VALUES (:id, :conversation_id, :role, :content, :citations, :retrieval_mode, :model, :prompt_version, :created_at)""", record)
+        record["citations"] = citations or []
+        return record
+
+    def save_chat_retrievals(self, message_id: str, chunks: list[dict]) -> None:
+        with connection_for(self.database_path) as connection:
+            connection.executemany("INSERT INTO document_chat_retrievals (message_id, chunk_id, rank, score) VALUES (?, ?, ?, ?)",
+                [(message_id, item["id"], rank, item["score"]) for rank, item in enumerate(chunks, 1)])
 
     def search_cases(self, bank_id: str, termo: str, limit: int = 30) -> list[dict]:
         """

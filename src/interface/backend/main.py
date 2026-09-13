@@ -21,6 +21,8 @@ from .database import connection_for, initialize_database
 from src.utils.document_service import DocumentService
 from src.utils.dossie_service import DossieService, DossieUnavailableError
 from src.utils.document_type_validator import validate_document_type
+from src.utils.document_chat_service import DocumentChatService, DocumentChatUnavailable
+from src.utils.document_chunk_service import DocumentChunkService
 from .monitoring import build_monitoring_summary
 from .bank_insights import build_bank_insights
 from src.utils.motivo_indisponibilidade import classificar_motivo
@@ -46,6 +48,9 @@ from .schemas import (
     CaseCreate,
     CaseAssignment,
     CaseRecord,
+    ChatConversationCreate,
+    ChatMessageRecord,
+    ChatQuestion,
     DocumentRecord,
     DocumentRequestCreate,
     DocumentRequestRecord,
@@ -83,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         initialize_database(app_settings.database_path)
         app.state.repository = Repository(app_settings.database_path)
         app.state.dossie = DossieService(app.state.repository)
+        app.state.document_chat = DocumentChatService(app.state.repository, app_settings)
 
         def analisar_dossie_ao_extrair(document_id: str) -> None:
             """Q37: o dossiê é analisado assim que a extração termina, para a política já usá-lo."""
@@ -443,6 +449,70 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(409, str(exc)) from exc
         background_tasks.add_task(document_service().process_document, document["id"])
         return document
+
+    @app.post("/api/cases/{case_id}/document-chat/conversations", status_code=201)
+    def create_document_chat_conversation(case_id: str, payload: ChatConversationCreate, request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        require_case_access(repository(), case_id, user)
+        if not app_settings.rag_enabled:
+            raise HTTPException(503, "Chat documental está desabilitado.")
+        if payload.document_ids:
+            allowed = {item["id"] for item in repository().list_documents(case_id)}
+            if not set(payload.document_ids) <= allowed:
+                raise HTTPException(422, "Há documento inválido para este processo.")
+        return repository().create_chat_conversation(case_id, user["id"], payload.document_ids)
+
+    @app.get("/api/cases/{case_id}/document-chat/conversations")
+    def list_document_chat_conversations(case_id: str, request: Request) -> list[dict]:
+        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        require_case_access(repository(), case_id, user)
+        return repository().list_chat_conversations(case_id, user["id"])
+
+    @app.get("/api/cases/{case_id}/document-chat/conversations/{conversation_id}/messages", response_model=list[ChatMessageRecord])
+    def list_document_chat_messages(case_id: str, conversation_id: str, request: Request) -> list[dict]:
+        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        require_case_access(repository(), case_id, user)
+        if repository().get_chat_conversation(conversation_id, case_id, user["id"]) is None:
+            raise HTTPException(404, "Conversa não encontrada neste processo.")
+        return repository().list_chat_messages(conversation_id)
+
+    @app.post("/api/cases/{case_id}/document-chat/conversations/{conversation_id}/messages", response_model=ChatMessageRecord, status_code=201)
+    def ask_document_chat(case_id: str, conversation_id: str, payload: ChatQuestion, request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        require_case_access(repository(), case_id, user)
+        conversation = repository().get_chat_conversation(conversation_id, case_id, user["id"])
+        if conversation is None:
+            raise HTTPException(404, "Conversa não encontrada neste processo.")
+        repository().save_chat_message(conversation_id, "USER", payload.question)
+        try:
+            result = app.state.document_chat.answer(case_id, conversation, payload.question)
+        except DocumentChatUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        answer = repository().save_chat_message(conversation_id, "ASSISTANT", result["answer"], result["citations"], result["mode"], app.state.document_chat.model)
+        if result.get("chunks"):
+            repository().save_chat_retrievals(answer["id"], result["chunks"])
+        return answer
+
+    @app.get("/api/documents/{document_id}/indexing")
+    def document_indexing(document_id: str, request: Request) -> dict:
+        document = repository().get_document(document_id)
+        if document is None:
+            raise HTTPException(404, "Documento não encontrado.")
+        require_case_access(repository(), document["case_id"], current_user(request))
+        return {"document_id": document_id, "chunks": repository().document_chunk_count(document_id),
+                "ready": document["status"] in {"COMPLETED", "COMPLETED_WITH_WARNINGS"}}
+
+    @app.post("/api/documents/{document_id}/indexing")
+    def retry_document_indexing(document_id: str, request: Request) -> dict:
+        document = repository().get_document(document_id)
+        if document is None:
+            raise HTTPException(404, "Documento não encontrado.")
+        require_case_access(repository(), document["case_id"], current_user(request))
+        if document["status"] not in {"COMPLETED", "COMPLETED_WITH_WARNINGS"}:
+            raise HTTPException(409, "A extração do documento precisa estar concluída antes da indexação.")
+        count = DocumentChunkService(repository(), app_settings.rag_chunk_chars, app_settings.rag_chunk_overlap_chars,
+                                     app_settings.rag_embedding_model).index_document(document_id)
+        return {"document_id": document_id, "chunks": count, "ready": True}
 
     @app.delete("/api/cases/{case_id}/documents/{document_id}", status_code=204)
     def delete_document(case_id: str, document_id: str, request: Request) -> Response:

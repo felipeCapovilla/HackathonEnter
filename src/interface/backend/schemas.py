@@ -163,6 +163,32 @@ class DocumentRecord(BaseModel):
     created_at: datetime
 
 
+class ChatConversationCreate(BaseModel):
+    document_ids: list[str] = Field(default_factory=list, max_length=50)
+
+
+class ChatQuestion(BaseModel):
+    question: str = Field(min_length=2, max_length=2000)
+
+
+class ChatCitation(BaseModel):
+    chunk_id: str
+    document_id: str
+    filename: str
+    page_start: int
+    page_end: int
+    quote: str
+
+
+class ChatMessageRecord(BaseModel):
+    id: str
+    role: Literal["USER", "ASSISTANT"]
+    content: str
+    citations: list[ChatCitation] = Field(default_factory=list)
+    retrieval_mode: str | None = None
+    created_at: datetime
+
+
 class TypeConfirmation(BaseModel):
     action: str = Field(pattern="^(RECLASSIFY|CONTINUE_WITH_RESERVATION|REMOVE)$")
     document_type: DocumentType | None = None
