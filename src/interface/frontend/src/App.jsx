@@ -12,6 +12,7 @@ import { BuscaProcessos } from "./banco/BuscaProcessos";
 import { ResultadoProcesso } from "./banco/ResultadoProcesso";
 import { MinhaFila } from "./advogado/MinhaFila";
 import CasoAdvogadoRota from "./advogado/CasoAdvogado";
+import { TOM_DA_FASE } from "./advogado/textos";
 
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Pedir documento", BANCO: "Empresa", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -191,6 +192,7 @@ function CaseStatus({ item }) {
     const outcome = OUTCOMES[item.outcome];
     return <span className={`pill ${outcome?.favoravel ? "success" : "danger"}`}>{outcome?.label || item.outcome}</span>;
   }
+  if (item.fase) return <span className={`pill ${TOM_DA_FASE[item.fase.codigo] || ""} dot`}>{item.fase.rotulo}</span>;
   if (item.decided) return <span className="pill info dot">Em negociação</span>;
   return <span className="pill amber dot">Aguardando avaliação</span>;
 }
@@ -432,7 +434,7 @@ function CaseDetail({ caseId, user }) {
           <h2>{detail.case.case_number}</h2>
           <p>{detail.case.uf} · {money(detail.case.value_of_claim)} · aberto em {shortDate(detail.case.created_at)}</p>
           <span className="case-card-tags" style={{ marginTop: "var(--s3)" }}>
-            <CaseStatus item={{ outcome: decision?.outcome, decided: Boolean(decision), active: !decision?.outcome }} />
+            <CaseStatus item={{ outcome: decision?.outcome, decided: Boolean(decision), active: !decision?.outcome, fase: detail.fase }} />
           </span>
         </div>
         {isLawyer && !encerrado && <button className="primary" disabled={busy} onClick={analyze}><Icon name="spark" />Avaliar risco e recomendação</button>}

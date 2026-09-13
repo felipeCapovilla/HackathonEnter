@@ -197,6 +197,6 @@ button.ghost:hover { background: #f6f7fa; box-shadow: none; }
 @media (max-width: 700px) { .origem-economia { grid-template-columns: minmax(0, 1fr); } }
 
 /* Ranking de advogados: cabeçalhos longos quebram em duas linhas e o nome não fica espremido */
-.data-table.tabela-advogados th { white-space: normal; vertical-align: bottom; min-width: 76px; max-width: 110px; line-height: 1.35; }
+.data-table.tabela-advogados th { white-space: normal; overflow-wrap: normal; vertical-align: bottom; min-width: 92px; max-width: 120px; line-height: 1.35; }
 .tabela-advogados th:first-child { min-width: 24px; }
 .data-table.tabela-advogados th:nth-child(2), .data-table.tabela-advogados td:nth-child(2) { min-width: 190px; max-width: none; }
