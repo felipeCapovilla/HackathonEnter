@@ -190,7 +190,8 @@ button.ghost:hover { background: #f6f7fa; box-shadow: none; }
 .origem-economia > div.ganho { border-left-color: #2f9e77; }
 .origem-economia > div.perda { border-left-color: #c2413b; }
 .origem-economia span { font-size: .8rem; color: var(--muted); }
-.origem-economia strong { font-family: var(--font-display, inherit); font-size: 1.6rem; color: #1c2742; }
+/* Mesma fonte dos números em destaque (.kpi strong) */
+.origem-economia strong { font-size: 1.65rem; font-weight: 600; letter-spacing: -.04em; color: #1c2742; }
 .origem-economia small { font-size: .75rem; color: var(--muted); }
 .estimativa { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #f1edfb; color: #5b4a86; font-size: .62rem; font-weight: 600; letter-spacing: .02em; vertical-align: middle; }
 @media (max-width: 700px) { .origem-economia { grid-template-columns: minmax(0, 1fr); } }
