@@ -11,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .database import connection_for
+from .fluxo import calcular_fase
 from .schemas import (
     CaseCreate,
     DocumentRequestCreate,
@@ -748,8 +749,10 @@ class Repository:
         with connection_for(self.database_path) as connection:
             connection.execute(
                 """INSERT INTO lawyer_decisions (
-                    id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id
-                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at, :lawyer_id)""",
+                    id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id,
+                    divergence_reason, requested_document
+                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at, :lawyer_id,
+                    :divergence_reason, :requested_document)""",
                 record,
             )
         return record
@@ -767,8 +770,8 @@ class Repository:
                       **payload.model_dump(mode="json"), "created_at": _now()}
             connection.execute(
                 """INSERT INTO negotiation_outcomes (id, case_id, decision_id, lawyer_id, status, offered_value,
-                counter_value, closed_value, created_at) VALUES (:id, :case_id, :decision_id, :lawyer_id, :status,
-                :offered_value, :counter_value, :closed_value, :created_at)""", record)
+                counter_value, closed_value, created_at, divergence_reason, reason) VALUES (:id, :case_id, :decision_id,
+                :lawyer_id, :status, :offered_value, :counter_value, :closed_value, :created_at, :divergence_reason, :reason)""", record)
             if record["status"] == "ACEITO":
                 # Acordo aceito é desfecho: encerra o processo no ciclo de vida da decisão.
                 self._close_decision(connection, decision["id"], "ACORDO_ACEITO", record["created_at"])
@@ -902,6 +905,27 @@ class Repository:
             "outcomes": outcomes,
             "actions": actions,
         }
+
+    def case_flow(self, case_id: str) -> dict:
+        """Fase e próxima ação do processo (máquina de estados em fluxo.py)."""
+        with connection_for(self.database_path) as connection:
+            def linhas(sql: str) -> list[dict]:
+                return [dict(row) for row in connection.execute(sql, (case_id,)).fetchall()]
+            dados = {
+                "caso": _row(connection.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()),
+                "analyses": linhas("SELECT id, recommendation, pricing, created_at FROM analyses WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+                "decisions": linhas("SELECT * FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+                "documents": linhas("SELECT created_at FROM documents WHERE case_id = ? AND deleted_at IS NULL"),
+                "requests": linhas("SELECT id, document_type, status, created_at, responded_at FROM document_requests WHERE case_id = ?"),
+                "negotiations": linhas("SELECT * FROM negotiation_outcomes WHERE case_id = ? ORDER BY created_at DESC"),
+                "judicials": linhas("SELECT * FROM judicial_outcomes WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+            }
+        return calcular_fase(**dados)
+
+    def lawyer_queue(self, lawyer_id: str) -> list[dict]:
+        """Processos do advogado na ordem da próxima ação: o que precisa dele primeiro."""
+        itens = [{**case, "fase": self.case_flow(case["id"])} for case in self.list_cases(lawyer_id=lawyer_id)]
+        return sorted(itens, key=lambda item: (item["fase"]["prioridade"], -item["fase"]["dias_parado"]))
 
     def save_document_reading(self, document_id: str, model: str, status: str,
                               result: dict | None, error: str | None) -> dict:

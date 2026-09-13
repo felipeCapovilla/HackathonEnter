@@ -234,6 +234,10 @@ MIGRATED_COLUMNS = (
     ("document_requests", "unavailability_reason_source", "TEXT"),
     ("cases", "is_simulated", "INTEGER NOT NULL DEFAULT 0"),
     ("lawyer_decisions", "lawyer_id", "TEXT"),
+    ("lawyer_decisions", "divergence_reason", "TEXT"),
+    ("lawyer_decisions", "requested_document", "TEXT"),
+    ("negotiation_outcomes", "divergence_reason", "TEXT"),
+    ("negotiation_outcomes", "reason", "TEXT"),
 )
 
 

@@ -104,6 +104,16 @@ class JudicialResult(StrEnum):
     NAO_EXITO = "NAO_EXITO"
 
 
+class DivergenceReason(StrEnum):
+    """Por que o advogado não seguiu a recomendação. Estruturado para a política aprender com isso."""
+    FATO_NOVO = "FATO_NOVO"
+    ENTENDIMENTO_LOCAL = "ENTENDIMENTO_LOCAL"
+    PROVA_MAIS_FRACA = "PROVA_MAIS_FRACA"
+    PROVA_MAIS_FORTE = "PROVA_MAIS_FORTE"
+    SINAL_DO_AUTOR = "SINAL_DO_AUTOR"
+    OUTRO = "OUTRO"
+
+
 class EngagementEventType(StrEnum):
     CASE_OPENED = "CASE_OPENED"
     DOCUMENT_OPENED = "DOCUMENT_OPENED"
@@ -226,6 +236,15 @@ class LawyerDecisionCreate(BaseModel):
     action: str = Field(pattern="^(ACORDO|DEFESA|RECUPERAR)$")
     reason: str | None = Field(default=None, max_length=2000)
     proposed_value: float | None = Field(default=None, ge=0)
+    divergence_reason: DivergenceReason | None = Field(
+        default=None, description="Obrigatório quando a ação difere da recomendação ou a proposta passa do valor máximo")
+    requested_document: Literal["CONTRATO", "EXTRATO", "COMPROVANTE_CREDITO"] | None = Field(
+        default=None, description="Documento a pedir à empresa quando a ação é RECUPERAR")
+
+
+class MensagemPropostaCreate(BaseModel):
+    valor: float | None = Field(default=None, gt=0)
+    prazo_dias: int = Field(default=5, ge=1, le=30)
 
 
 class NegotiationOutcomeCreate(BaseModel):
@@ -234,6 +253,8 @@ class NegotiationOutcomeCreate(BaseModel):
     offered_value: float | None = Field(default=None, ge=0)
     counter_value: float | None = Field(default=None, ge=0)
     closed_value: float | None = Field(default=None, ge=0)
+    divergence_reason: DivergenceReason | None = None
+    reason: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
     def _valores_coerentes(self) -> "NegotiationOutcomeCreate":
@@ -257,12 +278,16 @@ class NegotiationOutcomeRecord(NegotiationOutcomeCreate):
 class JudicialOutcomeCreate(BaseModel):
     """Desfecho do processo defendido; chega meses depois da decisão."""
     result: JudicialResult
-    condemnation_value: float = Field(default=0.0, ge=0)
+    condemnation_value: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _exito_sem_condenacao(self) -> "JudicialOutcomeCreate":
-        if self.result == JudicialResult.EXITO and self.condemnation_value > 0:
-            raise ValueError("Processo com êxito não tem valor de condenação.")
+        if self.result == JudicialResult.EXITO:
+            if self.condemnation_value:
+                raise ValueError("Processo com êxito não tem valor de condenação.")
+            self.condemnation_value = 0.0
+        elif self.condemnation_value is None:
+            raise ValueError("Sentença desfavorável exige o valor da condenação.")
         return self
 
 

@@ -42,6 +42,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt openai
 python -m scripts.seed_demo --confirm-demo
 python -m scripts.seed_operacao_simulada --confirm-demo   # opcional: popula o painel do banco
+python -m scripts.seed_casos_exemplo --confirm-demo      # os 2 processos da Enter, com PDFs, para a advogada demo
 export ENTERAGREE_RUNTIME_DIR="$PWD/.runtime/demo"
 export ENTERAGREE_DATABASE_PATH="$ENTERAGREE_RUNTIME_DIR/enteragree.db"
 export ENTERAGREE_AUTH_REQUIRED=true
