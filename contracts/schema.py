@@ -129,6 +129,14 @@ class Recomendacao(BaseModel):
     economia_no_alvo: float = 0.0
     recuperacao: Optional[PlanoRecuperacao] = None
 
+    # Valor para o advogado levar à mesa e o que o sustenta (curva dos acordos da base).
+    valor_recomendado: Optional[float] = None
+    chance_aceite: Optional[float] = None
+    faixa_mercado: Optional[list[float]] = None
+    custo_parecidos: Optional[float] = None
+    parecidos_n: Optional[int] = None
+    argumentos: list[str] = []
+
     justificativa: list[str]
     alertas: list[str] = []
     premissas_usadas: list[str]

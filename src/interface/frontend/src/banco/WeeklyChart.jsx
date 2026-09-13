@@ -1,32 +1,33 @@
 import { brlCompact } from "./format";
 
+/** Economia somada por semana de encerramento (pode ser negativa). */
 export function WeeklyChart({ series }) {
-  if (!series?.length) return <p className="muted">Ainda não há decisões com resultado para mostrar.</p>;
+  if (!series?.length) return <p className="muted">Ainda não há processos encerrados para mostrar.</p>;
   const width = 720, height = 220, pad = { top: 16, right: 12, bottom: 34, left: 64 };
-  const max = Math.max(1, ...series.flatMap((week) => [week.economia_esperada, week.economia_realizada]));
+  const valores = series.map((week) => week.economia);
+  const max = Math.max(0, ...valores), min = Math.min(0, ...valores);
+  const amplitude = Math.max(1, max - min);
   const plotW = width - pad.left - pad.right, plotH = height - pad.top - pad.bottom;
-  const slot = plotW / series.length, bar = Math.min(18, slot / 2.6);
-  const y = (value) => pad.top + plotH - (Math.max(0, value) / max) * plotH;
-  const ticks = [0, 0.5, 1].map((fraction) => max * fraction);
+  const slot = plotW / series.length, bar = Math.min(26, slot / 1.8);
+  const y = (value) => pad.top + ((max - value) / amplitude) * plotH;
+  const ticks = [...new Set([max, (max + min) / 2, min, 0])];
   return <figure className="weekly-chart">
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Economia esperada e realizada por semana">
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Economia por semana">
       {ticks.map((tick) => <g key={tick}>
-        <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} className="grid" />
+        <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} className={tick === 0 ? "grid zero" : "grid"} />
         <text x={pad.left - 8} y={y(tick) + 4} textAnchor="end" className="axis">{brlCompact(tick)}</text>
       </g>)}
       {series.map((week, index) => {
         const x = pad.left + index * slot + slot / 2;
+        const topo = y(Math.max(0, week.economia)), base = y(Math.min(0, week.economia));
         return <g key={week.semana}>
-          <rect x={x - bar - 1} y={y(week.economia_esperada)} width={bar} height={pad.top + plotH - y(week.economia_esperada)} className="bar-expected" rx="3">
-            <title>{`${week.semana}: esperada ${brlCompact(week.economia_esperada)}`}</title>
-          </rect>
-          <rect x={x + 1} y={y(week.economia_realizada)} width={bar} height={pad.top + plotH - y(week.economia_realizada)} className="bar-realized" rx="3">
-            <title>{`${week.semana}: realizada ${brlCompact(week.economia_realizada)}`}</title>
+          <rect x={x - bar / 2} y={topo} width={bar} height={Math.max(1, base - topo)} className={week.economia >= 0 ? "bar-realized" : "bar-negative"} rx="3">
+            <title>{`${week.semana}: ${brlCompact(week.economia)} em ${week.encerrados} processo(s) encerrado(s)`}</title>
           </rect>
           <text x={x} y={height - 12} textAnchor="middle" className="axis">{week.semana.split("-")[1]}</text>
         </g>;
       })}
     </svg>
-    <figcaption><span className="legend legend-expected" />Esperada pela política<span className="legend legend-realized" />Realizada</figcaption>
+    <figcaption><span className="legend legend-realized" />Economia dos processos encerrados na semana</figcaption>
   </figure>;
 }

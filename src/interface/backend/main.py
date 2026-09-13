@@ -695,15 +695,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/cases/{case_id}/engagement", status_code=204)
     def record_engagement(case_id: str, payload: EngagementEventCreate, request: Request) -> Response:
-        """Tela do advogado: tempo ativo (aba visível) e abertura de documento pelo visualizador."""
+        """Tela do advogado: abertura de documento pelo visualizador (tempo de tela não é coletado)."""
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         require_case(case_id, request)
         if payload.document_id:
             document = repository().get_document(payload.document_id)
             if document is None or document["case_id"] != case_id:
                 raise HTTPException(422, "Documento não pertence a este processo.")
-        if user["role"] == UserRole.ADVOGADO_EXTERNO.value and (payload.active_seconds or payload.event_type == "DOCUMENT_OPENED"):
-            repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id, payload.active_seconds)
+        if user["role"] == UserRole.ADVOGADO_EXTERNO.value:
+            repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id)
         return Response(status_code=204)
 
     @app.post("/api/cases/{case_id}/lawyer-decisions/{decision_id}/outcome", status_code=201)
@@ -753,7 +753,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pricing = analises[0].get("pricing") if analises else None
         if not pricing:
             raise HTTPException(409, "Avalie o processo antes de redigir a proposta: ainda não há valor sugerido.")
-        valor = payload.valor or pricing["opening_value"]
+        valor = payload.valor or pricing.get("recommended_value") or pricing["opening_value"]
         texto, fonte = redigir_mensagem(numero=case["case_number"], empresa=user.get("bank_name") or "a empresa",
                                         advogado=user.get("name") or "", valor=valor, prazo_dias=payload.prazo_dias)
         return {"mensagem": texto, "fonte": fonte, "valor": valor}

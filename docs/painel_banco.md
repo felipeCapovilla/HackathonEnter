@@ -88,3 +88,51 @@ Precisa de `data/resultados.csv` e `data/subsidios.csv` (`python -m scripts.expo
 | Textos da indicação de ação | O motor explica em frequência ("em 10 casos parecidos, a empresa perde 6"), sem walk-away, segmento ou P(derrota) |
 | Quanto se perdeu na sentença desfavorável | O desfecho aceita `value`; o processo mostra a condenação e compara com o acordo recomendado; a lista marca a condenação |
 | Busca por contrato | `GET /api/bank/search?q=` procura no número do processo, na leitura por IA (contrato, parte) e no texto de cada página |
+
+## Métricas observadas (rodada com a organização)
+
+O painel mostra **só valor observado**: o que foi pago de fato e quanto processos parecidos custaram na base de
+60 mil sentenças. Estimativas do modelo decidem a recomendação, mas não medem o próprio resultado.
+
+**Economia.** No pitch, o backtest: aplicar a política aos 60 mil processos e comparar com o que a empresa pagou
+nesses mesmos processos (R$ 193,0 mi pagos; R$ 163,5 mi com a política e 40% de aceitação; entre R$ 22 mi e
+R$ 44 mi conforme a aceitação fique entre 30% e 60%). No painel ao vivo, a soma, nos processos encerrados, de
+**custo médio real de processos parecidos − custo real do processo** (mesmos documentos, alegação e região; sem a
+região quando há menos de 30 casos). Nunca por processo isolado. A economia aparece dividida entre quem seguiu a
+recomendação e quem divergiu.
+
+**Pior caso e gasto real** lado a lado (soma do valor da causa × acordos e condenações pagos), sem número de diferença.
+
+**Ticket médio dos acordos**, em reais e em % da causa, contra os 280 acordos da base (R$ 4.540; 29,8% da causa).
+
+**Score de advogado e escritório (0 a 100).** Cada processo vira notas de 0 a 1 que não dependem do valor da causa:
+
+| Componente | Nota por processo | Peso |
+|---|---|---|
+| Resultado | (custo de parecidos − custo real) ÷ custo de parecidos, limitado a ±1 e levado para 0 a 1 | 50% |
+| Preço do acordo | 1 − posição do valor fechado (% da causa) entre os acordos da base | 20% |
+| Aderência | 1 seguiu a recomendação; 0,5 divergiu com motivo; 0 sem motivo | 20% |
+| Aceitação | 1 acordo proposto aceito; 0 recusado ou sem resposta | 10% |
+
+Componente sem dado sai da conta e os pesos se redistribuem. Com poucos processos encerrados o score é puxado para
+a média da empresa: (n × nota + 10 × média) ÷ (n + 10). Posição no ranking a partir de 20 encerrados. O mercado dos
+escritórios usa o mesmo score, com ao menos 2 outros clientes e 50 processos encerrados fora da empresa.
+
+**Exceções sem valor estimado:** acordo acima do limite, decisão diferente da recomendação (com o motivo) e decisão
+sem abrir documento. **Saiu do painel:** índice, custo das divergências, pago acima do alvo, economia esperada,
+condenação projetada, valor em jogo estimado e a aba de tempo (o tempo de tela deixou de ser coletado).
+
+**Saldo estimado das divergências** (`divergencias.py`, tabela `divergence_balances`): caminho recomendado em valor
+esperado − custo real, guardado por decisão encerrada que divergiu. Não aparece em tela; é a entrada do human in the loop.
+
+## Valor recomendado ao advogado
+
+- **Ofereça R$ X:** dentro da faixa de mercado (25% a 35% da causa, onde os acordos da base fecharam), a oferta que
+  maximiza chance de aceite × economia até o limite. A chance de aceite é a curva dos 280 acordos, corrigida pela
+  aceitação observada na operação a partir de 10 respostas.
+- **Faixa de mercado:** onde acordos parecidos fecham.
+- **Limite, explícito:** "Acima de R$ Y, acordo não compensa: defender sai mais barato." Y é o custo esperado de
+  defender (chance de perder × condenação média × custo do tempo), por isso chega perto de 85% da causa quando a
+  empresa quase sempre perde.
+- **Argumentos calculados:** chance de perder, faixa dos acordos parecidos, chance de aceite da oferta e economia
+  sobre o custo médio de processos parecidos.

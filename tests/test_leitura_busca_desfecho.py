@@ -107,4 +107,4 @@ def test_sentenca_desfavoravel_guarda_quanto_a_empresa_perdeu(tmp_path, monkeypa
         assert registrado.status_code == 201, registrado.text
         assert empresa.get("/api/cases").json()[0]["condemnation_value"] == 12000
         assert empresa.get(f"/api/cases/{case['id']}").json()["judicial_outcomes"][0]["condemnation_value"] == 12000
-        assert empresa.get("/api/bank/insights").json()["efetividade"]["desfechos_judiciais"]["condenacao_realizada"] == 12000
+        assert empresa.get("/api/bank/insights").json()["efetividade"]["defendidos"]["condenacoes"] == 12000

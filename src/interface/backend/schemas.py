@@ -299,9 +299,9 @@ class JudicialOutcomeRecord(JudicialOutcomeCreate):
 
 
 class EngagementEventCreate(BaseModel):
-    event_type: Literal["DOCUMENT_OPENED", "ACTIVE_TIME"]
-    document_id: str | None = Field(default=None, max_length=80)
-    active_seconds: int = Field(default=0, ge=0, le=300, description="Tempo ativo desde o último aviso; no máximo 5 min")
+    """Só a abertura de documento: tempo de tela deixou de ser coletado."""
+    event_type: Literal["DOCUMENT_OPENED"]
+    document_id: str = Field(max_length=80)
 
 
 class LawyerDecisionOutcomeCreate(BaseModel):
