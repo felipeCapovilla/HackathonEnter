@@ -1,1022 +1,754 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Política de Acordos EnterOS</title>
-<meta name="description" content="Apresentação final do módulo de Política de Acordos do EnterOS para o Banco Unicamp.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap">
+<meta name="description" content="Defender ou fazer acordo? A mesma resposta, pelo mesmo critério, em cada processo." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='5' width='22' height='22' fill='%23FFD400'/%3E%3Crect x='16' y='16' width='7' height='7' fill='%230A0A0A'/%3E%3C/svg%3E" />
 <style>
-/*
- * Mesmo sistema visual do produto: Newsreader para o que se lê (título, número, veredito),
- * Inter para o que se opera (rótulo, legenda). Âmbar é a marca; verde e vermelho são desfecho.
- * Cada slide é uma folha dos autos: cabeçalho com o módulo, a seção e a numeração "fls.".
- */
-@page { size: 1600px 900px; margin: 0; }
-:root {
-  --tinta: #0b0f1a;
-  --tinta-2: #161d2e;
-  --ambar: #ffae35;
-  --ambar-texto: #8a4b00;
-  --ambar-suave: #fff3de;
-  --ambar-borda: #f2d7ab;
-  --papel: #f7f6f3;
-  --folha: #fffefc;
-  --afundado: #efece6;
-  --filete: #e6e1d7;
-  --filete-forte: #cfc8ba;
-  --grafite: #16130f;
-  --suave: #4a453d;
-  --mudo: #6d675d;
-  --verde: #146b4d;
-  --verde-suave: #e4f2eb;
-  --vermelho: #a82f26;
-  --vermelho-suave: #fbeceb;
-  --info: #245a9e;
-  --fundo: #05070c;
-  --serif: "Newsreader", Georgia, "Times New Roman", serif;
-  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--grafite); }
-body { overflow: hidden; font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-.deck { position: fixed; inset: 0; }
+  :root {
+    --preto:#0A0A0A; --cru:#F3EFE5; --amarelo:#FFD400;
+    --coral:#FF664A; --violeta:#A78BFA; --menta:#9FF5D0; --cinza:#8A8A86;
+    --bg: var(--preto); --fg: var(--cru); --dim:#A8A49B; --faint: var(--cinza);
+    --line: rgba(243,239,229,.14); --line-2: rgba(243,239,229,.06); --panel:#101010;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, monospace;
+  }
+  /* Tema único, escuro, no mesmo sistema do deck de referência: preto, amarelo e branco cru.
+     Coral é derrota e custo; menta é economia; violeta é onde a IA trabalha. */
 
-/* ── Folha ─────────────────────────────────────────────── */
-.slide {
-  position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px;
-  transform: translate(-50%, -50%) scale(var(--k, 1));
-  display: none; flex-direction: column; padding: 0 96px; overflow: hidden;
-  background: var(--papel); color: var(--grafite); font-size: 24px; line-height: 1.45;
-  font-variant-numeric: lining-nums;
-}
-.slide.ativo { display: flex; }
-.cab {
-  flex: none; height: 84px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
-  padding-bottom: 16px; border-bottom: 1px solid var(--filete-forte);
-  font-size: 14px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo);
-}
-.cab b { color: var(--grafite); font-weight: 600; }
-.cab .fls { font-family: var(--serif); font-style: italic; font-size: 21px; letter-spacing: 0; text-transform: none; color: var(--grafite); }
-.corpo { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 34px; padding: 44px 0 56px; }
-.kicker { margin: 0 0 14px; font-size: 15px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ambar-texto); }
-h1, h2 { margin: 0; font-family: var(--serif); font-weight: 500; letter-spacing: -.018em; text-wrap: balance; }
-h2 { font-size: 58px; line-height: 1.06; max-width: 1320px; }
-h2 em, h1 em { font-style: italic; color: var(--ambar-texto); }
-.lead { margin: 16px 0 0; max-width: 1080px; font-size: 26px; color: var(--suave); text-wrap: pretty; }
-.nota { font-size: 17px; color: var(--mudo); line-height: 1.5; }
-.serif { font-family: var(--serif); }
-.num { font-family: var(--serif); font-weight: 500; letter-spacing: -.02em; font-variant-numeric: tabular-nums lining-nums; }
-.grade { display: grid; gap: 32px; min-height: 0; }
-.rot { font-size: 14px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans);
+    -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  body::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: .04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
 
-/* Folha escura: capa e fecho */
-.slide.tinta { background: var(--tinta); color: #e9e7e1; }
-.slide.tinta .cab { border-color: #ffffff24; color: #9aa1b0; }
-.slide.tinta .cab b, .slide.tinta .cab .fls { color: #fff; }
-.slide.tinta h1, .slide.tinta h2 { color: #fff; }
-.slide.tinta h1 em, .slide.tinta h2 em { color: var(--ambar); }
-.slide.tinta .kicker { color: var(--ambar); }
-.slide.tinta .lead { color: #b9bdc7; }
+  .deck { scroll-snap-type: y mandatory; height: 100vh; overflow-y: auto; scroll-behavior: smooth; position: relative; z-index: 1; }
+  .s { scroll-snap-align: start; min-height: 100vh;
+    padding: clamp(2.2rem,5.5vh,4rem) clamp(1.5rem,6vw,6rem) clamp(3.5rem,7vh,5rem);
+    display: flex; flex-direction: column; justify-content: center;
+    gap: clamp(1rem,2.4vh,1.8rem); position: relative; }
+  .s > * { max-width: 74rem; width: 100%; }
 
-/* ── Capa ──────────────────────────────────────────────── */
-.logo { display: inline-flex; align-items: flex-end; gap: 4px; font-family: var(--sans); font-weight: 600; font-size: 30px; letter-spacing: .02em; color: #fff; line-height: 1; }
-.logo i { width: 14px; height: 14px; background: #fff; display: inline-block; margin-bottom: 2px; }
-.capa .corpo { justify-content: center; gap: 0; padding-bottom: 40px; }
-.capa h1 { font-size: 88px; line-height: 1.02; max-width: 1250px; }
-.capa h1 em { display: block; font-size: 60px; line-height: 1.1; margin-top: 18px; max-width: 1180px; }
-.capa .lead { margin-top: 30px; font-size: 25px; max-width: 900px; }
-.missao { list-style: none; margin: 0; padding: 26px 0 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; border-top: 1px solid #ffffff24; font-size: 22px; color: #b9bdc7; }
-.missao b { display: block; font-family: var(--serif); font-weight: 500; font-size: 34px; color: #fff; }
-.capa-autos { position: absolute; right: 60px; top: 620px; font-family: var(--serif); font-style: italic; font-size: 104px; line-height: 1; color: #ffffff09; white-space: nowrap; pointer-events: none; }
+  .meta { position: absolute; top: clamp(1.4rem,3.5vh,2.3rem); right: clamp(1.5rem,6vw,6rem);
+    display: flex; gap: 1rem; font-family: var(--mono); font-size: .7rem; color: var(--faint); letter-spacing: .1em; }
+  .meta .t { color: var(--amarelo); }
+  .eyebrow { font-family: var(--mono); font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: var(--faint); margin: 0; }
 
-/* ── Números do problema ───────────────────────────────── */
-.tres-numeros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--filete-forte); }
-.tres-numeros > div { padding: 26px 32px 0 0; }
-.tres-numeros > div + div { padding-left: 32px; border-left: 1px solid var(--filete); }
-.tres-numeros .num { display: block; font-size: 84px; line-height: 1; white-space: nowrap; }
-.tres-numeros p { margin: 14px 0 0; font-size: 21px; color: var(--suave); max-width: 380px; }
-.passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; counter-reset: p; }
-.passos li { counter-increment: p; font-size: 19px; color: var(--suave); line-height: 1.4; padding-top: 14px; border-top: 2px solid var(--grafite); }
-.passos li::before { content: counter(p); display: block; font-family: var(--serif); font-size: 30px; color: var(--grafite); margin-bottom: 6px; }
-.desafio { margin: 0; font-family: var(--serif); font-size: 34px; line-height: 1.25; max-width: 1200px; }
-.desafio b { font-weight: 500; font-style: italic; color: var(--ambar-texto); }
+  h1 { font-size: clamp(2.4rem,7.4vw,5.9rem); line-height: .92; letter-spacing: -.05em; font-weight: 800; margin: 0; text-wrap: balance; }
+  h2 { font-size: clamp(1.7rem,4.4vw,3.4rem); line-height: 1.02; letter-spacing: -.04em; font-weight: 780; margin: 0; text-wrap: balance; }
+  .lede { font-size: clamp(.98rem,1.5vw,1.22rem); line-height: 1.5; color: var(--dim); max-width: 60ch; margin: 0; }
+  p { margin: 0; }
+  .y { color: var(--amarelo); } .c { color: var(--coral); } .m { color: var(--menta); } .v { color: var(--violeta); }
+  .note { font-family: var(--mono); font-size: .66rem; letter-spacing: .04em; color: var(--faint); line-height: 1.6; }
 
-/* ── Quadro requisitos ─────────────────────────────────── */
-.quadro { display: grid; grid-template-columns: 330px 1fr 290px; border-top: 2px solid var(--grafite); }
-.quadro > * { padding: 17px 24px 17px 0; border-bottom: 1px solid var(--filete); font-size: 21px; line-height: 1.4; }
-.quadro .th { font-size: 13px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mudo); padding-top: 12px; padding-bottom: 12px; }
-.quadro .req { font-family: var(--serif); font-size: 27px; line-height: 1.2; display: flex; gap: 14px; align-items: baseline; }
-.quadro .req small { font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--ambar-texto); }
-.quadro .onde { color: var(--mudo); font-size: 18px; }
+  .mark { display: flex; align-items: center; gap: .7rem; font-weight: 800; letter-spacing: -.04em; font-size: clamp(1.6rem,3.4vw,2.6rem); }
+  .mark .o { width: .8em; height: .8em; background: var(--amarelo); display: grid; place-items: end; flex: none; }
+  .mark .o::after { content: ''; width: .3em; height: .3em; background: var(--preto); }
 
-/* ── Mapa de risco (16 perfis) ─────────────────────────── */
-.risco { display: grid; grid-template-columns: 1fr 820px; gap: 64px; align-items: start; }
-.porta { border-left: 3px solid var(--vermelho); padding-left: 28px; }
-.porta .num { font-size: 132px; line-height: .9; color: var(--vermelho); display: block; }
-.porta p { margin: 12px 0 0; font-size: 22px; color: var(--suave); }
-.porta p b { color: var(--grafite); font-weight: 600; }
-.mapa { width: 100%; border-collapse: collapse; font-size: 17px; }
-.mapa th { font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mudo); text-align: center; padding: 0 4px 10px; vertical-align: bottom; }
-.mapa th.alt { text-align: left; padding-left: 12px; }
-.mapa td { height: 51px; text-align: center; border-bottom: 1px solid var(--filete); color: var(--suave); }
-.mapa td.doc { width: 86px; font-size: 20px; }
-.mapa td.doc.nao { color: var(--filete-forte); }
-.mapa td.p { width: 190px; padding: 3px; border-bottom: 0; }
-.mapa td.p div {
-  height: 45px; border-radius: 6px; display: flex; align-items: baseline; justify-content: space-between; padding: 10px 14px 0;
-  background: color-mix(in oklab, var(--vermelho) calc(var(--p) * 100%), var(--folha));
-  color: var(--grafite); font-size: 15px;
-}
-.mapa td.p div b { font-family: var(--serif); font-weight: 500; font-size: 24px; }
-.mapa td.p.escuro div { color: #fff; }
-.mapa td.p div span { font-size: 13px; opacity: .72; }
+  /* grade de caixas com filete */
+  .agents { display: grid; grid-template-columns: repeat(auto-fit,minmax(215px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .agents > div { background: var(--bg); padding: clamp(.9rem,1.7vw,1.2rem); display: flex; flex-direction: column; gap: .4rem; border-top: 2px solid var(--amarelo); }
+  .agents .n { font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; color: var(--amarelo); }
+  .agents .st { font-size: clamp(.92rem,1.35vw,1.05rem); font-weight: 680; line-height: 1.15; letter-spacing: -.025em; }
+  .agents .ro { font-family: var(--mono); font-size: .58rem; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin-top: -.15rem; }
+  .agents .ia { font-size: clamp(.8rem,1.15vw,.9rem); line-height: 1.35; color: var(--dim); }
+  .agents .ia b { color: var(--fg); font-weight: 650; }
+  .agents .rt { font-family: var(--mono); font-size: .6rem; color: var(--faint); letter-spacing: .04em; margin-top: auto; }
+  .agents .gate { border-top-color: var(--cinza); }
+  .agents .gate .n { color: var(--faint); }
+  .agents .ai { border-top-color: var(--violeta); } .agents .ai .n { color: var(--violeta); }
+  @media (min-width: 900px) { .agents.t3 { grid-template-columns: repeat(3,1fr); } }
 
-/* ── Preço ─────────────────────────────────────────────── */
-.contas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 2px solid var(--grafite); }
-.contas > div { padding: 20px 28px 0 0; }
-.contas > div + div { padding-left: 28px; border-left: 1px solid var(--filete); }
-.contas h3 { margin: 0 0 10px; font-family: var(--serif); font-weight: 500; font-size: 32px; line-height: 1.1; }
-.contas p { margin: 0; font-size: 20px; color: var(--suave); }
-.contas .formula { margin-top: 14px; font-size: 16px; color: var(--mudo); line-height: 1.5; }
-.saidas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.saida { padding: 20px 24px; border-radius: 12px; background: var(--folha); border: 1px solid var(--filete); }
-.saida b { display: block; font-family: var(--serif); font-weight: 500; font-size: 28px; margin-bottom: 4px; }
-.saida p { margin: 0; font-size: 18px; color: var(--suave); }
-.saida.acordo b { color: var(--ambar-texto); }
-.saida.defesa b { color: var(--info); }
+  .dims { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .dims > div { background: var(--bg); padding: clamp(1rem,2vw,1.5rem); display: flex; flex-direction: column; gap: .45rem; border-top: 3px solid; }
+  .dims .d1 { border-color: var(--coral); } .dims .d2 { border-color: var(--menta); } .dims .d3 { border-color: var(--violeta); } .dims .d4 { border-color: var(--amarelo); }
+  .dims .k { font-family: var(--mono); font-size: .64rem; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); }
+  .dims .v { font-size: clamp(.95rem,1.5vw,1.14rem); line-height: 1.35; color: var(--fg); }
+  .dims .big { font-size: clamp(1.6rem,3.2vw,2.5rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; }
+  .dims.compact .big { font-size: clamp(1.25rem,2.3vw,1.85rem); white-space: nowrap; }
 
-/* ── Régua do caso real ────────────────────────────────── */
-.casos { display: grid; grid-template-columns: 1fr 420px; gap: 56px; }
-.regua-bloco h3, .contraste h3 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 30px; white-space: nowrap; }
-.contraste h3 { font-size: 26px; }
-.regua-bloco .meta, .contraste .meta { margin: 6px 0 0; font-size: 18px; color: var(--mudo); }
-.veredito { display: flex; align-items: baseline; gap: 18px; margin: 18px 0 0; }
-.veredito .num { font-size: 64px; line-height: 1; }
-.veredito span { font-size: 20px; color: var(--suave); }
-.regua { position: relative; height: 250px; margin-top: 18px; }
-.regua svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.regua .et { position: absolute; font-size: 16px; line-height: 1.3; color: var(--suave); width: 250px; }
-.regua .et b { display: block; font-family: var(--serif); font-weight: 500; font-size: 24px; color: var(--grafite); }
-.regua .et.dir { text-align: right; }
-.contraste { border-left: 1px solid var(--filete-forte); padding-left: 40px; }
-.contraste .veredito .num { color: var(--info); }
-.contraste ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; font-size: 19px; color: var(--suave); }
-.contraste li { padding-top: 12px; border-top: 1px solid var(--filete); }
-.frase { margin: 0; font-family: var(--serif); font-size: 30px; line-height: 1.25; font-style: italic; color: var(--grafite); }
+  /* funil — cada etapa mostra uma ação */
+  .funnel { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 900px) { .funnel { grid-template-columns: repeat(5,1fr); } .funnel.f4 { grid-template-columns: repeat(4,1fr); } }
+  .funnel > div { background: var(--bg); padding: clamp(.85rem,1.7vw,1.15rem); display: flex; flex-direction: column; gap: .45rem; }
+  .funnel .f { font-family: var(--mono); font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); }
+  .funnel .g { font-size: clamp(.98rem,1.5vw,1.16rem); font-weight: 720; letter-spacing: -.03em; }
+  .funnel .act { font-size: clamp(.78rem,1.1vw,.86rem); line-height: 1.35; color: var(--dim); border-top: 1px solid var(--line-2); padding-top: .45rem; }
+  .funnel .act b { color: var(--amarelo); font-weight: 600; }
+  .funnel .last { background: var(--amarelo); }
+  .funnel .last .g, .funnel .last .f { color: var(--preto); }
+  .funnel .last .act { color: rgba(10,10,10,.78); border-top-color: rgba(10,10,10,.2); }
+  .funnel .last .act b { color: var(--preto); }
 
-/* ── Premissas ─────────────────────────────────────────── */
-.premissas { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
-.premissa { display: grid; grid-template-columns: 1fr auto; gap: 6px 20px; padding: 17px 0; border-bottom: 1px solid var(--filete); align-items: baseline; }
-.premissa:nth-child(-n+2) { border-top: 2px solid var(--grafite); }
-.premissa b { font-family: var(--serif); font-weight: 500; font-size: 27px; line-height: 1.15; }
-.premissa p { grid-column: 1 / -1; margin: 0; font-size: 18px; color: var(--mudo); }
-.selo { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
-.selo.base { background: var(--verde-suave); color: var(--verde); }
-.selo.prem { background: var(--ambar-suave); color: var(--ambar-texto); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(145px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .metrics > div { background: var(--bg); padding: clamp(.95rem,1.9vw,1.5rem); display: flex; flex-direction: column; gap: .3rem; }
+  .metrics .v { font-size: clamp(1.5rem,3.5vw,2.7rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; color: var(--fg); }
+  .metrics .k { font-family: var(--mono); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .metrics .d { font-size: clamp(.76rem,1.05vw,.84rem); line-height: 1.35; color: var(--dim); }
+  .metrics .hi .v { color: var(--amarelo); }
+  .metrics.compact .v { font-size: clamp(1.2rem,2.3vw,1.85rem); white-space: nowrap; }
+  .metrics .bom .v { color: var(--menta); }
+  .metrics .mau .v { color: var(--coral); }
 
-/* ── Potencial ─────────────────────────────────────────── */
-.potencial { display: grid; grid-template-columns: 1fr 470px; gap: 72px; align-items: start; }
-.barras { display: grid; gap: 30px; margin-top: 8px; }
-.barra .rotulo { display: flex; justify-content: space-between; align-items: baseline; font-size: 20px; color: var(--suave); margin-bottom: 10px; }
-.barra .rotulo .num { font-size: 40px; color: var(--grafite); }
-.barra .trilho { height: 56px; background: var(--afundado); border-radius: 6px; overflow: hidden; }
-.barra .cheio { height: 100%; background: var(--grafite); border-radius: 6px; }
-.barra.politica .cheio { background: var(--ambar); }
-.barra .sobra { position: relative; }
-.eco { border-left: 3px solid var(--ambar); padding-left: 32px; }
-.eco .num { display: block; font-size: 150px; line-height: .9; }
-.eco p { margin: 14px 0 0; font-size: 22px; color: var(--suave); }
-.eco dl { margin: 28px 0 0; display: grid; gap: 14px; }
-.eco dt { font-size: 14px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--mudo); }
-.eco dd { margin: 2px 0 0; font-family: var(--serif); font-size: 28px; line-height: 1.2; }
+  .receipt { font-family: var(--mono); font-size: clamp(.62rem,.95vw,.72rem); color: var(--faint); line-height: 1.85;
+    overflow-x: auto; border-left: 2px solid var(--amarelo); padding-left: 1rem; }
+  .receipt b { color: var(--dim); font-weight: 400; }
 
-/* ── Validação ─────────────────────────────────────────── */
-.provas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--grafite); }
-.provas > div { padding: 26px 36px 0 0; }
-.provas > div + div { padding-left: 36px; border-left: 1px solid var(--filete); }
-.provas .num { display: block; font-size: 76px; line-height: 1; white-space: nowrap; }
-.provas .num small { font-size: 36px; }
-.provas p { margin: 14px 0 0; font-size: 21px; color: var(--suave); }
-.provas .nota { margin-top: 12px; }
-.escolha { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.modelo { padding: 22px 26px; border-radius: 12px; border: 1px solid var(--filete); background: var(--folha); }
-.modelo.nossa { border-color: var(--ambar-borda); background: var(--ambar-suave); }
-.modelo .rot { display: block; margin-bottom: 8px; }
-.modelo b { font-family: var(--serif); font-weight: 500; font-size: 30px; }
-.modelo p { margin: 6px 0 0; font-size: 18px; color: var(--suave); }
+  .cmp { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 800px) { .cmp { grid-template-columns: 1fr 1fr; } }
+  .cmp > div { background: var(--bg); padding: clamp(1.2rem,2.4vw,1.9rem); display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
+  .cmp .tag { font-family: var(--mono); font-size: .64rem; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); }
+  .cmp .out { font-size: clamp(1rem,1.85vw,1.34rem); line-height: 1.3; letter-spacing: -.025em; font-weight: 620; }
+  .cmp .win { border-top: 3px solid var(--amarelo); }
+  .cmp .win .tag { color: var(--amarelo); }
+  .cmp .lose .out { color: var(--faint); }
+  .cmp .verdict { font-size: clamp(1.6rem,3.4vw,2.6rem); font-weight: 800; letter-spacing: -.05em; line-height: 1; }
+  .cmp ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .cmp li { padding: .55rem 0; border-bottom: 1px solid var(--line-2); font-size: clamp(.84rem,1.2vw,.95rem); line-height: 1.4; color: var(--dim); }
+  .cmp li b { color: var(--fg); font-weight: 650; }
 
-/* ── Telas ─────────────────────────────────────────────── */
-.telas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; min-height: 0; }
-.tela-passo { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.tela-passo header { display: flex; gap: 16px; align-items: baseline; }
-.tela-passo header .n { font-family: var(--serif); font-size: 40px; line-height: 1; color: var(--ambar-texto); }
-.tela-passo header b { display: block; font-family: var(--serif); font-weight: 500; font-size: 28px; line-height: 1.15; }
-.tela-passo header p { margin: 4px 0 0; font-size: 18px; color: var(--mudo); }
-.tela { border-radius: 10px; overflow: hidden; border: 1px solid var(--filete-forte); background: #fff; box-shadow: 0 1px 2px #1a140b14, 0 28px 50px -30px #1a140b59; }
-.tela img { display: block; width: 100%; height: auto; }
+  .rows { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .rows > div { display: grid; grid-template-columns: 1fr; gap: .2rem; padding: clamp(.7rem,1.4vh,1rem) 0; border-bottom: 1px solid var(--line); }
+  @media (min-width: 760px) { .rows > div { grid-template-columns: 14rem 1fr; gap: 2rem; align-items: baseline; } }
+  .rows .lbl { font-family: var(--mono); font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .rows .lbl.base { color: var(--menta); } .rows .lbl.prem { color: var(--amarelo); }
+  .rows .val { font-size: clamp(.94rem,1.45vw,1.1rem); line-height: 1.45; }
+  .rows .val b { color: var(--amarelo); font-weight: 650; }
+  .rows .val small { display: block; color: var(--faint); font-size: .82em; margin-top: .15rem; }
 
-/* ── Fluxo ─────────────────────────────────────────────── */
-.fluxo { position: relative; width: 1408px; height: 410px; }
-.fluxo svg { position: absolute; inset: 0; width: 1408px; height: 410px; overflow: visible; }
-.no { position: absolute; width: 250px; height: 72px; border-radius: 10px; background: var(--folha); border: 1px solid var(--filete-forte); padding: 11px 16px; display: flex; flex-direction: column; justify-content: center; }
-.no b { font-weight: 600; font-size: 19px; line-height: 1.2; }
-.no span { font-size: 14px; color: var(--mudo); line-height: 1.3; }
-.no.inicio { background: var(--ambar-suave); border-color: var(--ambar-borda); }
-.no.fim { background: var(--tinta); border-color: var(--tinta); }
-.no.fim b { color: #fff; } .no.fim span { color: #b9bdc7; }
-.regras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px solid var(--filete-forte); }
-.regras li { font-size: 18px; color: var(--suave); line-height: 1.4; }
-.regras li b { display: block; color: var(--grafite); font-weight: 600; }
+  /* telas do produto */
+  .shots { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 900px) { .shots { grid-template-columns: 1fr 1fr; } }
+  .shots > figure { margin: 0; background: var(--bg); padding: clamp(.8rem,1.6vw,1.1rem); display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+  .shots figcaption { display: flex; gap: .7rem; align-items: baseline; }
+  .shots figcaption .n { font-family: var(--mono); font-size: .64rem; letter-spacing: .14em; color: var(--amarelo); }
+  .shots figcaption b { font-size: clamp(.92rem,1.35vw,1.05rem); font-weight: 680; letter-spacing: -.02em; }
+  .shots figcaption span { font-size: clamp(.78rem,1.1vw,.86rem); color: var(--dim); }
+  .shots img, .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
+  .split { display: grid; grid-template-columns: 1fr; gap: clamp(1rem,2.4vw,2rem); align-items: start; }
+  @media (min-width: 980px) { .split { grid-template-columns: 1.15fr 1fr; } .split.inv { grid-template-columns: 1fr 1.15fr; } }
 
-/* ── Painel ────────────────────────────────────────────── */
-.painel { display: grid; grid-template-columns: 820px 1fr; gap: 52px; min-height: 0; align-items: start; }
-.fatos { display: grid; gap: 0; border-top: 2px solid var(--grafite); }
-.fato { padding: 16px 0; border-bottom: 1px solid var(--filete); }
-.fato .rot { display: block; margin-bottom: 4px; }
-.fato .num { font-size: 44px; line-height: 1.05; }
-.fato p { margin: 4px 0 0; font-size: 17px; color: var(--mudo); line-height: 1.4; }
-.fato .num.bom { color: var(--verde); } .fato .num.ruim { color: var(--vermelho); }
-.lado { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  /* mapa de risco dos 16 perfis */
+  .heat-wrap { overflow-x: auto; border: 1px solid var(--line); }
+  .heat { width: 100%; border-collapse: collapse; min-width: 560px; }
+  .heat th { font-family: var(--mono); font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 400; padding: .6rem .5rem; border-bottom: 1px solid var(--line); text-align: center; }
+  .heat td { border-bottom: 1px solid var(--line-2); text-align: center; font-size: .9rem; color: var(--dim); padding: 0 .4rem; height: clamp(1.9rem,4.2vh,2.5rem); }
+  .heat td.no { color: rgba(243,239,229,.22); }
+  .heat td.p { padding: 2px; }
+  .heat td.p div { height: 100%; min-height: clamp(1.75rem,3.9vh,2.3rem); display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: 0 .7rem;
+    background: color-mix(in oklab, var(--coral) calc(var(--p) * 100%), #141414); color: var(--cru); }
+  .heat td.p b { font-weight: 800; font-size: 1rem; letter-spacing: -.03em; }
+  .heat td.p span { font-family: var(--mono); font-size: .58rem; opacity: .75; }
 
-/* Pesos da nota */
-.pesos { display: flex; height: 58px; border-radius: 8px; overflow: hidden; margin: 10px 0 12px; }
-.pesos div { display: flex; align-items: center; padding: 0 14px; font-size: 16px; font-weight: 600; color: var(--grafite); white-space: nowrap; }
-.pesos .p1 { flex: 50; background: var(--ambar); }
-.pesos .p2 { flex: 20; background: #ffd28a; }
-.pesos .p3 { flex: 20; background: #ffe5bb; }
-.pesos .p4 { flex: 10; background: var(--afundado); }
-.legenda-pesos { display: flex; font-size: 15px; color: var(--mudo); }
-.legenda-pesos span:nth-child(1) { flex: 50; } .legenda-pesos span:nth-child(2) { flex: 20; }
-.legenda-pesos span:nth-child(3) { flex: 20; } .legenda-pesos span:nth-child(4) { flex: 10; }
-.lista { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
-.lista li { font-size: 19px; color: var(--suave); padding-left: 22px; position: relative; line-height: 1.4; }
-.lista li::before { content: ""; position: absolute; left: 0; top: .6em; width: 8px; height: 8px; border-radius: 2px; background: var(--ambar); }
-.lista li b { color: var(--grafite); font-weight: 600; }
+  /* barras */
+  .bars { display: flex; flex-direction: column; gap: .9rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+  .bar .lab { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .35rem; }
+  .bar .lab span { font-family: var(--mono); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .bar .lab b { font-size: clamp(1rem,1.8vw,1.35rem); font-weight: 800; letter-spacing: -.04em; }
+  .bar .track { height: clamp(.9rem,2vh,1.3rem); background: var(--line-2); }
+  .bar .fill { height: 100%; background: var(--cru); }
+  .bar.y .fill { background: var(--amarelo); } .bar.y .lab b { color: var(--amarelo); }
+  .bar.c .fill { background: var(--coral); }
 
-/* ── IA ────────────────────────────────────────────────── */
-.ia { display: grid; grid-template-columns: 1.25fr 1fr; gap: 0; border-top: 2px solid var(--grafite); }
-.ia > div { padding: 26px 48px 0 0; }
-.ia > div + div { padding: 26px 0 0 48px; border-left: 1px solid var(--filete-forte); }
-.ia h3 { margin: 0 0 18px; font-family: var(--serif); font-weight: 500; font-size: 34px; }
-.usos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
-.uso b { display: block; font-size: 20px; font-weight: 600; line-height: 1.3; }
-.uso p { margin: 4px 0 0; font-size: 17px; color: var(--mudo); line-height: 1.4; }
-.nao-decide p { margin: 0 0 18px; font-size: 22px; color: var(--suave); }
-.nao-decide .frase { font-size: 32px; margin-bottom: 22px; }
+  /* régua de valores do caso real */
+  .ruler { position: relative; height: 150px; margin-top: .4rem; }
+  .ruler svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .ruler .tk { position: absolute; font-family: var(--mono); font-size: .6rem; letter-spacing: .04em; color: var(--faint); line-height: 1.35; white-space: nowrap; }
+  .ruler .tk b { display: block; font-family: var(--sans); font-size: .95rem; font-weight: 750; letter-spacing: -.03em; color: var(--fg); }
 
-/* ── Arquitetura ───────────────────────────────────────── */
-.arq { display: grid; grid-template-columns: 260px 40px 380px 40px 1fr; align-items: stretch; }
-.seta { display: flex; align-items: center; justify-content: center; color: var(--filete-forte); font-size: 30px; }
-.camada { display: flex; flex-direction: column; gap: 12px; }
-.camada > .rot { margin-bottom: 2px; }
-.caixa { border-radius: 10px; border: 1px solid var(--filete-forte); background: var(--folha); padding: 14px 18px; }
-.caixa b { display: block; font-size: 19px; font-weight: 600; }
-.caixa span { display: block; font-size: 15px; color: var(--mudo); line-height: 1.4; margin-top: 2px; }
-.caixa.forte { background: var(--tinta); border-color: var(--tinta); }
-.caixa.forte b { color: #fff; } .caixa.forte span { color: #b9bdc7; }
-.caixa.marca { background: var(--ambar-suave); border-color: var(--ambar-borda); }
-.nucleo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.rodape-fatos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding-top: 18px; border-top: 1px solid var(--filete-forte); font-size: 18px; color: var(--suave); }
-.rodape-fatos b { display: block; font-family: var(--serif); font-weight: 500; font-size: 30px; color: var(--grafite); }
+  code { font-family: var(--mono); font-size: .9em; }
 
-/* ── Limitações e próximos passos ──────────────────────── */
-.limites { display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
-.limite { padding: 18px 0; border-bottom: 1px solid var(--filete); display: grid; grid-template-columns: 44px 1fr; gap: 4px 0; }
-.limite:nth-child(-n+2) { border-top: 2px solid var(--grafite); }
-.limite .rot { grid-column: 2; }
-.limite b { grid-column: 2; font-family: var(--serif); font-weight: 500; font-size: 26px; line-height: 1.2; }
-.limite p { grid-column: 2; margin: 4px 0 0; font-size: 18px; color: var(--mudo); }
-.limite::before { content: ""; grid-row: 1 / span 3; width: 14px; height: 14px; margin-top: 8px; border: 2px solid var(--vermelho); border-radius: 50%; }
-.proximos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 2px solid var(--grafite); }
-.proximo { padding: 24px 28px 0 0; }
-.proximo + .proximo { padding-left: 28px; border-left: 1px solid var(--filete); }
-.proximo .n { font-family: var(--serif); font-size: 44px; line-height: 1; color: var(--ambar-texto); }
-.proximo h3 { margin: 12px 0 10px; font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.12; }
-.proximo p { margin: 0 0 10px; font-size: 18px; color: var(--suave); line-height: 1.45; }
-.proximo .ja { font-size: 15px; color: var(--verde); font-weight: 600; }
+  .s.gold { background: var(--amarelo); color: var(--preto); }
+  .s.gold .eyebrow, .s.gold .meta { color: rgba(10,10,10,.55); }
+  .s.gold .meta .t { color: var(--preto); }
+  .s.gold .lede { color: rgba(10,10,10,.72); }
+  .s.gold .mark .o { background: var(--preto); }
+  .s.gold .mark .o::after { background: var(--amarelo); }
+  .s.gold .receipt { color: rgba(10,10,10,.6); border-left-color: var(--preto); }
+  .s.gold .receipt b { color: var(--preto); }
 
-/* ── Fecho ─────────────────────────────────────────────── */
-.fecho .corpo { justify-content: center; gap: 44px; }
-.fecho h2 { font-size: 104px; line-height: 1; }
-.fecho-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; border-top: 1px solid #ffffff24; padding-top: 28px; }
-.fecho-grade b { display: block; font-family: var(--serif); font-weight: 500; font-size: 34px; color: #fff; margin-bottom: 8px; }
-.fecho-grade p { margin: 0; font-size: 20px; color: #b9bdc7; }
+  .ctl { position: fixed; bottom: 1rem; right: 1rem; z-index: 10; display: flex; gap: .4rem; font-family: var(--mono); font-size: .66rem; }
+  .ctl button { font: inherit; letter-spacing: .12em; text-transform: uppercase; background: var(--panel);
+    color: var(--dim); border: 1px solid var(--line); padding: .5rem .7rem; cursor: pointer; }
+  .ctl button:hover { color: var(--amarelo); border-color: var(--amarelo); }
+  .ctl button:focus-visible { outline: 2px solid var(--amarelo); outline-offset: 2px; }
 
-/* ── Apêndice ──────────────────────────────────────────── */
-.slide.apendice { background: #f1efea; }
-.slide.apendice .cab .fls { color: var(--ambar-texto); }
-.apendice h2 { font-size: 46px; }
-.colunas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--grafite); }
-.colunas.duas { grid-template-columns: 1fr 1fr; }
-.colunas > div { padding: 22px 36px 0 0; }
-.colunas > div + div { padding-left: 36px; border-left: 1px solid var(--filete-forte); }
-.colunas h3 { margin: 0 0 10px; font-family: var(--serif); font-weight: 500; font-size: 28px; line-height: 1.15; }
-.colunas p { margin: 0 0 12px; font-size: 19px; color: var(--suave); line-height: 1.5; }
-.colunas p b { color: var(--grafite); font-weight: 600; }
-.tabela-min { width: 100%; border-collapse: collapse; font-size: 18px; }
-.tabela-min th { text-align: left; font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--mudo); padding: 0 12px 8px 0; }
-.tabela-min td { padding: 9px 12px 9px 0; border-top: 1px solid var(--filete); color: var(--suave); vertical-align: top; }
-.tabela-min td:first-child { color: var(--grafite); font-weight: 600; }
-.tabela-min td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (prefers-reduced-motion: no-preference) {
+    .s > * { animation: rise .5s cubic-bezier(.2,.7,.3,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  }
+  @media (prefers-reduced-motion: reduce) { .deck { scroll-behavior: auto; } }
 
-/* ── Controle ──────────────────────────────────────────── */
-.hud { position: fixed; right: 18px; bottom: 14px; display: flex; align-items: center; gap: 6px; font: 500 13px/1 var(--sans); color: #c9ccd4; opacity: .38; transition: opacity .2s; z-index: 2; }
-.hud:hover, .hud:focus-within { opacity: 1; }
-.hud button { font: inherit; color: inherit; background: #ffffff14; border: 1px solid #ffffff26; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-.hud button:focus-visible { outline: 2px solid var(--ambar); outline-offset: 2px; }
-.hud span { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
-
-@media print {
-  html, body { height: auto; overflow: visible; background: none; }
-  .deck { position: static; }
-  .slide { position: relative; left: auto; top: auto; transform: none; display: flex !important; break-after: page; page-break-after: always; }
-  .hud { display: none; }
-}
+  @page { size: A4 landscape; margin: 0; }
+  @media print {
+    html, body, .s { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body::after, .ctl, .meta { display: none !important; }
+    .deck { height: auto; overflow: visible; scroll-snap-type: none; }
+    .s { width: 297mm; height: 209mm; min-height: 0; break-after: page;
+      page-break-after: always; break-inside: avoid; justify-content: center;
+      padding: 12mm 16mm; gap: .9rem; overflow: hidden; }
+    .s:last-child { break-after: auto; page-break-after: auto; }
+    .s > * { animation: none !important; max-width: 100%; }
+    h1 { font-size: 3rem; } h2 { font-size: 1.9rem; }
+    .lede { font-size: .95rem; max-width: 70ch; }
+    .metrics .v { font-size: 1.8rem; }
+    .funnel { grid-template-columns: repeat(5,1fr); } .funnel.f4 { grid-template-columns: repeat(4,1fr); }
+    .shots { grid-template-columns: 1fr 1fr; } .cmp { grid-template-columns: 1fr 1fr; }
+    .split { grid-template-columns: 1.15fr 1fr; }
+    .shots img, .shot img { max-height: 108mm; object-fit: cover; object-position: top; }
+  }
 </style>
+</head>
+<body>
 
-<main class="deck" aria-roledescription="apresentação">
+<div class="ctl">
+  <button id="print" type="button" aria-label="Salvar como PDF">pdf</button>
+</div>
 
-<!-- 1 · Capa -->
-<section class="slide tinta capa" aria-label="Capa">
-  <div class="capa-autos" aria-hidden="true">0654321-09.2024.8.04.0001</div>
-  <div class="cab"><span class="logo">ENTER<i></i></span><span>Hackathon Enter × Unicamp · 13 de setembro de 2026</span></div>
-  <div class="corpo">
-    <p class="kicker">EnterOS · Política de Acordos · Banco Unicamp</p>
-    <h1>Defender ou fazer acordo? <em>A mesma resposta, pelo mesmo critério, em cada processo.</em></h1>
-    <p class="lead">Para as ações em que o autor diz não reconhecer a contratação de um empréstimo: a política decide, o advogado executa e a empresa acompanha.</p>
-  </div>
-  <ol class="missao">
-    <li><b>Definir</b>a política de acordos, com a base de 60 mil sentenças</li>
-    <li><b>Garantir</b>que cada advogado a aplique do mesmo jeito</li>
-    <li><b>Monitorar</b>se ela está dando o resultado esperado</li>
-  </ol>
-</section>
+<div class="deck" id="deck">
 
-<!-- 2 · Problema -->
-<section class="slide" aria-label="O problema">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>O problema</span><span class="fls">fls. 02</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Contexto</p>
-      <h2>Todo mês, milhares de advogados respondem à mesma pergunta — <em>cada um do seu jeito.</em></h2>
-    </div>
-    <div class="tres-numeros">
-      <div><span class="num">15 mil</span><p>novos processos por mês no Banco Unicamp</p></div>
-      <div><span class="num">5 mil</span><p>alegam não reconhecer a contratação de um empréstimo</p></div>
-      <div><span class="num">R$ 193 mi</span><p>pagos em acordos e condenações nas 60 mil sentenças da base</p></div>
-    </div>
-    <ol class="passos" aria-label="Como o fluxo funciona hoje">
-      <li>Advogado externo recebe o processo pela plataforma</li>
-      <li>Lê os autos e os subsídios que a empresa enviou</li>
-      <li>Decide: defesa ou acordo, com base na política</li>
-      <li>Se for acordo, negocia com o autor</li>
-      <li>Reporta à empresa a decisão, o valor e o resultado</li>
-    </ol>
-    <p class="desafio">O desafio é triplo: <b>definir</b> uma boa política, <b>garantir</b> que ela seja seguida e <b>monitorar</b> os resultados.</p>
-  </div>
-</section>
+  <!-- 1 · abertura -->
+  <section class="s">
+    <span class="meta"><span class="t">0:00–0:20</span><span>01 / 27</span></span>
+    <div class="mark"><span class="o"></span>EnterOS</div>
+    <p class="eyebrow">Política de Acordos · Banco Unicamp · Hackathon Enter × Unicamp</p>
+    <h1>Defender ou fazer acordo?<br /><span class="y">A mesma resposta, pelo mesmo critério, em cada processo.</span></h1>
+    <p class="lede">Para as ações em que o autor diz não reconhecer a contratação de um empréstimo: a política decide, o advogado executa e a empresa acompanha.</p>
+  </section>
 
-<!-- 3 · Requisitos → solução -->
-<section class="slide" aria-label="Requisitos e solução">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Requisitos → solução</span><span class="fls">fls. 03</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">O que foi pedido e o que entregamos</p>
-      <h2>Os cinco requisitos mínimos, <em>cada um com um lugar no produto.</em></h2>
+  <!-- 2 · problema -->
+  <section class="s">
+    <span class="meta"><span class="t">0:20–1:00</span><span>02 / 27</span></span>
+    <p class="eyebrow">O problema</p>
+    <h2>Todo mês, milhares de advogados respondem à mesma pergunta — <span class="y">cada um do seu jeito.</span></h2>
+    <div class="metrics">
+      <div><span class="k">Processos novos</span><span class="v">15 mil</span><span class="d">por mês no Banco Unicamp</span></div>
+      <div><span class="k">Não reconhecem o empréstimo</span><span class="v">5 mil</span><span class="d">por mês, com o mesmo tipo de alegação</span></div>
+      <div class="hi"><span class="k">Pago na base</span><span class="v">R$ 193 mi</span><span class="d">em acordos e condenações, nas 60 mil sentenças</span></div>
     </div>
-    <div class="quadro" role="table">
-      <div class="th" role="columnheader">Requisito</div><div class="th" role="columnheader">Como resolvemos</div><div class="th" role="columnheader">Onde aparece</div>
-      <div class="req"><small>01</small>Regra de decisão</div><div>Primeiro a prova (sem contrato e sem extrato não há defesa padrão), depois 16 perfis de documentos e o estado: defender, propor acordo ou pedir o documento que falta.</div><div class="onde">Tela do advogado · Avaliação</div>
-      <div class="req"><small>02</small>Sugestão de valor</div><div>A oferta com melhor retorno dentro da faixa em que acordos parecidos fecham, e o limite explícito: acima de R$ X, defender sai mais barato.</div><div class="onde">Avaliação e decisão</div>
-      <div class="req"><small>03</small>Acesso à recomendação</div><div>Fila ordenada pelo que precisa do advogado, análise pronta ao abrir, documentos e conversa com IA no mesmo lugar.</div><div class="onde">Minha fila · processo</div>
-      <div class="req"><small>04</small>Aderência</div><div>Quem segue a recomendação, exceções com motivo e nota de 0 a 100 por advogado e por escritório.</div><div class="onde">Painel da empresa</div>
-      <div class="req"><small>05</small>Efetividade</div><div>Economia observada contra processos parecidos, ticket médio, aceitação dos acordos e o valor dos documentos que não chegam.</div><div class="onde">Painel da empresa</div>
+    <div class="funnel">
+      <div><span class="f">Hoje · 1</span><span class="g">Recebe o processo</span><span class="act">Advogado externo, de um escritório, pela plataforma.</span></div>
+      <div><span class="f">Hoje · 2</span><span class="g">Lê autos e subsídios</span><span class="act">Contrato, extrato, comprovante, dossiê, laudo.</span></div>
+      <div><span class="f">Hoje · 3</span><span class="g">Decide sozinho</span><span class="act">Defesa ou acordo, com a política como referência.</span></div>
+      <div><span class="f">Hoje · 4</span><span class="g">Negocia</span><span class="act">Se for acordo, ele mesmo fala com o autor.</span></div>
+      <div class="last"><span class="f">O desafio</span><span class="g">Triplo</span><span class="act"><b>Definir</b> a política, <b>garantir</b> que seja seguida e <b>monitorar</b> o resultado.</span></div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- 4 · A prova -->
-<section class="slide" aria-label="Regra de decisão: a prova">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Regra de decisão · 1. A prova</span><span class="fls">fls. 04</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Antes do valor, a pergunta jurídica</p>
-      <h2>A empresa consegue provar que o empréstimo existiu?</h2>
+  <!-- 3 · requisitos -->
+  <section class="s">
+    <span class="meta"><span class="t">1:00–1:30</span><span>03 / 27</span></span>
+    <p class="eyebrow">O que foi pedido e onde está no produto</p>
+    <h2>Os cinco requisitos mínimos, <span class="y">cada um com um lugar na tela.</span></h2>
+    <div class="rows">
+      <div><span class="lbl">01 · Regra de decisão</span><span class="val">Primeiro a prova, depois 16 perfis de documentos e o estado: <b>defender, propor acordo ou pedir o documento que falta</b>.</span></div>
+      <div><span class="lbl">02 · Sugestão de valor</span><span class="val">A oferta com melhor retorno dentro da faixa de mercado, e o limite explícito: <b>acima de R$ X, defender sai mais barato</b>.</span></div>
+      <div><span class="lbl">03 · Acesso</span><span class="val">Fila ordenada pelo que precisa do advogado, análise pronta ao abrir, documentos e conversa com IA no mesmo lugar.</span></div>
+      <div><span class="lbl">04 · Aderência</span><span class="val">Quem segue a recomendação, exceções com motivo e nota de 0 a 100 por advogado e escritório.</span></div>
+      <div><span class="lbl">05 · Efetividade</span><span class="val">Economia observada contra processos parecidos, ticket médio, aceitação e o valor dos documentos que não chegam.</span></div>
     </div>
-    <div class="risco">
-      <div style="display:grid; gap:36px">
-        <div class="porta">
-          <span class="rot">Sem contrato válido e sem extrato</span>
-          <span class="num">2,7%</span>
-          <p>é quanto a empresa vence em <b>6.493 processos</b> assim — <b>10,8% do volume e 34,7% de todo o custo</b>. Sem prova da contratação (art. 373, II, do CPC), a defesa sai do caminho padrão e só segue com justificativa.</p>
-        </div>
-        <div>
-          <span class="rot">Depois, o perfil do processo</span>
-          <p style="margin:10px 0 0; font-size:21px; color:var(--suave)">Quais documentos a empresa tem e se o autor alega golpe definem a chance de perder. O estado ajusta: <b style="color:var(--grafite); font-weight:600">AM, AP, BA, GO, RJ e RS</b> ficam no grupo de risco mais alto. Dossiê e laudo, na base, não mudam o resultado.</p>
-        </div>
-      </div>
-      <table class="mapa" aria-label="Chance de a empresa perder por perfil de documentos">
-        <thead><tr><th>Contrato</th><th>Extrato</th><th>Comprov. de crédito</th><th class="alt">Alegação comum</th><th class="alt">Alega golpe</th></tr></thead>
+  </section>
+
+  <!-- 4 · como a política decide -->
+  <section class="s">
+    <span class="meta"><span class="t">1:30–2:20</span><span>04 / 27</span></span>
+    <p class="eyebrow">Regra de decisão</p>
+    <h2>Cinco perguntas, na ordem em que um jurídico faria.</h2>
+    <div class="funnel">
+      <div><span class="f">1 · Prova</span><span class="g">Dá para provar o empréstimo?</span><span class="act">Sem contrato e sem extrato a empresa vence <b>2,7%</b> de 6.493 processos. A defesa sai do padrão (art. 373, II, do CPC).</span></div>
+      <div><span class="f">2 · Perfil</span><span class="g">Quais documentos existem?</span><span class="act">Contrato, extrato, comprovante e alegação de golpe formam <b>16 perfis</b>: de 2 a 99 derrotas em cada 100.</span></div>
+      <div><span class="f">3 · Estado</span><span class="g">Onde corre o processo?</span><span class="act"><b>AM, AP, BA, GO, RJ e RS</b> elevam o risco; oito estados reduzem.</span></div>
+      <div><span class="f">4 · Preço</span><span class="g">Quanto custa cada caminho?</span><span class="act">Oferta dentro da faixa de mercado (<b>25% a 35%</b> da causa) e o valor máximo, acima do qual defender sai mais barato.</span></div>
+      <div class="last"><span class="f">5 · Nosso diferencial</span><span class="g">Vale pedir o documento?</span><span class="act">Quando há sinal de que ele existe e a chegada dele <b>mudaria a decisão</b>.</span></div>
+    </div>
+    <p class="lede">A política fala com o jurídico em frequências — “98 em cada 100” — e nunca em siglas ou probabilidades.</p>
+  </section>
+
+  <!-- 5 · mapa de risco -->
+  <section class="s">
+    <span class="meta"><span class="t">2:20–3:00</span><span>05 / 27</span></span>
+    <p class="eyebrow">O que as 60 mil sentenças mostram</p>
+    <h2>A chance de perder depende, antes de tudo, <span class="y">de quais documentos a empresa tem.</span></h2>
+    <div class="heat-wrap">
+      <table class="heat" aria-label="Derrotas em cada 100 processos, por perfil de documentos">
+        <thead><tr><th>Contrato</th><th>Extrato</th><th>Comprovante de crédito</th><th>Alegação comum</th><th>Alega golpe</th></tr></thead>
         <tbody>
-          <tr><td class="doc">✓</td><td class="doc">✓</td><td class="doc">✓</td><td class="p" style="--p:.021"><div><b>2</b><span>em 100 · 9.351</span></div></td><td class="p" style="--p:.052"><div><b>5</b><span>em 100 · 16.647</span></div></td></tr>
-          <tr><td class="doc">✓</td><td class="doc">✓</td><td class="doc nao">—</td><td class="p" style="--p:.064"><div><b>6</b><span>em 100 · 4.177</span></div></td><td class="p" style="--p:.166"><div><b>17</b><span>em 100 · 8.196</span></div></td></tr>
-          <tr><td class="doc">✓</td><td class="doc nao">—</td><td class="doc">✓</td><td class="p" style="--p:.309"><div><b>31</b><span>em 100 · 650</span></div></td><td class="p escuro" style="--p:.524"><div><b>52</b><span>em 100 · 1.742</span></div></td></tr>
-          <tr><td class="doc">✓</td><td class="doc nao">—</td><td class="doc nao">—</td><td class="p escuro" style="--p:.612"><div><b>61</b><span>em 100 · 472</span></div></td><td class="p escuro" style="--p:.774"><div><b>77</b><span>em 100 · 1.748</span></div></td></tr>
-          <tr><td class="doc nao">—</td><td class="doc">✓</td><td class="doc">✓</td><td class="p" style="--p:.290"><div><b>29</b><span>em 100 · 1.454</span></div></td><td class="p escuro" style="--p:.543"><div><b>54</b><span>em 100 · 3.957</span></div></td></tr>
-          <tr><td class="doc nao">—</td><td class="doc">✓</td><td class="doc nao">—</td><td class="p escuro" style="--p:.608"><div><b>61</b><span>em 100 · 1.149</span></div></td><td class="p escuro" style="--p:.815"><div><b>82</b><span>em 100 · 3.964</span></div></td></tr>
-          <tr><td class="doc nao">—</td><td class="doc nao">—</td><td class="doc">✓</td><td class="p escuro" style="--p:.903"><div><b>90</b><span>em 100 · 455</span></div></td><td class="p escuro" style="--p:.965"><div><b>96</b><span>em 100 · 2.158</span></div></td></tr>
-          <tr><td class="doc nao">—</td><td class="doc nao">—</td><td class="doc nao">—</td><td class="p escuro" style="--p:.971"><div><b>97</b><span>em 100 · 664</span></div></td><td class="p escuro" style="--p:.989"><div><b>99</b><span>em 100 · 3.216</span></div></td></tr>
+          <tr><td>●</td><td>●</td><td>●</td><td class="p" style="--p:.021"><div><b>2</b><span>9.351 proc.</span></div></td><td class="p" style="--p:.052"><div><b>5</b><span>16.647 proc.</span></div></td></tr>
+          <tr><td>●</td><td>●</td><td class="no">—</td><td class="p" style="--p:.064"><div><b>6</b><span>4.177 proc.</span></div></td><td class="p" style="--p:.166"><div><b>17</b><span>8.196 proc.</span></div></td></tr>
+          <tr><td>●</td><td class="no">—</td><td>●</td><td class="p" style="--p:.309"><div><b>31</b><span>650 proc.</span></div></td><td class="p" style="--p:.524"><div><b>52</b><span>1.742 proc.</span></div></td></tr>
+          <tr><td>●</td><td class="no">—</td><td class="no">—</td><td class="p" style="--p:.612"><div><b>61</b><span>472 proc.</span></div></td><td class="p" style="--p:.774"><div><b>77</b><span>1.748 proc.</span></div></td></tr>
+          <tr><td class="no">—</td><td>●</td><td>●</td><td class="p" style="--p:.290"><div><b>29</b><span>1.454 proc.</span></div></td><td class="p" style="--p:.543"><div><b>54</b><span>3.957 proc.</span></div></td></tr>
+          <tr><td class="no">—</td><td>●</td><td class="no">—</td><td class="p" style="--p:.608"><div><b>61</b><span>1.149 proc.</span></div></td><td class="p" style="--p:.815"><div><b>82</b><span>3.964 proc.</span></div></td></tr>
+          <tr><td class="no">—</td><td class="no">—</td><td>●</td><td class="p" style="--p:.903"><div><b>90</b><span>455 proc.</span></div></td><td class="p" style="--p:.965"><div><b>96</b><span>2.158 proc.</span></div></td></tr>
+          <tr><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="p" style="--p:.971"><div><b>97</b><span>664 proc.</span></div></td><td class="p" style="--p:.989"><div><b>99</b><span>3.216 proc.</span></div></td></tr>
         </tbody>
       </table>
     </div>
-  </div>
-</section>
+    <p class="note">Derrotas em cada 100 processos. Dossiê e laudo, sozinhos, não mudam o resultado na base — por isso não entram no perfil.</p>
+  </section>
 
-<!-- 5 · O preço -->
-<section class="slide" aria-label="Regra de decisão: o preço">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Regra de decisão · 2. O preço</span><span class="fls">fls. 05</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Quanto custa cada caminho</p>
-      <h2>Acordo só quando custa menos que defender — <em>e nunca acima do que o mercado paga.</em></h2>
-    </div>
-    <div class="contas">
-      <div><h3>Custo de defender</h3><p>Chance de perder × condenação média, corrigida pelo tempo, mais honorários.</p><p class="formula">Condenação média: 71% da causa · 1% ao mês por 24 meses</p></div>
-      <div><h3>Valor máximo</h3><p>O custo de defender, menos o honorário do acordo. <b style="color:var(--grafite); font-weight:600">Acima dele, defender sai mais barato.</b></p><p class="formula">Aparece para o advogado como “acima de R$ X, acordo não compensa”</p></div>
-      <div><h3>Faixa de mercado</h3><p>Onde acordos parecidos fecham: de 25% a 35% da causa.</p><p class="formula">280 acordos reais da base · mediana de 29% da causa</p></div>
-      <div><h3>Oferta recomendada</h3><p>Dentro da faixa, o valor com melhor equilíbrio entre chance de aceite e economia até o máximo.</p><p class="formula">Chance de aceite pela curva dos 280 acordos · arredondado a R$ 10</p></div>
-    </div>
-    <div class="saidas">
-      <div class="saida acordo"><b>Propor acordo</b><p>O valor máximo fica acima da proposta de abertura: existe espaço para negociar.</p></div>
-      <div class="saida defesa"><b>Seguir com a defesa</b><p>Defender custa menos que a própria abertura do acordo.</p></div>
-      <div class="saida"><b>Pedir documento</b><p>O documento que falta mudaria a decisão e há chance de achá-lo: 70% com dossiê ou laudo, 25% sem.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- 6 · Dois casos reais -->
-<section class="slide" aria-label="Dois processos reais">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Regra de decisão · na prática</span><span class="fls">fls. 06</span></div>
-  <div class="corpo" style="gap:26px">
-    <div>
-      <p class="kicker">Os dois processos de exemplo, pela mesma regra</p>
-      <h2>Mesmo critério, respostas opostas — <em>e cada uma se explica.</em></h2>
-    </div>
-    <div class="casos">
-      <div class="regua-bloco">
-        <h3>0654321-09.2024.8.04.0001</h3>
-        <p class="meta">Manaus/AM · alega golpe · causa de R$ 25.000 · sem contrato e sem extrato</p>
-        <div class="veredito"><span class="num" style="color:var(--vermelho)">98 em 100</span><span>é a chance de a empresa perder → <b style="color:var(--ambar-texto)">propor acordo</b></span></div>
-        <div class="regua" aria-label="Régua de valores do processo, de R$ 0 a R$ 25.000">
-          <svg viewBox="0 0 900 250" preserveAspectRatio="none" aria-hidden="true">
-            <rect x="0" y="118" width="900" height="14" rx="3" fill="#efece6"/>
-            <rect x="225" y="112" width="90" height="26" rx="4" fill="#ffae35"/>
-            <rect x="775" y="118" width="125" height="14" fill="#fbeceb"/>
-            <line x1="315" y1="100" x2="315" y2="150" stroke="#16130f" stroke-width="2"/>
-            <line x1="690.7" y1="96" x2="690.7" y2="118" stroke="#6d675d" stroke-width="2"/>
-            <line x1="775" y1="132" x2="775" y2="162" stroke="#a82f26" stroke-width="3"/>
-            <text x="0" y="245" font-family="Inter, sans-serif" font-size="15" fill="#6d675d">R$ 0</text>
-            <text x="900" y="245" text-anchor="end" font-family="Inter, sans-serif" font-size="15" fill="#6d675d">R$ 25.000 · causa</text>
+  <!-- 6 · dois casos reais -->
+  <section class="s">
+    <span class="meta"><span class="t">3:00–3:40</span><span>06 / 27</span></span>
+    <p class="eyebrow">Os dois processos de exemplo, pela mesma regra</p>
+    <h2>Mesmo critério, respostas opostas — <span class="y">e cada uma se explica.</span></h2>
+    <div class="cmp">
+      <div class="win">
+        <span class="tag">0654321-09.2024.8.04.0001 · Manaus/AM · alega golpe · R$ 25.000</span>
+        <span class="verdict"><span class="c">98 em 100</span> → propor acordo</span>
+        <span class="out">Sem contrato e sem extrato. Oferta de <span class="y">R$ 8.750</span>, com 76% de chance de aceite.</span>
+        <div class="ruler" aria-label="Régua de R$ 0 a R$ 25.000">
+          <svg viewBox="0 0 1000 150" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="0" y="68" width="1000" height="10" fill="rgba(243,239,229,.12)"/>
+            <rect x="861" y="68" width="139" height="10" fill="rgba(255,102,74,.45)"/>
+            <rect x="250" y="62" width="100" height="22" fill="#FFD400"/>
+            <line x1="767" y1="56" x2="767" y2="90" stroke="#A8A49B" stroke-width="2"/>
+            <line x1="861" y1="56" x2="861" y2="96" stroke="#FF664A" stroke-width="3"/>
           </svg>
-          <div class="et" style="left:25%; top:0; transform:translateX(-50%); width:240px; text-align:center"><b>R$ 6.250 – 8.750</b>faixa de mercado</div>
-          <div class="et" style="left:35%; top:160px; transform:translateX(-30%); width:280px"><b>R$ 8.750</b>oferta · 76% de chance de aceite</div>
-          <div class="et dir" style="right:calc(100% - 76.7% - 10px); top:0; width:300px"><b>R$ 19.185</b>custo médio de 645 parecidos</div>
-          <div class="et dir" style="right:calc(100% - 86.1%); top:170px; width:340px"><b>R$ 21.527</b>acima disso, defender sai mais barato</div>
+          <span class="tk" style="left:25%; top:0">faixa de mercado<b>R$ 6.250–8.750</b></span>
+          <span class="tk" style="left:25%; top:100px">R$ 0 → causa R$ 25.000</span>
+          <span class="tk" style="right:calc(100% - 76.7%); top:0; text-align:right">custo de 645 parecidos<b>R$ 19.185</b></span>
+          <span class="tk" style="right:0; top:100px; text-align:right">acima disso, defender sai mais barato<b class="c">R$ 21.527</b></span>
         </div>
-        <p class="frase" style="font-size:25px; margin-top:6px">Se aceito, economiza R$ 10.435 frente ao que processos parecidos custaram.</p>
       </div>
-      <div class="contraste">
-        <h3>0801234-56.2024.8.10.0001</h3>
-        <p class="meta">São Luís/MA · não reconhece a contratação · causa de R$ 20.000 · 7 documentos</p>
-        <div class="veredito"><span class="num">2 em 100</span></div>
-        <p class="meta" style="margin-top:4px; font-size:20px; color:var(--suave)">é a chance de perder → <b style="color:var(--info)">seguir com a defesa</b></p>
+      <div>
+        <span class="tag">0801234-56.2024.8.10.0001 · São Luís/MA · R$ 20.000</span>
+        <span class="verdict"><span class="m">2 em 100</span> → defender</span>
+        <span class="out">Os 7 documentos presentes, com contrato e extrato.</span>
         <ul>
-          <li>Tem a prova mínima da contratação: contrato e extrato.</li>
-          <li>Defender custa <b style="color:var(--grafite)">R$ 272,85</b> em média, contra <b style="color:var(--grafite)">R$ 5.800</b> de abertura de acordo.</li>
+          <li>Tem a <b>prova mínima da contratação</b>.</li>
+          <li>Defender custa <b>R$ 272,85</b> em média, contra <b>R$ 5.800</b> de abertura de acordo.</li>
           <li>MA está no grupo de menor risco.</li>
         </ul>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- 7 · Premissas -->
-<section class="slide" aria-label="Premissas adotadas">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Premissas adotadas</span><span class="fls">fls. 07</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">O que vem da base e o que assumimos</p>
-      <h2>Toda conta tem premissas. <em>Aqui elas estão à vista.</em></h2>
+  <!-- 7 · premissas -->
+  <section class="s">
+    <span class="meta"><span class="t">3:40–4:10</span><span>07 / 27</span></span>
+    <p class="eyebrow">Premissas adotadas</p>
+    <h2>Toda conta tem premissas. <span class="y">Aqui elas estão à vista.</span></h2>
+    <div class="rows">
+      <div><span class="lbl base">Da base</span><span class="val">Quando perde, a empresa paga em média <b>71% da causa</b><small>17.987 condenações nas 60 mil sentenças</small></span></div>
+      <div><span class="lbl base">Da base</span><span class="val">Acordos fecham entre <b>25% e 35% da causa</b>, mediana de 29% — a proposta de abertura<small>280 acordos reais</small></span></div>
+      <div><span class="lbl prem">Premissa</span><span class="val">O autor aceita <b>40%</b> das ofertas no começo<small>A base não registra recusas. Com 10 respostas registradas, a taxa real passa a ajustar a recomendação.</small></span></div>
+      <div><span class="lbl prem">Premissa</span><span class="val">O documento que falta é encontrado em <b>70%</b> dos casos com sinal de que existe; 25% sem sinal<small>17.194 processos da base em que o documento comprovadamente existiu</small></span></div>
+      <div><span class="lbl prem">Premissa</span><span class="val">O processo custa <b>1% ao mês por 24 meses</b>; honorários de sucumbência de 15%<small>A decisão não muda entre 12 e 36 meses</small></span></div>
     </div>
-    <div class="premissas">
-      <div class="premissa"><b>Quando perde, a empresa paga em média 71% da causa</b><span class="selo base">Da base</span><p>17.987 condenações nas 60 mil sentenças.</p></div>
-      <div class="premissa"><b>Acordos fecham entre 25% e 35% da causa</b><span class="selo base">Da base</span><p>280 acordos: mediana de 29%, e é essa a proposta de abertura.</p></div>
-      <div class="premissa"><b>O autor aceita 40% das ofertas, no começo</b><span class="selo prem">Premissa</span><p>A base não registra ofertas recusadas. Com 10 respostas registradas, a taxa real passa a ajustar a recomendação.</p></div>
-      <div class="premissa"><b>O documento que falta é encontrado em 70% dos casos</b><span class="selo prem">Premissa</span><p>70% quando há dossiê ou laudo apontando que ele existe; 25% sem esse sinal.</p></div>
-      <div class="premissa"><b>O processo custa 1% ao mês por 24 meses</b><span class="selo prem">Premissa</span><p>Juros e capital parado. A decisão não muda entre 12 e 36 meses.</p></div>
-      <div class="premissa"><b>Honorários de sucumbência de 15% da condenação</b><span class="selo prem">Premissa</span><p>Praxe de 10% a 20% (art. 85 do CPC). Honorários do escritório vêm do contrato com a empresa.</p></div>
-    </div>
-    <p class="nota" style="margin:0">Para o jurídico, a política fala em frequências (“98 em cada 100”), nunca em siglas ou probabilidades.</p>
-  </div>
-</section>
+  </section>
 
-<!-- 8 · Potencial financeiro -->
-<section class="slide" aria-label="Potencial financeiro">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Potencial financeiro</span><span class="fls">fls. 08</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">A política aplicada às 60 mil sentenças da base</p>
-      <h2>Com a política, a empresa teria pago <em>R$ 29,5 milhões a menos.</em></h2>
+  <!-- 8 · validação -->
+  <section class="s">
+    <span class="meta"><span class="t">4:10–4:40</span><span>08 / 27</span></span>
+    <p class="eyebrow">Validação fora da amostra</p>
+    <h2>O risco que a política mostra <span class="y">é o risco que acontece.</span></h2>
+    <div class="metrics">
+      <div class="hi"><span class="k">Ordena o risco</span><span class="v">92 em 100</span><span class="d">pares de processos — um perdido, um ganho — em que a política aponta qual tinha mais risco (AUC 0,92)</span></div>
+      <div><span class="k">Acerta o número</span><span class="v">0,62 ponto</span><span class="d">maior distância entre o risco previsto e o observado, em qualquer faixa</span></div>
+      <div><span class="k">Reproduz o total</span><span class="v">R$ 192,9 mi</span><span class="d">de condenações previstas, contra R$ 193,0 mi pagos de fato</span></div>
     </div>
-    <div class="potencial">
+    <div class="cmp">
+      <div class="lose"><span class="tag">Gradient boosting · LightGBM</span><span class="out">92,15 em 100. Caixa-preta: precisa de treino e é difícil de auditar.</span></div>
+      <div class="win"><span class="tag">Tabela de 16 perfis · escolhida</span><span class="out">91,99 em 100. Empate prático, <span class="y">R$ 68 mil a mais de economia</span> e o jurídico lê cada linha.</span></div>
+    </div>
+  </section>
+
+  <!-- 9 · potencial -->
+  <section class="s">
+    <span class="meta"><span class="t">4:40–5:20</span><span>09 / 27</span></span>
+    <p class="eyebrow">Potencial financeiro · a política aplicada às 60 mil sentenças</p>
+    <h2>Só com a regra, a empresa teria pago <span class="y">R$ 29,5 milhões a menos.</span></h2>
+    <div class="bars">
+      <div class="bar"><div class="lab"><span>O que foi pago de fato</span><b>R$ 193,0 mi</b></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+      <div class="bar y"><div class="lab"><span>Com a política · 40% de aceitação</span><b>R$ 163,5 mi</b></div><div class="track"><div class="fill" style="width:84.7%"></div></div></div>
+    </div>
+    <div class="metrics">
+      <div class="hi"><span class="k">Economia</span><span class="v">15,3%</span><span class="d">só sabendo quais documentos o processo tem</span></div>
+      <div><span class="k">Se a aceitação variar</span><span class="v">R$ 22–44 mi</span><span class="d">com aceitação entre 30% e 60%</span></div>
+      <div><span class="k">Por mês · estimativa</span><span class="v">≈ R$ 2,5 mi</span><span class="d">≈ R$ 490 por processo nos 5 mil mensais; a base não informa o período</span></div>
+    </div>
+    <p class="lede">E isso é só a regra. <span class="y">O pedido de documento leva a economia a 27,7%.</span></p>
+  </section>
+
+  <!-- 10 · diferencial 1 -->
+  <section class="s gold">
+    <span class="meta"><span class="t">5:20–5:40</span><span>10 / 27</span></span>
+    <p class="eyebrow">Diferencial 1</p>
+    <h1 style="max-width:18ch">O documento que não chegou muda o jogo.</h1>
+    <p class="lede">Quase todo mundo vai modelar a chance de perder. Nós fomos atrás do porquê: o que falta no processo, se isso existe e se dá para buscar de novo.</p>
+  </section>
+
+  <!-- 11 · como chegamos lá -->
+  <section class="s">
+    <span class="meta"><span class="t">5:40–6:20</span><span>11 / 27</span></span>
+    <p class="eyebrow">Análise de dados sobre as 60 mil sentenças</p>
+    <h2>Seis análises. <span class="y">Um padrão que ninguém estava olhando.</span></h2>
+    <div class="agents t3">
+      <div><span class="n">01</span><span class="st">Efeito de cada documento</span><span class="ro">com × sem</span><span class="ia">Taxa de derrota e custo médio comparados, documento a documento.</span></div>
+      <div><span class="n">02</span><span class="st">Segmentação em perfis</span><span class="ro">tabela de contingência</span><span class="ia">Contrato × extrato × comprovante × alegação: <b>16 perfis</b> com amostra grande.</span></div>
+      <div><span class="n">03</span><span class="st">Agrupamento de estados</span><span class="ro">log-odds</span><span class="ia">Estados em três grupos de risco, aplicados como ajuste na chance de perder.</span></div>
+      <div><span class="n">04</span><span class="st">Modelo de comparação</span><span class="ro">LightGBM · 5 dobras</span><span class="ia">Gradient boosting fora da amostra para medir se a tabela perdia precisão.</span></div>
+      <div><span class="n">05</span><span class="st">Calibração</span><span class="ro">previsto × observado</span><span class="ia">Faixa a faixa, o risco prometido contra o que aconteceu.</span></div>
+      <div><span class="n">06</span><span class="st">Backtest contrafactual</span><span class="ro">sensibilidade</span><span class="ia">A política aplicada à base, com aceitação de 30% a 60% e recuperação de 25% a 70%.</span></div>
+    </div>
+  </section>
+
+  <!-- 12 · o padrão -->
+  <section class="s">
+    <span class="meta"><span class="t">6:20–7:00</span><span>12 / 27</span></span>
+    <p class="eyebrow">O padrão</p>
+    <h2>Sem contrato, a empresa perde <span class="c">6 vezes mais.</span></h2>
+    <div class="dims compact">
+      <div class="d1"><span class="k">Contrato · falta em 28%</span><span class="big">12,7% → 75,3%</span><span class="v">de derrota com e sem ele. Custo médio de R$ 1.333 → R$ 7.975.</span></div>
+      <div class="d1"><span class="k">Extrato · falta em 19%</span><span class="big">18,8% → 81,7%</span><span class="v">de derrota com e sem ele. Custo médio de R$ 1.985 → R$ 8.640.</span></div>
+      <div class="d4"><span class="k">Comprovante · falta em 39%</span><span class="big">19,9% → 46,7%</span><span class="v">Efeito menor, mas presente. Custo de R$ 2.099 → R$ 4.941.</span></div>
+      <div class="d3"><span class="k">Dossiê e laudo</span><span class="big">30% → 30%</span><span class="v">Não mudam o resultado sozinhos — mas <b>provam que o contrato e o extrato existem</b>.</span></div>
+    </div>
+    <div class="metrics">
+      <div class="mau"><span class="k">Pago em processos sem contrato</span><span class="v">R$ 135,7 mi</span><span class="d">70% de tudo que a empresa pagou na base</span></div>
+      <div class="mau"><span class="k">Pago em processos sem extrato</span><span class="v">R$ 95,9 mi</span><span class="d">em 11.105 processos</span></div>
+    </div>
+  </section>
+
+  <!-- 13 · cuidado -->
+  <section class="s">
+    <span class="meta"><span class="t">7:00–7:30</span><span>13 / 27</span></span>
+    <p class="eyebrow">O cuidado</p>
+    <h2>Documento ausente <span class="y">não é, por si só, falha da empresa.</span></h2>
+    <div class="dims">
+      <div class="d1"><span class="k">Sem contrato</span><span class="big">78%</span><span class="v">alegam golpe — contra 66% dos processos com contrato.</span></div>
+      <div class="d1"><span class="k">Sem contrato e sem extrato</span><span class="big">83%</span><span class="v">alegam golpe. Muitas vezes o documento não existe porque a operação não existiu.</span></div>
+      <div class="d3"><span class="k">Por isso a política só pede com sinal</span><span class="v">O <b>dossiê conferiu a assinatura</b> → o contrato existe. O <b>laudo mostra o crédito na conta</b> → o extrato existe.</span></div>
+      <div class="d2"><span class="k">Sem sinal</span><span class="v">Acordo rápido, e o motivo da falta vai para <b>Prevenção a fraudes</b> revisar a esteira de originação.</span></div>
+    </div>
+  </section>
+
+  <!-- 14 · impacto de pedir -->
+  <section class="s">
+    <span class="meta"><span class="t">7:30–8:20</span><span>14 / 27</span></span>
+    <p class="eyebrow">O impacto de pedir de novo</p>
+    <h2>Só ter a opção de pedir o documento <span class="y">vale R$ 23,9 milhões.</span></h2>
+    <div class="metrics">
+      <div><span class="k">Processos com sinal</span><span class="v">7.543</span><span class="d">12,6% da base: o dossiê indica que o contrato existe</span></div>
+      <div class="bom"><span class="k">Risco se o contrato chega</span><span class="v">63 → 10</span><span class="d">derrotas em cada 100, em média</span></div>
+      <div class="bom"><span class="k">Processos revertidos</span><span class="v">≈ 5,3 mil</span><span class="d">voltam a ter defesa viável, com 70% de recuperação</span></div>
+      <div class="hi"><span class="k">Economia a mais</span><span class="v">R$ 23,9 mi</span><span class="d">R$ 8,5 mi mesmo se só 25% dos pedidos derem certo</span></div>
+    </div>
+    <div class="bars">
+      <div class="bar c"><div class="lab"><span>Nesses 7.543 · pago de fato</span><b>R$ 49,5 mi</b></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+      <div class="bar"><div class="lab"><span>Política sem pedir o documento</span><b>R$ 42,3 mi</b></div><div class="track"><div class="fill" style="width:85.4%"></div></div></div>
+      <div class="bar y"><div class="lab"><span>Política pedindo o documento</span><b>R$ 18,3 mi</b></div><div class="track"><div class="fill" style="width:37%"></div></div></div>
+    </div>
+    <p class="note">Economia total da política: 15,3% → 27,7%. Teto que assume que todo dossiê presente teve a assinatura conferida pela IA; modelado, não observado.</p>
+  </section>
+
+  <!-- 15 · na operação -->
+  <section class="s">
+    <span class="meta"><span class="t">8:20–8:50</span><span>15 / 27</span></span>
+    <p class="eyebrow">Como o pedido anda na operação</p>
+    <h2>Do pedido do advogado <span class="y">à reavaliação automática.</span></h2>
+    <div class="funnel">
+      <div><span class="f">1 · Advogado</span><span class="g">Pede o documento</span><span class="act">A recomendação diz <b>qual documento</b> e por que ele deve existir.</span></div>
+      <div><span class="f">2 · Empresa</span><span class="g">Fila de recuperação</span><span class="act">Ordenada pelo <b>valor em jogo</b> de cada pedido.</span></div>
+      <div><span class="f">3 · Empresa</span><span class="g">Entrega ou justifica</span><span class="act">Se não houver documento, <b>registra o motivo</b>.</span></div>
+      <div><span class="f">4 · IA</span><span class="g">Classifica o motivo</span><span class="act">E aponta a <b>área responsável</b> por resolver a causa.</span></div>
+      <div class="last"><span class="f">5 · Política</span><span class="g">Reavalia sozinha</span><span class="act">O documento chegou: <b>nova recomendação</b> na fila do advogado.</span></div>
+    </div>
+    <div class="metrics">
+      <div><span class="k">Pedidos na demo</span><span class="v">32</span><span class="d">10 em aberto</span></div>
+      <div><span class="k">Resposta · mediana</span><span class="v">7 dias</span></div>
+      <div><span class="k">Entregues</span><span class="v">27%</span><span class="d">16 declarados indisponíveis, com motivo</span></div>
+      <div class="hi"><span class="k">Em jogo · estimativa</span><span class="v">R$ 1,02 mi</span><span class="d">se os documentos que faltam chegassem</span></div>
+    </div>
+  </section>
+
+  <!-- 16 · diferencial 2 -->
+  <section class="s gold">
+    <span class="meta"><span class="t">8:50–9:05</span><span>16 / 27</span></span>
+    <p class="eyebrow">Diferencial 2</p>
+    <h1 style="max-width:17ch">A política se adapta ao contrato de cada escritório.</h1>
+    <p class="lede">O honorário muda o que é mais barato para a empresa — e o que é mais lucrativo para o escritório. A política pesa os dois.</p>
+  </section>
+
+  <!-- 17 · dois contratos -->
+  <section class="s">
+    <span class="meta"><span class="t">9:05–10:00</span><span>17 / 27</span></span>
+    <p class="eyebrow">Dois modelos de contrato, a mesma base de 60 mil sentenças</p>
+    <h2>Contrato diferente, recomendação diferente — <span class="y">sempre contra o vício do contrato.</span></h2>
+    <div class="cmp">
       <div>
-        <div class="barras">
-          <div class="barra">
-            <div class="rotulo"><span>O que foi pago de fato</span><span class="num">R$ 193,0 mi</span></div>
-            <div class="trilho"><div class="cheio" style="width:100%"></div></div>
-          </div>
-          <div class="barra politica">
-            <div class="rotulo"><span>Com a política, com 40% de aceitação</span><span class="num">R$ 163,5 mi</span></div>
-            <div class="trilho"><div class="cheio" style="width:84.7%"></div></div>
-          </div>
-        </div>
-        <div class="lado" style="margin-top:40px">
-          <div class="fato" style="border-top:1px solid var(--filete-forte)"><span class="rot">Se a aceitação variar</span><span class="num">R$ 22 a 44 mi</span><p>de economia, com aceitação entre 30% e 60%</p></div>
-          <div class="fato" style="border-top:1px solid var(--filete-forte)"><span class="rot">Teto</span><span class="num">27,7%</span><p>se todo dossiê presente periciar a assinatura do contrato</p></div>
-        </div>
-      </div>
-      <div class="eco">
-        <span class="num">15,3%</span>
-        <p>de economia, só com a informação de quais documentos o processo tem.</p>
-        <dl>
-          <div><dt>Por processo</dt><dd>≈ R$ 490</dd></div>
-          <div><dt>Nos 5 mil processos por mês</dt><dd>≈ R$ 2,5 milhões por mês</dd></div>
-        </dl>
-        <p class="nota" style="margin-top:18px">Estimativa por mês: a base não informa o período que cobre.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 9 · Validação -->
-<section class="slide" aria-label="Validação">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Validação</span><span class="fls">fls. 09</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Testada em processos que ela não viu</p>
-      <h2>O risco que a política mostra <em>é o risco que acontece.</em></h2>
-    </div>
-    <div class="provas">
-      <div><span class="num">92 <small>em 100</small></span><p>pares de processos — um perdido, um ganho — em que a política aponta corretamente qual tinha mais risco.</p><p class="nota">AUC de 0,92, fora da amostra, em 5 rodadas.</p></div>
-      <div><span class="num">0,62 <small>ponto</small></span><p>é a maior distância entre o risco previsto e o que aconteceu, em qualquer faixa de risco.</p><p class="nota">Quando diz “30 em cada 100”, acontece entre 29,4 e 30,6.</p></div>
-      <div><span class="num">R$ 192,9 mi</span><p>de condenações previstas pela política, contra R$ 193,0 mi pagos de fato na base.</p><p class="nota">A média de 71% da causa reproduz o total pago.</p></div>
-    </div>
-    <div class="escolha">
-      <div class="modelo"><span class="rot">Aprendizado de máquina (LightGBM)</span><b>92,15 em 100</b><p>Caixa-preta: precisa de treino, dependências e é difícil de auditar.</p></div>
-      <div class="modelo nossa"><span class="rot">Tabela de 16 perfis · escolhida</span><b>91,99 em 100</b><p>Empate prático, economizou R$ 68 mil a mais, e o jurídico lê e audita cada linha.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- 10 · Advogado: fila e avaliação -->
-<section class="slide" aria-label="Experiência do advogado: fila e avaliação">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Experiência do advogado</span><span class="fls">fls. 10</span></div>
-  <div class="corpo" style="gap:28px">
-    <div>
-      <p class="kicker">Acesso à recomendação</p>
-      <h2>O advogado abre o processo <em>e a análise já está pronta.</em></h2>
-    </div>
-    <div class="telas">
-      <div class="tela-passo">
-        <header><span class="n">1</span><div><b>Minha fila</b><p>O que precisa dele primeiro, e o próprio desempenho no topo.</p></div></header>
-        <div class="tela"><img src="img/advogado-fila.jpg" alt="Tela Minha fila com taxa de êxito, aderência e processos por próxima ação"></div>
-      </div>
-      <div class="tela-passo">
-        <header><span class="n">2</span><div><b>Avaliação</b><p>Chance de perder, oferta, faixa de mercado e o limite, ao lado dos autos.</p></div></header>
-        <div class="tela"><img src="img/advogado-avaliacao.jpg" alt="Tela de avaliação com recomendação de acordo de R$ 8.750 e limite de R$ 21.527,05"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 11 · Advogado: decisão e IA -->
-<section class="slide" aria-label="Experiência do advogado: decisão e documentos">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Experiência do advogado</span><span class="fls">fls. 11</span></div>
-  <div class="corpo" style="gap:28px">
-    <div>
-      <p class="kicker">Garantir a implementação</p>
-      <h2>Seguir a política é um clique. <em>Divergir deixa rastro.</em></h2>
-    </div>
-    <div class="telas">
-      <div class="tela-passo">
-        <header><span class="n">3</span><div><b>Decisão</b><p>Seguir não pede justificativa; divergir ou passar do máximo pede o motivo.</p></div></header>
-        <div class="tela"><img src="img/advogado-decisao.jpg" alt="Tela de decisão com opções propor acordo, seguir com a defesa e pedir documento"></div>
-      </div>
-      <div class="tela-passo">
-        <header><span class="n">4</span><div><b>Documentos com IA</b><p>PDF original na tela, resumo por documento e perguntas com fonte e página.</p></div></header>
-        <div class="tela"><img src="img/advogado-chat.jpg" alt="Conversa com os documentos respondendo com fontes e páginas"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 12 · Fluxo -->
-<section class="slide" aria-label="Fluxo do processo">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Regras de negócio · fluxo</span><span class="fls">fls. 12</span></div>
-  <div class="corpo" style="gap:30px">
-    <div>
-      <p class="kicker">Cada fase só oferece o que faz sentido</p>
-      <h2>Um fluxo que <em>não deixa registrar decisão incoerente.</em></h2>
-    </div>
-    <div class="fluxo">
-      <svg viewBox="0 0 1408 410" aria-hidden="true">
-        <defs><marker id="ponta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6d675d"/></marker></defs>
-        <g fill="none" stroke="#6d675d" stroke-width="2">
-          <path d="M250 186 H326" marker-end="url(#ponta)"/>
-          <path d="M580 186 H650 V36 H716" marker-end="url(#ponta)"/>
-          <path d="M580 186 H716" marker-end="url(#ponta)"/>
-          <path d="M650 186 V336 H716" marker-end="url(#ponta)"/>
-          <path d="M970 36 H1096" marker-end="url(#ponta)"/>
-          <path d="M845 72 V146" marker-end="url(#ponta)"/>
-          <path d="M970 186 H1096" marker-end="url(#ponta)"/>
-          <path d="M970 336 H1096" marker-end="url(#ponta)"/>
-          <path d="M1225 372 V398 H455 V226" marker-end="url(#ponta)" stroke-dasharray="6 6"/>
-        </g>
-        <g font-family="Inter, sans-serif" font-size="15" fill="#4a453d">
-          <text x="1033" y="26" text-anchor="middle">aceito</text>
-          <text x="857" y="116">recusou ou não respondeu</text>
-          <text x="1033" y="176" text-anchor="middle">sentença</text>
-          <text x="1033" y="326" text-anchor="middle">chegou</text>
-          <text x="600" y="390">reavaliar</text>
-        </g>
-      </svg>
-      <div class="no inicio" style="left:0; top:150px"><b>Aguardando avaliação</b><span>análise roda sozinha</span></div>
-      <div class="no inicio" style="left:330px; top:150px"><b>Pronto para decidir</b><span>recomendação pronta</span></div>
-      <div class="no" style="left:720px; top:0"><b>Em negociação</b><span>decisão: propor acordo</span></div>
-      <div class="no" style="left:720px; top:150px"><b>Em defesa</b><span>decisão: defender</span></div>
-      <div class="no" style="left:720px; top:300px"><b>Aguardando documento</b><span>decisão: pedir à empresa</span></div>
-      <div class="no fim" style="left:1100px; top:0"><b>Encerrado</b><span>acordo fechado</span></div>
-      <div class="no fim" style="left:1100px; top:150px"><b>Encerrado</b><span>sentença registrada</span></div>
-      <div class="no" style="left:1100px; top:300px"><b>Documentos novos</b><span>nova avaliação</span></div>
-    </div>
-    <ul class="regras">
-      <li><b>Acordo aceito não fecha como defesa</b>e defesa não registra valor de acordo.</li>
-      <li><b>Recusa ou silêncio levam à defesa</b>e depois à sentença.</li>
-      <li><b>Contraproposta dentro do máximo</b>pode ser aceita; acima, pede motivo.</li>
-      <li><b>Justificativa só quando diverge</b>ou quando o valor passa do máximo.</li>
-    </ul>
-  </div>
-</section>
-
-<!-- 13 · Painel: efetividade -->
-<section class="slide" aria-label="Painel da empresa: efetividade">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Monitoramento de efetividade</span><span class="fls">fls. 13</span></div>
-  <div class="corpo" style="gap:28px">
-    <div>
-      <p class="kicker">Painel da empresa · casos da base colocados na demo</p>
-      <h2>A economia do painel é <em>observada, não prometida.</em></h2>
-    </div>
-    <div class="painel">
-      <div class="tela"><img src="img/empresa-geral.jpg" alt="Painel da empresa com economia, ticket médio, aceitação e aderência"></div>
-      <div class="fatos">
-        <div class="fato"><span class="rot">Quem seguiu a recomendação</span><span class="num bom">+ R$ 186 mil</span><p>200 processos encerrados, contra o que processos parecidos custaram</p></div>
-        <div class="fato"><span class="rot">Quem decidiu diferente</span><span class="num ruim">− R$ 90 mil</span><p>46 processos encerrados custaram mais que os parecidos</p></div>
-        <div class="fato"><span class="rot">Pior caso × gasto real</span><span class="num">R$ 3,60 mi · R$ 0,90 mi</span><p>lado a lado, sem número de diferença que exagere o resultado</p></div>
-        <div class="fato"><span class="rot">Ticket médio dos acordos</span><span class="num">R$ 5.568</span><p>36,6% da causa, contra 29,8% na base: o painel mostra onde a empresa paga acima do mercado</p></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 14 · Painel: aderência -->
-<section class="slide" aria-label="Painel da empresa: aderência">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Monitoramento de aderência</span><span class="fls">fls. 14</span></div>
-  <div class="corpo" style="gap:28px">
-    <div>
-      <p class="kicker">Advogados e escritórios</p>
-      <h2>Uma nota justa: <em>cada processo comparado com os parecidos.</em></h2>
-    </div>
-    <div class="painel" style="grid-template-columns: 1fr 760px">
-      <div style="display:grid; gap:26px">
-        <div>
-          <span class="rot">Nota geral de 0 a 100</span>
-          <div class="pesos" aria-hidden="true"><div class="p1">50</div><div class="p2">20</div><div class="p3">20</div><div class="p4">10</div></div>
-          <div class="legenda-pesos"><span>Economia nos processos</span><span>Valor dos acordos</span><span>Segue a recomendação</span><span>Aceitos</span></div>
-        </div>
-        <ul class="lista">
-          <li><b>Carteiras diferentes ficam comparáveis:</b> cada processo é medido contra processos parecidos.</li>
-          <li><b>Pouco histórico não vira ranking:</b> a nota é puxada para a média da empresa e só ranqueia com 20 encerrados.</li>
-          <li><b>Tempo não entra na nota;</b> o resultado entra.</li>
-          <li><b>88 exceções para revisar:</b> 73 decisões diferentes da recomendação, com motivo, e 15 decisões sem abrir os documentos.</li>
+        <span class="tag">Modelo A · êxito na defesa</span>
+        <span class="out">Escritório recebe <span class="y">10% da causa</span> quando a defesa ganha.</span>
+        <ul>
+          <li>Tendência do escritório: <b>defender</b>, porque é quando ele ganha mais.</li>
+          <li>A política soma o prêmio ao custo de defender: <b>1.154 processos passam de defesa para acordo</b>.</li>
+          <li>Processo limítrofe*: <b>acordo</b> · oferta R$ 3.900 · máximo R$ 5.043.</li>
         </ul>
       </div>
-      <div class="tela"><img src="img/empresa-advogados.jpg" alt="Ranking de advogados com nota geral e colunas explicadas"></div>
-    </div>
-  </div>
-</section>
-
-<!-- 15 · Documentos -->
-<section class="slide" aria-label="Documentos que não chegam">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Monitoramento · documentos</span><span class="fls">fls. 15</span></div>
-  <div class="corpo" style="gap:28px">
-    <div>
-      <p class="kicker">A economia que depende só da empresa</p>
-      <h2>O documento que não chega <em>também tem preço.</em></h2>
-    </div>
-    <div class="painel">
-      <div class="tela"><img src="img/empresa-documentos.jpg" alt="Painel de documentos com valor em jogo e motivos da falta"></div>
-      <div class="fatos">
-        <div class="fato"><span class="rot">Valor em jogo · estimativa</span><span class="num">R$ 1,02 mi</span><p>se os documentos que faltam chegassem, nos 517 processos analisados</p></div>
-        <div class="fato"><span class="rot">Contrato</span><span class="num">R$ 478 mil</span><p>146 processos sem ele</p></div>
-        <div class="fato"><span class="rot">Extrato · comprovante</span><span class="num">R$ 335 mil · R$ 212 mil</span><p>109 e 205 processos sem cada um</p></div>
-        <div class="fato"><span class="rot">E o motivo vira ação</span><p style="font-size:19px; color:var(--suave)">“Correspondente não enviou” vai para Canais; “contrato físico não digitalizado”, para Operações de crédito e TI.</p></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 16 · IA -->
-<section class="slide" aria-label="Uso de IA">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Uso de IA</span><span class="fls">fls. 16</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Onde a IA acelera e onde ela não decide</p>
-      <h2>A IA lê, resume e responde. <em>O valor sai de uma regra auditável.</em></h2>
-    </div>
-    <div class="ia">
       <div>
-        <h3>Onde a IA trabalha</h3>
-        <div class="usos">
-          <div class="uso"><b>Lê cada documento</b><p>Resumo, número do contrato, valores e pontos de atenção.</p></div>
-          <div class="uso"><b>Classifica o que foi enviado</b><p>Identifica o tipo e recusa arquivo que não é do processo.</p></div>
-          <div class="uso"><b>Analisa o dossiê</b><p>Assinatura e documentos pessoais, com citação da página.</p></div>
-          <div class="uso"><b>Responde sobre os autos</b><p>Conversa com os documentos, com fonte e página em cada resposta.</p></div>
-          <div class="uso"><b>Entende por que o documento não veio</b><p>O motivo escrito pela empresa vira categoria e área responsável.</p></div>
-          <div class="uso"><b>Redige a proposta</b><p>Mensagem pronta para o advogado do autor, com o valor decidido.</p></div>
-        </div>
-      </div>
-      <div class="nao-decide">
-        <h3>Onde ela não decide</h3>
-        <p class="frase">Defender, propor acordo e quanto oferecer saem de 60 mil sentenças, não de um texto gerado.</p>
-        <p>A regra é a mesma para todo processo, versionada e registrada em cada análise, para o jurídico auditar.</p>
-        <p>Sem a chave de IA, a política continua funcionando.</p>
-        <p class="nota">Modelos: gpt-4o-mini para leitura e texto; text-embedding-3-small para a busca nos documentos.</p>
+        <span class="tag">Modelo B · por acordo fechado</span>
+        <span class="out">Escritório recebe <span class="y">10% da causa</span> por acordo fechado.</span>
+        <ul>
+          <li>Tendência do escritório: <b>fazer acordo</b>, porque é quando ele ganha mais.</li>
+          <li>A política soma o honorário ao custo do acordo: <b>1.049 processos passam de acordo para defesa</b>.</li>
+          <li>Processo limítrofe*: <b>defender</b>. No caso de Manaus, o máximo cai de R$ 21.527 para R$ 19.027.</li>
+        </ul>
       </div>
     </div>
-  </div>
-</section>
+    <p class="note">* São Paulo, causa de R$ 15.000, com contrato e comprovante, sem extrato. No contrato padrão, a recomendação é defender. A economia contra defender a carteira inteira também muda: 15,3% no padrão, 12,5% no modelo A e 9,3% no modelo B — por isso o gestor simula antes de assinar.</p>
+  </section>
 
-<!-- 17 · Arquitetura -->
-<section class="slide" aria-label="Arquitetura">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Arquitetura e solução técnica</span><span class="fls">fls. 17</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Do navegador à regra</p>
-      <h2>Uma aplicação, três perfis, <em>um motor de política no centro.</em></h2>
-    </div>
-    <div class="arq">
-      <div class="camada">
-        <span class="rot">Quem usa</span>
-        <div class="caixa"><b>Advogado externo</b><span>fila, avaliação, decisão</span></div>
-        <div class="caixa"><b>Gestor da empresa</b><span>processos, painel, contrato</span></div>
-        <div class="caixa"><b>Administrador</b><span>empresas, usuários, auditoria</span></div>
+  <!-- 18 · customizável -->
+  <section class="s">
+    <span class="meta"><span class="t">10:00–10:25</span><span>18 / 27</span></span>
+    <p class="eyebrow">Métricas do contrato, definidas pelo cliente</p>
+    <h2>O gestor muda o contrato; <span class="y">a estratégia se recalcula.</span></h2>
+    <div class="split">
+      <div class="rows">
+        <div><span class="lbl">Honorários</span><span class="val">Se a defesa ganha, se perde e por acordo fechado — <b>fixo, % da causa ou % da condenação</b></span></div>
+        <div><span class="lbl">Tempo</span><span class="val">Custo mensal do processo aberto e duração esperada</span></div>
+        <div><span class="lbl">Alçada</span><span class="val">Teto de oferta autorizado, como % da causa, e quanto ceder na negociação</span></div>
+        <div><span class="lbl">Por escritório</span><span class="val">Cada escritório pode ter o próprio contrato; sem ele, vale o padrão da empresa</span></div>
+        <div><span class="lbl">Com rastro</span><span class="val">Cada mudança é <b>uma nova versão com justificativa</b>, simulada na carteira antes de salvar; cada análise grava a versão usada</span></div>
       </div>
-      <div class="seta" aria-hidden="true">→</div>
-      <div class="camada">
-        <span class="rot">Aplicação</span>
-        <div class="caixa"><b>Interface web</b><span>React · Vite · as telas de cada perfil</span></div>
-        <div class="caixa forte"><b>API</b><span>FastAPI · Python · login por perfil, cada advogado vê só os seus processos, fluxo de fases</span></div>
-        <div class="caixa"><b>Trilha de auditoria</b><span>só aceita inserção: nada é editado ou apagado</span></div>
-      </div>
-      <div class="seta" aria-hidden="true">→</div>
-      <div class="camada">
-        <span class="rot">Núcleo</span>
-        <div class="nucleo">
-          <div class="caixa marca" style="grid-column: 1 / -1"><b>Motor de política</b><span>prova → 16 perfis + estado → preço → faixa de mercado → recuperar documento · versão da política e do contrato gravadas em cada análise</span></div>
-          <div class="caixa"><b>Serviços de IA</b><span>OpenAI: leitura, dossiê, motivos, proposta, conversa com fontes</span></div>
-          <div class="caixa"><b>Documentos</b><span>PDF e texto, extração por página, trechos para busca</span></div>
-          <div class="caixa"><b>Banco de dados</b><span>SQLite · processos, decisões, negociações, sentenças</span></div>
-          <div class="caixa"><b>Base histórica</b><span>60 mil sentenças → tabela da política e referências</span></div>
-        </div>
+      <div class="receipt">
+        <b>simular impacto na carteira</b><br />
+        amostra: 12 mil processos da base<br />
+        contrato vigente → proposto<br />
+        decisões que mudam: <b>quantas e em que direção</b><br />
+        economia: <b>antes × depois</b><br />
+        premissas: aceitação 40% · recuperação 70%<br />
+        <br />
+        <b>exemplo na demo</b><br />
+        Nogueira Prado · aditivo de 2026<br />
+        10% da causa quando a defesa perde<br />
+        → defender fica mais caro<br />
+        → processos no limite passam a acordo
       </div>
     </div>
-    <div class="rodape-fatos">
-      <div><b>225 testes</b>automatizados no backend</div>
-      <div><b>Contrato por escritório</b>honorários mudam a fronteira entre acordo e defesa, com versão e justificativa</div>
-      <div><b>Funciona sem IA</b>a recomendação não depende de chamada externa</div>
-    </div>
-  </div>
-</section>
+  </section>
 
-<!-- 18 · Limitações -->
-<section class="slide" aria-label="Limitações conhecidas">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Limitações conhecidas</span><span class="fls">fls. 18</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">O que ainda não sabemos</p>
-      <h2>O que a solução <em>ainda não resolve.</em></h2>
-    </div>
-    <div class="limites">
-      <div class="limite"><span class="rot">Premissas</span><b>Aceitação de 40% e chance de achar o documento</b><p>A base não registra ofertas recusadas. A economia estimada varia com essas taxas.</p></div>
-      <div class="limite"><span class="rot">Dados</span><b>Custas processuais fora da conta</b><p>A base não traz custas nem os honorários reais de cada escritório.</p></div>
-      <div class="limite"><span class="rot">Documentos</span><b>A base diz se o documento existe, não o que diz</b><p>Só o dossiê é lido a fundo. Os 16 perfis são fixos.</p></div>
-      <div class="limite"><span class="rot">Leitura</span><b>PDF escaneado sem texto</b><p>Não há OCR próprio; depende da leitura por IA do arquivo.</p></div>
-      <div class="limite"><span class="rot">Demo</span><b>Casos reais, comportamento simulado</b><p>Pegamos casos da base e colocamos na demo; respostas de advogados e autores são simuladas para exercitar o painel.</p></div>
-      <div class="limite"><span class="rot">Infraestrutura</span><b>Feita para o hackathon</b><p>SQLite, processamento no mesmo servidor e documentos sem criptografia.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- 19 · Próximos passos -->
-<section class="slide" aria-label="Próximos passos">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Próximos passos · 1 mês</span><span class="fls">fls. 19</span></div>
-  <div class="corpo">
-    <div>
-      <p class="kicker">Com mais um mês de desenvolvimento, nesta ordem</p>
-      <h2>Trocar premissa por dado <em>e preparar para muitos clientes.</em></h2>
-    </div>
-    <div class="proximos">
-      <div class="proximo"><span class="n">1</span><h3>Aprender com o advogado</h3><p>Quando o advogado diverge e acerta, a divergência realimenta a política (humano no ciclo).</p><p class="ja">Já gravamos o saldo de cada divergência.</p></div>
-      <div class="proximo"><span class="n">2</span><h3>Aceitação real</h3><p>Cada oferta e resposta registradas viram uma curva de aceite por faixa de valor e estado, no lugar dos 40%.</p><p class="ja">Ofertas e respostas já são registradas.</p></div>
-      <div class="proximo"><span class="n">3</span><h3>Infra para vários clientes</h3><p>Nuvem (AWS), Kubernetes, PostgreSQL, fila de processamento, isolamento por cliente, criptografia e observabilidade.</p></div>
-      <div class="proximo"><span class="n">4</span><h3>Mais contexto do negócio</h3><p>Custas processuais e honorários reais dos contratos na conta; outros tipos de ação além do não reconhecimento de empréstimo.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- 20 · Fecho -->
-<section class="slide tinta fecho" aria-label="Encerramento">
-  <div class="cab"><span class="logo">ENTER<i></i></span><span>EnterOS · Política de Acordos</span><span class="fls">fls. 20</span></div>
-  <div class="corpo">
-    <h2>Mesma justiça.<br><em>Mais impacto.</em></h2>
-    <div class="fecho-grade">
-      <div><b>Definir</b><p>Primeiro a prova, depois 16 perfis e o preço. Validada em 60 mil sentenças: R$ 29,5 mi a menos (15,3%).</p></div>
-      <div><b>Garantir</b><p>Análise pronta ao abrir, limite explícito e justificativa só quando o advogado diverge.</p></div>
-      <div><b>Monitorar</b><p>Economia observada, nota justa por advogado e o preço de cada documento que não chega.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- Apêndice -->
-<section class="slide apendice" aria-label="Apêndice: como medimos a economia">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A1</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Economia</p><h2>Por que medimos contra processos parecidos, e não contra o valor da causa</h2></div>
-    <div class="colunas">
-      <div><h3>Pior caso exagera</h3><p>“Se perdesse tudo pelo valor da causa” nunca acontece: nem toda derrota paga a causa inteira. Por isso <b>pior caso e gasto real ficam lado a lado</b>, sem um número de diferença.</p></div>
-      <div><h3>Parecido de verdade</h3><p>Economia = <b>custo médio real de processos parecidos − custo real do processo</b>. Parecido é mesmos documentos, mesma alegação e mesmo grupo de estados; com menos de 30 processos, o grupo se amplia.</p></div>
-      <div><h3>Só o que foi observado</h3><p>O painel mostra valores pagos de fato. O que é estimativa, como o valor em jogo dos documentos, aparece marcado como <b>estimativa</b> e com a conta ao lado.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="slide apendice" aria-label="Apêndice: valor recomendado">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A2</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Valor</p><h2>Por que a oferta fica dentro de 25% a 35% da causa</h2></div>
-    <div class="colunas">
-      <div><h3>A curva de aceite</h3><p>Dos 280 acordos da base, a chance de aceite de uma oferta é a fração dos acordos que fecharam até aquele percentual da causa, <b>limitada entre 5% e 85%</b>.</p></div>
-      <div><h3>O melhor equilíbrio</h3><p>A oferta recomendada maximiza <b>chance de aceite × economia até o valor máximo</b>. Fora da faixa, a conta às vezes pagaria mais para subir a aceitação — e o advogado levaria à mesa um valor acima do mercado.</p></div>
-      <div><h3>Aprende com a operação</h3><p>Com ao menos <b>10 respostas registradas</b>, a aceitação observada ajusta a curva (fator entre 0,5 e 1,5). Na demo, 62% dos acordos foram aceitos, contra a premissa inicial de 40%.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="slide apendice" aria-label="Apêndice: nota dos advogados">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A3</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Aderência</p><h2>Ranquear advogados não é injusto?</h2></div>
-    <div class="colunas">
-      <div><h3>O que entra</h3><p><b>Economia nos processos (50)</b>, valor dos acordos (20), se segue a recomendação (20) e acordos aceitos (10). Decidir diferente registrando o motivo vale metade; sem motivo, zero.</p></div>
-      <div><h3>O que protege</h3><p>Cada processo é comparado com parecidos, então carteira difícil não pune. A nota é <b>puxada para a média da empresa com peso de 10 processos</b> e só entra no ranking com 20 encerrados.</p></div>
-      <div><h3>Mercado anônimo</h3><p>O escritório é comparado com o mesmo escritório em outros clientes, <b>sem identificar ninguém</b>, só com ao menos 2 outros clientes e 50 processos encerrados. Tempo gasto não entra na nota.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="slide apendice" aria-label="Apêndice: divergência e exceções">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A4</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Implementação</p><h2>O advogado pode discordar da política?</h2></div>
-    <div class="colunas">
-      <div><h3>Pode, com motivo</h3><p>Motivos em lista: <b>fato novo, entendimento local do juízo, prova mais fraca, prova mais forte, sinal do autor</b> ou outro. Seguir a recomendação nunca pede texto.</p></div>
-      <div><h3>Vira exceção</h3><p>A empresa revisa três tipos: <b>acordo acima do valor máximo</b>, <b>decisão diferente da recomendação</b> (com o motivo) e <b>decisão sem abrir os documentos</b>.</p></div>
-      <div><h3>E vira aprendizado</h3><p>Cada divergência guarda quanto custou frente ao caminho recomendado. É a base para o humano no ciclo: <b>quando o advogado acerta, a política aprende</b>.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="slide apendice" aria-label="Apêndice: documentos e áreas">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A5</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Documentos</p><h2>Como chegamos ao valor em jogo e quem resolve cada falta</h2></div>
-    <div class="colunas duas">
-      <div>
-        <h3>A conta, marcada como estimativa</h3>
-        <p><b>(chance de perder sem o documento − com ele) × condenação média (71,1% da causa) × chance de achar o documento (70%)</b>.</p>
-        <p>Na base, sem contrato a empresa perde 75,3% das vezes; com contrato, 12,7%. Faltou contrato em 17.017 processos.</p>
-      </div>
-      <div>
-        <table class="tabela-min">
-          <thead><tr><th>Motivo da falta</th><th>Área responsável</th></tr></thead>
-          <tbody>
-            <tr><td>Correspondente não enviou</td><td>Canais e correspondentes bancários</td></tr>
-            <tr><td>Contrato físico não digitalizado</td><td>Operações de crédito + TI</td></tr>
-            <tr><td>Operação não existe (golpe)</td><td>Prevenção a fraudes</td></tr>
-            <tr><td>Sistema sem exportação</td><td>Jurídico interno + TI</td></tr>
-            <tr><td>Dossiê que não muda o resultado</td><td>Suprimentos · gestão de fornecedores</td></tr>
-          </tbody>
-        </table>
+  <!-- 19 · valor executivo -->
+  <section class="s">
+    <span class="meta"><span class="t">10:25–11:05</span><span>19 / 27</span></span>
+    <p class="eyebrow">Diferencial 3 · valor entregue · nível executivo</p>
+    <h2>Para a diretoria: <span class="y">quanto a política economiza e onde o dinheiro vaza.</span></h2>
+    <div class="split">
+      <div class="shot"><img src="img/empresa-geral.jpg" alt="Painel da empresa com economia, ticket médio, aceitação e aderência" /></div>
+      <div class="metrics compact" style="grid-template-columns:1fr 1fr">
+        <div class="bom"><span class="k">Quem seguiu a política</span><span class="v">+R$ 186 mil</span><span class="d">200 processos, contra parecidos</span></div>
+        <div class="mau"><span class="k">Quem divergiu</span><span class="v">−R$ 90 mil</span><span class="d">46 processos custaram mais</span></div>
+        <div><span class="k">Ticket médio</span><span class="v">36,6%</span><span class="d">da causa, contra 29,8% na base: acordos acima do mercado</span></div>
+        <div><span class="k">Aceitação</span><span class="v">62,2%</span><span class="d">contra a premissa inicial de 40%</span></div>
+        <div><span class="k">Aderência</span><span class="v">85,8%</span><span class="d">de 515 decisões</span></div>
+        <div class="hi"><span class="k">Pior caso × gasto real</span><span class="v">3,6 × 0,9 mi</span><span class="d">lado a lado, sem inflar a diferença</span></div>
       </div>
     </div>
-  </div>
-</section>
+    <p class="note">Casos da base colocados na demo. Só valores observados; o que é estimativa aparece marcado.</p>
+  </section>
 
-<section class="slide apendice" aria-label="Apêndice: contrato empresa e escritório">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A6</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Contrato</p><h2>Honorários mudam a fronteira entre acordo e defesa</h2></div>
-    <div class="colunas">
-      <div><h3>O que o gestor ajusta</h3><p>Honorário se a defesa ganha, se perde e por acordo fechado; custo do tempo; duração esperada; <b>teto de alçada</b> e quanto ceder na negociação.</p></div>
-      <div><h3>Com rastro</h3><p>Cada mudança vira <b>nova versão com justificativa</b>, e o gestor simula o impacto na carteira antes de salvar. Cada análise grava a versão usada.</p></div>
-      <div><h3>Exemplo da demo</h3><p>Um escritório com aditivo de <b>10% da causa quando a defesa perde</b>: defender fica mais caro, e processos no limite passam a pedir acordo.</p></div>
+  <!-- 20 · valor operacional -->
+  <section class="s">
+    <span class="meta"><span class="t">11:05–11:45</span><span>20 / 27</span></span>
+    <p class="eyebrow">Diferencial 3 · valor entregue · nível operacional</p>
+    <h2>Para o time: <span class="y">o que mudar no processo para ter prova no próximo.</span></h2>
+    <div class="agents">
+      <div><span class="n">CANAIS</span><span class="st">Correspondente não enviou</span><span class="ro">canais e correspondentes</span><span class="ia">Condicionar a comissão ao envio do contrato e do comprovante no ato da contratação.</span></div>
+      <div><span class="n">OPERAÇÕES + TI</span><span class="st">Contrato físico não digitalizado</span><span class="ro">operações de crédito</span><span class="ia">Repositório único indexado pela operação, com assinatura eletrônica na originação.</span></div>
+      <div><span class="n">FRAUDES</span><span class="st">Operação não existe</span><span class="ro">prevenção a fraudes</span><span class="ia">Sinal de golpe: acordo rápido e revisão da esteira onde esses casos se concentram.</span></div>
+      <div><span class="n">JURÍDICO + TI</span><span class="st">Documento falta sem motivo</span><span class="ro">jurídico interno</span><span class="ia">Registrar o motivo de cada ausência para descobrir a causa e a área dona.</span></div>
+      <div class="gate"><span class="n">SUPRIMENTOS</span><span class="st">Dossiê que não muda o resultado</span><span class="ro">gestão de fornecedores</span><span class="ia">Pedir à terceira o dossiê focado na assinatura, quando falta o contrato.</span></div>
     </div>
-  </div>
-</section>
-
-<section class="slide apendice" aria-label="Apêndice: números da base">
-  <div class="cab"><span><b>EnterOS</b> · Política de Acordos</span><span>Apêndice · perguntas prováveis</span><span class="fls">fls. A7</span></div>
-  <div class="corpo">
-    <div><p class="kicker">Base histórica</p><h2>Os números por trás da política</h2></div>
-    <div class="colunas duas">
-      <div>
-        <table class="tabela-min">
-          <tbody>
-            <tr><td>Sentenças na base</td><td class="n">60.000</td></tr>
-            <tr><td>Empresa perde, no geral</td><td class="n">30 em cada 100</td></tr>
-            <tr><td>Condenação média quando perde</td><td class="n">71,1% da causa</td></tr>
-            <tr><td>Total pago</td><td class="n">R$ 193,0 mi</td></tr>
-            <tr><td>Sem contrato e sem extrato</td><td class="n">6.493 processos · R$ 67,1 mi</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <table class="tabela-min">
-          <tbody>
-            <tr><td>Acordos na base</td><td class="n">280</td></tr>
-            <tr><td>Acordo médio</td><td class="n">R$ 4.540 · 29,8% da causa</td></tr>
-            <tr><td>Faixa dos acordos</td><td class="n">P25 25% · mediana 29% · P75 35%</td></tr>
-            <tr><td>Perfis de documentos</td><td class="n">16 · de 2 a 99 em cada 100</td></tr>
-            <tr><td>Grupos de estado</td><td class="n">alto · médio · baixo</td></tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="metrics">
+      <div><span class="k">Exceções para revisar</span><span class="v">88</span><span class="d">73 decisões diferentes, com motivo · 15 sem abrir os documentos</span></div>
+      <div><span class="k">Nota por advogado</span><span class="v">0–100</span><span class="d">comparada com processos parecidos; ranking só com 20 encerrados</span></div>
+      <div><span class="k">Fila de recuperação</span><span class="v">32</span><span class="d">pedidos ordenados pelo valor em jogo</span></div>
     </div>
-  </div>
-</section>
+  </section>
 
-</main>
+  <!-- 21 · advogado 1 -->
+  <section class="s">
+    <span class="meta"><span class="t">11:45–12:20</span><span>21 / 27</span></span>
+    <p class="eyebrow">Experiência do advogado · acesso à recomendação</p>
+    <h2>O advogado abre o processo <span class="y">e a análise já está pronta.</span></h2>
+    <div class="shots">
+      <figure><figcaption><span class="n">01</span><b>Minha fila</b><span>o que precisa dele primeiro</span></figcaption><img src="img/advogado-fila.jpg" alt="Minha fila com taxa de êxito, aderência e processos por próxima ação" /></figure>
+      <figure><figcaption><span class="n">02</span><b>Avaliação</b><span>chance, oferta, faixa e limite ao lado dos autos</span></figcaption><img src="img/advogado-avaliacao.jpg" alt="Avaliação com oferta de R$ 8.750 e limite de R$ 21.527,05" /></figure>
+    </div>
+  </section>
 
-<nav class="hud" aria-label="Navegação dos slides">
-  <button type="button" data-ir="-1" aria-label="Slide anterior">←</button>
-  <span aria-live="polite">1 / 27</span>
-  <button type="button" data-ir="1" aria-label="Próximo slide">→</button>
-  <button type="button" data-tela-cheia aria-label="Tela cheia">Tela cheia</button>
-</nav>
+  <!-- 22 · advogado 2 -->
+  <section class="s">
+    <span class="meta"><span class="t">12:20–12:50</span><span>22 / 27</span></span>
+    <p class="eyebrow">Experiência do advogado · garantir a implementação</p>
+    <h2>Seguir a política é um clique. <span class="y">Divergir deixa rastro.</span></h2>
+    <div class="shots">
+      <figure><figcaption><span class="n">03</span><b>Decisão</b><span>seguir não pede justificativa; divergir pede o motivo</span></figcaption><img src="img/advogado-decisao.jpg" alt="Decisão com propor acordo, seguir com a defesa e pedir documento" /></figure>
+      <figure><figcaption><span class="n">04</span><b>Documentos com IA</b><span>respostas com fonte e página</span></figcaption><img src="img/advogado-chat.jpg" alt="Conversa com os documentos com fontes e páginas" /></figure>
+    </div>
+  </section>
+
+  <!-- 23 · IA -->
+  <section class="s">
+    <span class="meta"><span class="t">12:50–13:15</span><span>23 / 27</span></span>
+    <p class="eyebrow">Uso de IA</p>
+    <h2>A IA lê, resume e responde. <span class="y">O valor sai de uma regra auditável.</span></h2>
+    <div class="agents">
+      <div class="ai"><span class="n">LEITURA</span><span class="st">Lê cada documento</span><span class="ia">Resumo, número do contrato, valores e pontos de atenção.</span><span class="rt">gpt-4o-mini</span></div>
+      <div class="ai"><span class="n">DOSSIÊ</span><span class="st">Confere a assinatura</span><span class="ia">E cita a página — é o sinal que libera o pedido do contrato.</span><span class="rt">gpt-4o-mini</span></div>
+      <div class="ai"><span class="n">CONVERSA</span><span class="st">Responde sobre os autos</span><span class="ia">Com fonte e página em cada resposta.</span><span class="rt">text-embedding-3-small</span></div>
+      <div class="ai"><span class="n">MOTIVOS</span><span class="st">Entende por que faltou</span><span class="ia">O texto da empresa vira categoria e área responsável.</span><span class="rt">gpt-4o-mini</span></div>
+      <div class="gate"><span class="n">NÃO DECIDE</span><span class="st">Defender, acordar e quanto</span><span class="ia">Saem de 60 mil sentenças, versionados e iguais para todos. <b>Sem a chave de IA, a política continua funcionando.</b></span></div>
+    </div>
+  </section>
+
+  <!-- 24 · arquitetura -->
+  <section class="s">
+    <span class="meta"><span class="t">13:15–13:50</span><span>24 / 27</span></span>
+    <p class="eyebrow">Arquitetura e solução técnica</p>
+    <h2>Uma aplicação, três perfis, <span class="y">um motor de política no centro.</span></h2>
+    <div class="funnel">
+      <div><span class="f">Quem usa</span><span class="g">Três perfis</span><span class="act">Advogado externo, gestor da empresa e administrador.</span></div>
+      <div><span class="f">Interface</span><span class="g">React · Vite</span><span class="act">Fila, avaliação, painel, contrato, auditoria.</span></div>
+      <div><span class="f">API</span><span class="g">FastAPI · Python</span><span class="act">Login por perfil; cada advogado vê <b>só os seus</b> processos; fluxo de fases.</span></div>
+      <div><span class="f">Dados</span><span class="g">SQLite</span><span class="act">Processos, decisões, negociações, sentenças e <b>auditoria só de inserção</b>.</span></div>
+      <div class="last"><span class="f">Núcleo</span><span class="g">Motor de política</span><span class="act">Prova → perfis → estado → preço → <b>pedir documento</b>, com a versão gravada.</span></div>
+    </div>
+    <div class="receipt">
+      <b>base histórica</b> 60 mil sentenças → tabela de 16 perfis · grupos de estado · curva dos 280 acordos · referências de custo<br />
+      <b>serviços de IA</b> OpenAI · leitura · dossiê · motivos · proposta · conversa com fontes<br />
+      <b>qualidade</b> 225 testes automatizados no backend · funciona sem chamada externa
+    </div>
+  </section>
+
+  <!-- 25 · limitações -->
+  <section class="s">
+    <span class="meta"><span class="t">13:50–14:20</span><span>25 / 27</span></span>
+    <p class="eyebrow">Limitações conhecidas</p>
+    <h2>O que a solução <span class="y">ainda não resolve.</span></h2>
+    <div class="rows">
+      <div><span class="lbl">Premissas</span><span class="val">Aceitação de 40% e recuperação de 70% são premissas: <b>a base não registra ofertas recusadas nem pedidos de documento</b>.</span></div>
+      <div><span class="lbl">Dados</span><span class="val">Custas processuais e honorários reais dos escritórios não estão na base.</span></div>
+      <div><span class="lbl">Documentos</span><span class="val">A base diz se o documento existe, não o que ele diz; só o dossiê é lido a fundo.</span></div>
+      <div><span class="lbl">Leitura</span><span class="val">PDF escaneado sem texto depende da leitura por IA; não há OCR próprio.</span></div>
+      <div><span class="lbl">Demo</span><span class="val">Pegamos casos da base e colocamos na demo; respostas de advogados e autores são simuladas para exercitar o painel.</span></div>
+      <div><span class="lbl">Infraestrutura</span><span class="val">Feita para o hackathon: SQLite, processamento no mesmo servidor, documentos sem criptografia.</span></div>
+    </div>
+  </section>
+
+  <!-- 26 · próximos passos -->
+  <section class="s">
+    <span class="meta"><span class="t">14:20–14:45</span><span>26 / 27</span></span>
+    <p class="eyebrow">Com mais um mês, nesta ordem</p>
+    <h2>Trocar premissa por dado <span class="y">e preparar para muitos clientes.</span></h2>
+    <div class="funnel f4">
+      <div><span class="f">1</span><span class="g">Aprender com o advogado</span><span class="act">Quando ele diverge e acerta, a política aprende. <b>O saldo de cada divergência já é gravado.</b></span></div>
+      <div><span class="f">2</span><span class="g">Aceitação e recuperação reais</span><span class="act">Cada oferta e cada pedido de documento viram curvas por faixa de valor e estado.</span></div>
+      <div><span class="f">3</span><span class="g">Infra multi-cliente</span><span class="act">AWS, Kubernetes, PostgreSQL, fila de processamento, isolamento por cliente e criptografia.</span></div>
+      <div class="last"><span class="f">4</span><span class="g">Mais contexto do negócio</span><span class="act">Custas e honorários reais na conta; <b>outros tipos de ação</b> além do empréstimo não reconhecido.</span></div>
+    </div>
+  </section>
+
+  <!-- 27 · fecho -->
+  <section class="s gold">
+    <span class="meta"><span class="t">14:45–15:00</span><span>27 / 27</span></span>
+    <div class="mark"><span class="o"></span>EnterOS</div>
+    <h1 style="max-width:16ch">Mesma justiça. Mais impacto.</h1>
+    <div class="receipt">
+      <b>definir</b> prova → 16 perfis → preço · validada em 60 mil sentenças · 15,3%<br />
+      <b>buscar a prova</b> pedir o documento certo · R$ 23,9 mi a mais · 27,7%<br />
+      <b>adaptar</b> a estratégia ao contrato de cada escritório<br />
+      <b>monitorar</b> o executivo vê o dinheiro; o time vê o que corrigir
+    </div>
+  </section>
+
+  <!-- apêndice -->
+  <section class="s">
+    <span class="meta"><span class="t">apêndice</span><span>A1</span></span>
+    <p class="eyebrow">Apêndice · economia</p>
+    <h2>Por que medimos contra processos parecidos</h2>
+    <div class="rows">
+      <div><span class="lbl">Pior caso exagera</span><span class="val">“Perder tudo pelo valor da causa” nunca acontece. Por isso <b>pior caso e gasto real ficam lado a lado</b>, sem um número de diferença.</span></div>
+      <div><span class="lbl">Parecido de verdade</span><span class="val">Economia = <b>custo médio real de processos parecidos − custo real</b>. Mesmos documentos, mesma alegação, mesmo grupo de estados; com menos de 30, o grupo se amplia.</span></div>
+      <div><span class="lbl">Só o observado</span><span class="val">O painel mostra o que foi pago. Estimativas, como o valor em jogo dos documentos, vêm marcadas e com a conta ao lado.</span></div>
+    </div>
+  </section>
+
+  <section class="s">
+    <span class="meta"><span class="t">apêndice</span><span>A2</span></span>
+    <p class="eyebrow">Apêndice · valor</p>
+    <h2>Por que a oferta fica entre 25% e 35% da causa</h2>
+    <div class="rows">
+      <div><span class="lbl">Curva de aceite</span><span class="val">Dos 280 acordos, a chance de aceite de uma oferta é a fração que fechou até aquele percentual, <b>entre 5% e 85%</b>.</span></div>
+      <div><span class="lbl">Melhor equilíbrio</span><span class="val">A oferta maximiza <b>chance de aceite × economia até o valor máximo</b>. Fora da faixa, a conta às vezes pagaria mais para subir a aceitação — acima do mercado.</span></div>
+      <div><span class="lbl">Aprende</span><span class="val">Com 10 respostas registradas, a aceitação real ajusta a curva (fator de 0,5 a 1,5).</span></div>
+    </div>
+  </section>
+
+  <section class="s">
+    <span class="meta"><span class="t">apêndice</span><span>A3</span></span>
+    <p class="eyebrow">Apêndice · aderência</p>
+    <h2>Ranquear advogados não é injusto?</h2>
+    <div class="rows">
+      <div><span class="lbl">O que entra</span><span class="val"><b>Economia nos processos 50</b> · valor dos acordos 20 · segue a recomendação 20 · acordos aceitos 10. Divergir com motivo vale metade; sem motivo, zero.</span></div>
+      <div><span class="lbl">O que protege</span><span class="val">Cada processo é comparado com parecidos; a nota é puxada para a média da empresa com peso de 10 processos e só ranqueia com 20 encerrados.</span></div>
+      <div><span class="lbl">Mercado anônimo</span><span class="val">O escritório é comparado com ele mesmo em outros clientes, sem identificar ninguém, com ao menos 2 clientes e 50 encerrados. Tempo não entra.</span></div>
+    </div>
+  </section>
+
+  <section class="s">
+    <span class="meta"><span class="t">apêndice</span><span>A4</span></span>
+    <p class="eyebrow">Apêndice · implementação</p>
+    <h2>O advogado pode discordar da política?</h2>
+    <div class="rows">
+      <div><span class="lbl">Pode, com motivo</span><span class="val">Fato novo, entendimento local do juízo, prova mais fraca, prova mais forte, sinal do autor ou outro. <b>Seguir nunca pede texto.</b></span></div>
+      <div><span class="lbl">Vira exceção</span><span class="val">Acordo acima do valor máximo, decisão diferente da recomendação e decisão sem abrir os documentos.</span></div>
+      <div><span class="lbl">Fluxo coerente</span><span class="val">Acordo aceito não fecha como defesa; recusa leva à defesa; contraproposta dentro do máximo pode ser aceita.</span></div>
+    </div>
+  </section>
+
+  <section class="s">
+    <span class="meta"><span class="t">apêndice</span><span>A5</span></span>
+    <p class="eyebrow">Apêndice · base histórica</p>
+    <h2>Os números por trás da política</h2>
+    <div class="metrics compact">
+      <div><span class="k">Sentenças</span><span class="v">60.000</span></div>
+      <div><span class="k">Derrota geral</span><span class="v">30 em 100</span></div>
+      <div><span class="k">Condenação média</span><span class="v">71,1%</span><span class="d">da causa, quando perde</span></div>
+      <div><span class="k">Acordos</span><span class="v">280</span><span class="d">média de R$ 4.540 · 29,8% da causa</span></div>
+      <div><span class="k">Sem contrato e extrato</span><span class="v">6.493</span><span class="d">97,3% de derrota · R$ 67,1 mi pagos</span></div>
+    </div>
+  </section>
+
+</div>
 
 <script>
-(() => {
-  const slides = [...document.querySelectorAll(".slide")];
-  const contador = document.querySelector(".hud span");
-  let atual = 0;
-  const ajustar = () => {
-    const k = Math.min(innerWidth / 1600, innerHeight / 900);
-    document.documentElement.style.setProperty("--k", k);
-  };
-  const ir = (n) => {
-    atual = Math.max(0, Math.min(slides.length - 1, n));
-    slides.forEach((s, i) => s.classList.toggle("ativo", i === atual));
-    contador.textContent = `${atual + 1} / ${slides.length}`;
-    try { history.replaceState(null, "", `#${atual + 1}`); } catch (e) {}
-  };
-  const telaCheia = () => {
-    if (document.fullscreenElement) document.exitFullscreen?.();
-    else document.documentElement.requestFullscreen?.().catch(() => {});
-  };
-  addEventListener("resize", ajustar);
-  addEventListener("keydown", (e) => {
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.s'));
+  function current() {
+    var top = deck.scrollTop, best = 0, dist = Infinity;
+    slides.forEach(function (el, i) { var d = Math.abs(el.offsetTop - top); if (d < dist) { dist = d; best = i; } });
+    return best;
+  }
+  function go(step) {
+    var next = Math.min(slides.length - 1, Math.max(0, current() + step));
+    slides[next].scrollIntoView({ block: 'start' });
+  }
+  document.addEventListener('keydown', function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); ir(atual + 1); }
-    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); ir(atual - 1); }
-    else if (e.key === "Home") ir(0);
-    else if (e.key === "End") ir(slides.length - 1);
-    else if (e.key === "f" || e.key === "F") telaCheia();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+    else if (e.key === 'Home') { e.preventDefault(); slides[0].scrollIntoView({ block: 'start' }); }
+    else if (e.key === 'End') { e.preventDefault(); slides[slides.length - 1].scrollIntoView({ block: 'start' }); }
   });
-  document.querySelector(".deck").addEventListener("click", (e) => {
-    if (e.target.closest("a, button")) return;
-    ir(atual + (e.clientX > innerWidth / 2 ? 1 : -1));
-  });
-  document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => ir(atual + Number(b.dataset.ir))));
-  document.querySelector("[data-tela-cheia]").addEventListener("click", telaCheia);
-  ajustar();
-  ir((parseInt(location.hash.slice(1), 10) || 1) - 1);
-})();
+  document.getElementById('print').addEventListener('click', function () { window.print(); });
 </script>
+
+</body>
+</html>
