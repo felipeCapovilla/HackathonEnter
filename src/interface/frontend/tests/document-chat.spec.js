@@ -164,6 +164,7 @@ test("todos os cards recolhem com resumo e preservam formulário; IA permanece a
     analyses: [{ id: "analysis-1", recommendation: "ACORDO", reasons: [], created_at: "2026-09-12T12:00:00Z", pricing: { opening_value: 100, target_value: 200, walk_away_value: 300, expected_defense_cost: 300 } }],
     fase: { codigo: "PRONTO_PARA_DECIDIR", rotulo: "Pronto para decidir", proxima_acao: "Registrar a decisão" },
   });
+  await page.getByRole("tab", { name: "Próximo passo" }).click();
   const amount = page.getByRole("spinbutton", { name: "Valor da proposta" });
   await amount.fill("150");
   await page.getByRole("button", { name: "Recolher Decisão", exact: true }).click();
@@ -195,12 +196,14 @@ test("áreas de avaliação, decisão e histórico preservam rascunhos e navegam
   await page.setViewportSize({ width: 1440, height: 1000 });
   const sameTypeDocs = [...documents, { ...documents[0], id: "doc-3", original_filename: "03_Contrato_aditivo_renegociacao.txt" }];
   await setup(page, null, sameTypeDocs, { ...readyCase, document_readings: [{ document_id: "doc-1", status: "COMPLETED", result: { resumo: "Contrato da operação de crédito questionada no processo.", pontos_de_atencao: ["Conferir a assinatura e a data de contratação."] } }] });
+  await expect(page.getByRole("tab", { name: "Avaliação" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Propor acordo", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continuar para a decisão" }).click();
   await expect(page.getByRole("tab", { name: "Próximo passo" })).toHaveAttribute("aria-selected", "true");
   const amount = page.getByRole("spinbutton", { name: "Valor da proposta" });
   await amount.fill("2800");
   await page.getByRole("tab", { name: "Avaliação" }).click();
   await expect(amount).toBeHidden();
-  await expect(page.getByRole("heading", { name: "Propor acordo", exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("workspace-desktop.png") });
   await page.getByRole("button", { name: "Continuar para a decisão" }).click();
   await expect(amount).toHaveValue("2800");
