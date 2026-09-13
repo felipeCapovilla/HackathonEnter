@@ -63,6 +63,13 @@
 .viewer-summary[open] summary .icon:last-child { transform: rotate(180deg); }
 .viewer-summary p { margin: 10px 0 0; font-size: 13px; }
 .viewer-summary ul { font-size: 13px; }
+.viewer-ai-action { display: grid; gap: 10px; }
+.viewer-ai-action > div { display: flex; align-items: flex-start; gap: 8px; }
+.viewer-ai-action > div > .icon { flex: 0 0 auto; margin-top: 2px; color: var(--primary-text); }
+.viewer-ai-action strong { display: block; font-size: 13px; }
+.viewer-ai-action p { margin: 3px 0 0; color: var(--muted); }
+.viewer-ai-action > button { justify-self: start; min-height: 32px; padding: 5px 9px; font-size: 12px; }
+.viewer-ai-action > [role="alert"] { color: var(--danger); }
 .case-workspace .visualizador-quadro { height: clamp(420px, 64vh, 760px); min-height: 0; margin-top: 0; }
 .case-workspace .visualizador-rodape { font-size: 12px; }
 .case-workspace .visualizador-rodape > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

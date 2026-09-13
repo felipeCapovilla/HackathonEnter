@@ -115,7 +115,7 @@ export function CasoAdvogado({ caseId }) {
         </div>
         <div className={`caso-grade case-work-grid mobile-${mobileView}`}>
           <div className="caso-documentos-coluna">
-            <VisualizadorDocumentos documentos={detalhe.documents} leituras={detalhe.document_readings}>
+            <VisualizadorDocumentos documentos={detalhe.documents} leituras={detalhe.document_readings} leituraAtiva={Boolean(detalhe.leitura_ia_ativa)} onLeituraGerada={recurso.reload}>
               <ChatDocumentos caseId={caseId} caseNumber={detalhe.case.case_number} documentos={detalhe.documents} />
             </VisualizadorDocumentos>
           </div>

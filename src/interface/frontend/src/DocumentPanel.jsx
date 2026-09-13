@@ -6,20 +6,13 @@ import "./banco/banco.css";
 
 const moeda = (value) => value == null ? null : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-/** O que a IA leu no documento. Só alerta; não muda tipo nem cadastro sozinha. */
-function LeituraIA({ document, leitura, leituraAtiva, valueOfClaim, onRefresh }) {
-  const action = useAction();
-  const ler = () => action.run(async () => {
-    await request(`/documents/${document.id}/leitura`, { method: "POST" });
-    onRefresh();
-  });
+/** O banco consulta a leitura que o advogado solicitou; não consegue criá-la daqui. */
+function LeituraIA({ document, leitura, valueOfClaim }) {
   if (!["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status)) return null;
-  if (!leitura && !leituraAtiva) return null;
-  if (!leitura || leitura.status === "FAILED") {
+  if (!leitura) return null;
+  if (leitura.status === "FAILED") {
     return <div className="leitura-ia">
-      <p className="muted">{leitura ? `Leitura por IA indisponível: ${leitura.error}` : "Documento ainda sem leitura por IA."}</p>
-      <button type="button" className="subtle" disabled={action.pending} onClick={ler}>{action.pending ? "Lendo…" : "Ler com IA"}</button>
-      {action.error && <p role="alert" className="leitura-alerta">{action.error}</p>}
+      <p className="muted">Leitura por IA não concluída: {leitura.error || "indisponível"}.</p>
     </div>;
   }
   const r = leitura.result;
@@ -101,7 +94,7 @@ function DeleteDocument({ caseId, document, onDeleted }) {
   </div>;
 }
 
-export function DocumentPanel({ caseId, documents, readings = [], leituraAtiva = false, valueOfClaim = null, canUpload, encerrado = false, onUploaded }) {
+export function DocumentPanel({ caseId, documents, readings = [], valueOfClaim = null, canUpload, encerrado = false, onUploaded }) {
   // Depois do desfecho a prova é histórica: nem entra documento novo, nem sai o
   // que já sustentou a recomendação emitida.
   const podeEditar = canUpload && !encerrado;
@@ -157,7 +150,7 @@ export function DocumentPanel({ caseId, documents, readings = [], leituraAtiva =
           {document.page_count > 0 && ` · ${document.page_count} página(s)`}
         </span>
         <DocumentNotice document={document} />
-        <LeituraIA document={document} leitura={readings.find((reading) => reading.document_id === document.id)} leituraAtiva={leituraAtiva} valueOfClaim={valueOfClaim} onRefresh={onUploaded} />
+        <LeituraIA document={document} leitura={readings.find((reading) => reading.document_id === document.id)} valueOfClaim={valueOfClaim} />
         <div className="document-actions">
           <a href={documentDownloadUrl(document.id)} target="_blank" rel="noopener noreferrer" aria-label={`Baixar ${document.original_filename}`}>Baixar original</a>
           {/* Só o banco exclui, e só o que ele mesmo enviou: o gate documental é dele. */}

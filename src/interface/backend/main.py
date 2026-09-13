@@ -133,11 +133,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         def ao_extrair(document_id: str) -> None:
             analisar_dossie_ao_extrair(document_id)
-            if app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip():
-                try:
-                    ler_com_ia(document_id)
-                except Exception:  # noqa: BLE001 - a leitura é complemento; o documento já está processado
-                    logger.exception("Leitura por IA do documento %s falhou", document_id)
             avaliar_quando_documentos_prontos(document_id)
 
         app.state.leitor = ler_documento
@@ -408,7 +403,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "negotiation_outcomes": repository().list_negotiation_outcomes(case_id),
             "document_readings": repository().list_document_readings(case_id),
             "fase": repository().case_flow(case_id),
-            # A tela espera a leitura por IA só quando ela de fato vai acontecer.
+            # Indica ao advogado se a ação manual de leitura está disponível.
             "leitura_ia_ativa": bool(app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip()),
             "judicial_outcomes": repository().list_judicial_outcomes(case_id),
             "case": case,
@@ -852,13 +847,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/documents/{document_id}/leitura", status_code=201)
     def ler_documento_com_ia(document_id: str, request: Request) -> dict:
-        """Refaz (ou faz pela primeira vez) a leitura por IA de um documento do processo."""
-        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        """Gera (ou refaz) a leitura por IA sob solicitação do advogado responsável."""
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         document = repository().get_document(document_id)
         if document is None:
             raise HTTPException(404, "Documento não encontrado.")
         require_case_access(repository(), document["case_id"], user)
-        if not os.getenv("OPENAI_API_KEY", "").strip():
+        if not app_settings.leitura_ia or not os.getenv("OPENAI_API_KEY", "").strip():
             raise HTTPException(503, "Leitura por IA indisponível: configure OPENAI_API_KEY no servidor.")
         return app.state.ler_com_ia(document_id)
 
