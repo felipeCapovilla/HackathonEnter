@@ -101,7 +101,7 @@ def test_sentenca_desfavoravel_guarda_quanto_a_empresa_perdeu(tmp_path, monkeypa
                                                            sub_subject="Golpe", assigned_lawyer_id=lawyer["id"]))
         analysis = advogado.post(f"/api/cases/{case['id']}/analyses").json()
         decision = advogado.post(f"/api/cases/{case['id']}/lawyer-decisions?analysis_id={analysis['id']}",
-                                 json={"action": "DEFESA"}).json()
+                                 json={"action": "DEFESA", "divergence_reason": "PROVA_MAIS_FORTE"}).json()
         registrado = advogado.post(f"/api/cases/{case['id']}/lawyer-decisions/{decision['id']}/outcome",
                                    json={"outcome": "SENTENCA_DESFAVORAVEL", "value": 12000})
         assert registrado.status_code == 201, registrado.text

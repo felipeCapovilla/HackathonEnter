@@ -25,6 +25,7 @@ from .monitoring import build_monitoring_summary
 from .bank_insights import build_bank_insights
 from src.utils.motivo_indisponibilidade import classificar_motivo
 from src.tools.leitor_documentos import LeituraIndisponivel, ler_documento
+from src.tools.mensagem_proposta import redigir_mensagem
 from src.policy.service import PolicyService
 from contracts.schema import ParametrosContrato
 from .repository import Repository
@@ -37,6 +38,7 @@ from .schemas import (
     JudicialOutcomeCreate,
     JudicialOutcomeRecord,
     LawFirmCreate,
+    MensagemPropostaCreate,
     LawFirmRecord,
     NegotiationOutcomeCreate,
     NegotiationOutcomeRecord,
@@ -383,6 +385,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "negotiation_outcomes": repository().list_negotiation_outcomes(case_id),
             "document_readings": repository().list_document_readings(case_id),
+            "fase": repository().case_flow(case_id),
             # A tela espera a leitura por IA só quando ela de fato vai acontecer.
             "leitura_ia_ativa": bool(app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip()),
             "judicial_outcomes": repository().list_judicial_outcomes(case_id),
@@ -484,7 +487,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return page
 
     @app.get("/api/documents/{document_id}/file")
-    def download_document(document_id: str, request: Request) -> FileResponse:
+    def download_document(document_id: str, request: Request, inline: bool = False) -> FileResponse:
         document = repository().get_document_internal(document_id)
         # Excluído logicamente não existe para quem consulta: a linha só sobrevive
         # para a auditoria das análises que já o usaram.
@@ -496,7 +499,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         path = Path(document["file_path"])
         if not path.exists():
             raise HTTPException(410, "Arquivo original não está mais disponível.")
-        return FileResponse(path, filename=document["original_filename"])
+        # inline=1 abre o PDF na própria tela do processo; sem ele, baixa o original.
+        return FileResponse(path, filename=document["original_filename"],
+                            content_disposition_type="inline" if inline else "attachment")
 
     @app.get("/api/documents/{document_id}/dossie-analysis", response_model=DossieAnalysisRecord)
     def get_dossie_analysis(document_id: str, request: Request) -> dict:
@@ -607,19 +612,52 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_lawyer_decision(case_id: str, analysis_id: str, payload: LawyerDecisionCreate, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         case = require_case(case_id, request)
-        # Uma decisão por processo. A segunda não seria revisão: viraria um
-        # segundo registro competindo com o primeiro no cálculo de aderência,
-        # e o desfecho ficaria pendurado em qual dos dois?
-        estagio = repository().case_stage(case_id)
-        if estagio == "ENCERRADO":
-            raise HTTPException(409, "Processo encerrado: não é possível registrar nova decisão.")
-        if estagio == "DECIDIDO":
+        # Uma decisão por processo (a segunda competiria com a primeira na aderência). A exceção
+        # é "pedir documento": ela espera a empresa responder e, depois da reavaliação, dá lugar
+        # à decisão final. A fase vem da máquina de estados em fluxo.py.
+        fase = repository().case_flow(case_id)["codigo"]
+        bloqueios = {
+            "ENCERRADO": "Processo encerrado: não é possível registrar nova decisão.",
+            "AGUARDANDO_AVALIACAO": "Avalie o processo antes de decidir.",
+            "REAVALIAR": "Chegaram documentos novos: reavalie o processo antes de decidir.",
+            "AGUARDANDO_DOCUMENTO": "Aguarde a empresa responder ao pedido de documento.",
+        }
+        if fase in bloqueios:
+            raise HTTPException(409, bloqueios[fase])
+        if fase != "PRONTO_PARA_DECIDIR":
             raise HTTPException(409, "Este processo já tem decisão registrada. Registre o desfecho.")
         analysis = repository().get_analysis(analysis_id)
         if analysis is None or analysis["case_id"] != case_id:
             raise HTTPException(422, "Análise inválida para este processo.")
+        if repository().list_analyses(case_id)[0]["id"] != analysis_id:
+            raise HTTPException(409, "Use a avaliação mais recente do processo.")
+        if payload.action == "ACORDO" and not payload.proposed_value:
+            raise HTTPException(422, "Informe o valor da proposta de acordo.")
+        maximo = (analysis.get("pricing") or {}).get("walk_away_value")
+        acima_do_maximo = payload.action == "ACORDO" and maximo is not None and payload.proposed_value > maximo + 0.01
+        if (payload.action != analysis["recommendation"] or acima_do_maximo) and payload.divergence_reason is None:
+            raise HTTPException(422, "A proposta passa do valor máximo: escolha o motivo." if acima_do_maximo and payload.action == analysis["recommendation"]
+                                else "A decisão é diferente da recomendação: escolha o motivo.")
+        if payload.divergence_reason == "OUTRO" and not (payload.reason or "").strip():
+            raise HTTPException(422, "Descreva o motivo da divergência.")
+        documento = None
+        if payload.action == "RECUPERAR":
+            plano = (analysis.get("policy_output") or {}).get("recuperacao") or {}
+            documento = payload.requested_document or {"contrato": "CONTRATO", "extrato": "EXTRATO",
+                                                       "comprovante_credito": "COMPROVANTE_CREDITO"}.get(plano.get("documento"))
+            if documento is None:
+                raise HTTPException(422, "Escolha qual documento pedir à empresa.")
+        payload = payload.model_copy(update={
+            "proposed_value": payload.proposed_value if payload.action == "ACORDO" else None,
+            "requested_document": documento,
+        })
         lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
         decision = repository().create_lawyer_decision(case_id, analysis_id, payload, lawyer_id)
+        if documento:
+            plano = (analysis.get("policy_output") or {}).get("recuperacao") or {}
+            repository().create_document_request(case_id, DocumentRequestCreate(
+                document_type=documento, hypothesis_key="decisao-do-advogado",
+                reason=(plano.get("fundamento") or payload.reason or "Documento pedido pelo advogado antes de decidir.")[:1000]))
         track(user, case_id, EngagementEventType.DECISION_REGISTERED)
         return decision
 
@@ -628,6 +666,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         case = require_case(case_id, request)
         require_open_case(case_id, "registrar resultado da negociação")
+        fase = repository().case_flow(case_id)
+        if fase["codigo"] not in {"EM_NEGOCIACAO", "CONTRAPROPOSTA"}:
+            raise HTTPException(409, "Não há negociação de acordo aberta neste processo.")
+        analise_da_decisao = repository().get_analysis(fase["decisao"]["analysis_id"]) or {}
+        maximo = (analise_da_decisao.get("pricing") or {}).get("walk_away_value")
+        if (payload.status == "ACEITO" and maximo is not None and payload.closed_value > maximo + 0.01
+                and payload.divergence_reason is None):
+            raise HTTPException(422, "O valor passa do valor máximo: escolha o motivo para aceitar mesmo assim.")
         lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
         try:
             outcome = repository().create_negotiation_outcome(case_id, payload, lawyer_id)
@@ -640,6 +686,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def create_judicial_outcome(case_id: str, payload: JudicialOutcomeCreate, request: Request) -> dict:
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         case = require_case(case_id, request)
+        if repository().case_flow(case_id)["codigo"] != "EM_DEFESA":
+            raise HTTPException(409, "A sentença só entra em processo em defesa: decisão de defesa ou acordo recusado.")
         lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
         outcome = repository().create_judicial_outcome(case_id, payload, lawyer_id)
         track(user, case_id, EngagementEventType.OUTCOME_REGISTERED)
@@ -689,6 +737,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             repository().create_negotiation_outcome(case_id, NegotiationOutcomeCreate(
                 status="ACEITO", offered_value=decision["proposed_value"], closed_value=payload.value), lawyer_id)
         return updated
+
+    @app.get("/api/lawyer/queue")
+    def lawyer_queue(request: Request) -> list[dict]:
+        """Minha fila: os processos do advogado na ordem da próxima ação."""
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        return repository().lawyer_queue(user["id"])
+
+    @app.post("/api/cases/{case_id}/mensagem-proposta")
+    def mensagem_proposta(case_id: str, payload: MensagemPropostaCreate, request: Request) -> dict:
+        """Mensagem de proposta de acordo pronta para enviar ao advogado do autor."""
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        case = require_case(case_id, request)
+        analises = repository().list_analyses(case_id)
+        pricing = analises[0].get("pricing") if analises else None
+        if not pricing:
+            raise HTTPException(409, "Avalie o processo antes de redigir a proposta: ainda não há valor sugerido.")
+        valor = payload.valor or pricing["opening_value"]
+        texto, fonte = redigir_mensagem(numero=case["case_number"], empresa=user.get("bank_name") or "a empresa",
+                                        advogado=user.get("name") or "", valor=valor, prazo_dias=payload.prazo_dias)
+        return {"mensagem": texto, "fonte": fonte, "valor": valor}
 
     @app.get("/api/lawyer/performance", response_model=LawyerPerformance)
     def lawyer_performance(request: Request) -> dict:

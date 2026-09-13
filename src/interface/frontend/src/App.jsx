@@ -9,6 +9,8 @@ import { DocumentRequestsPanel } from "./banco/DocumentRequestsPanel";
 import { BuscaProcessos } from "./banco/BuscaProcessos";
 import { ResultadoProcesso } from "./banco/ResultadoProcesso";
 import { useActiveTime } from "./useActiveTime";
+import { MinhaFila } from "./advogado/MinhaFila";
+import CasoAdvogadoRota from "./advogado/CasoAdvogado";
 
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Pedir documento", BANCO: "Empresa", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -660,8 +662,8 @@ export default function App() {
       <Route path="/banco" element={user.role === "BANCO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
       <Route path="/banco/casos/:caseId" element={user.role === "BANCO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
       <Route path="/banco/monitoramento" element={user.role === "BANCO" ? <BankDashboard user={user} /> : <Navigate to={base} replace />} />
-      <Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
-      <Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
+      <Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <MinhaFila desempenho={<LawyerPerformance />} /> : <Navigate to={base} replace />} />
+      <Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CasoAdvogadoRota /> : <Navigate to={base} replace />} />
       <Route path="/admin" element={user.role === "ADMIN_GLOBAL" ? <Admin /> : <Navigate to={base} replace />} />
       <Route path="*" element={<Navigate to={base} replace />} />
     </Routes>
