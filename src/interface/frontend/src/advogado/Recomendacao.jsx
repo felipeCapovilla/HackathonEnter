@@ -30,9 +30,8 @@ export function Recomendacao({ recomendacao, precisaAvaliar, onAvaliar, ocupado 
   if (!recomendacao) {
     return <article className="panel recomendacao">
       <span className="pill amber"><Icon name="spark" />Recomendação</span>
-      <h3>Ainda não avaliado</h3>
-      <p className="muted">Quando os documentos estiverem no processo, peça a avaliação: a política calcula o caminho mais barato para a empresa.</p>
-      <button className="primary" disabled={ocupado} onClick={onAvaliar}><Icon name="spark" />{ocupado ? "Avaliando…" : "Avaliar o processo"}</button>
+      <h3>{ocupado ? "Calculando a recomendação…" : "Aguardando documentos"}</h3>
+      <p className="muted">{ocupado ? "A política está analisando os documentos deste processo." : "A recomendação aparece sozinha assim que a empresa enviar os documentos do processo."}</p>
     </article>;
   }
   const po = recomendacao.policy_output || {};

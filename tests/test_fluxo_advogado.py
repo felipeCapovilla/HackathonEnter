@@ -150,21 +150,23 @@ def test_documento_novo_depois_da_avaliacao_pede_reavaliacao(ambiente):
     enviado = empresa.post(f"/api/cases/{case_id}/documents", data={"declared_type": "CONTRATO", "source_party": "BANCO"},
                            files={"file": ("contrato.txt", b"Contrato de emprestimo assinado", "text/plain")})
     assert enviado.status_code == 201
-    assert _fase(advogado, case_id)["codigo"] == "REAVALIAR"
+    detalhe = advogado.get(f"/api/cases/{case_id}").json()
+    assert detalhe["fase"]["codigo"] == "PRONTO_PARA_DECIDIR", "documento novo reavalia sozinho"
+    assert detalhe["analyses"][0]["id"] != analysis["id"]
     assert advogado.post(f"/api/cases/{case_id}/lawyer-decisions?analysis_id={analysis['id']}",
-                         json={"action": "ACORDO", "proposed_value": 1000}).status_code == 409
+                         json={"action": "ACORDO", "proposed_value": 1000}).status_code == 409, "avaliação antiga"
 
 
 def test_pdf_abre_na_pagina_e_mensagem_de_proposta_sem_ia(ambiente):
     app, empresa, advogado, lawyer_id = ambiente
     case_id = _caso(app, lawyer_id)
+    assert advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).status_code == 409
     pdf = empresa.post(f"/api/cases/{case_id}/documents", data={"declared_type": "AUTOS", "source_party": "BANCO"},
                        files={"file": ("autos.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")}).json()
     na_pagina = advogado.get(f"/api/documents/{pdf['id']}/file", params={"inline": 1})
     assert na_pagina.status_code == 200 and na_pagina.headers["content-disposition"].startswith("inline")
     assert advogado.get(f"/api/documents/{pdf['id']}/file").headers["content-disposition"].startswith("attachment")
 
-    assert advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).status_code == 409
     analysis = _avaliar(advogado, case_id)
     mensagem = advogado.post(f"/api/cases/{case_id}/mensagem-proposta", json={}).json()
     numero = advogado.get(f"/api/cases/{case_id}").json()["case"]["case_number"]

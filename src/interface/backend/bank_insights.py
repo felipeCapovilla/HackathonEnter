@@ -20,7 +20,8 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from src.policy.constants import P3
+from src.policy import table
+from src.policy.constants import P3, P4, RATIO_CONDENACAO
 from src.policy.referencia import acordos as referencia_acordos, custo_parecidos, posicao_no_mercado
 
 ARTEFATO_BASE = Path(__file__).resolve().parents[3] / "artefatos" / "insights_base_historica.json"
@@ -345,12 +346,12 @@ def _excecoes(itens: list[dict]) -> dict:
     for x in itens:
         base = {"case_id": x["case_id"], "case_number": x["case_number"], "advogado": x["lawyer_name"],
                 "escritorio": x["law_firm_name"], "data": x["decidido_em"].isoformat() if x["decidido_em"] else None,
-                "valor_causa": x["valor_causa"], "motivo": MOTIVOS_DIVERGENCIA.get(x["motivo_divergencia"])}
+                "valor_causa": x["valor_causa"], "motivo": None}
         if x["fechado"] is not None and x["limite"] is not None and x["fechado"] > x["limite"] + 0.01:
             lista.append({**base, "tipo": "ACORDO_ACIMA_DO_LIMITE",
                           "detalhe": f"Fechou em {_brl(x['fechado'])}; acima de {_brl(x['limite'])} o acordo não compensa."})
         if not x["aderente"]:
-            lista.append({**base, "tipo": "DECISAO_DIFERENTE",
+            lista.append({**base, "tipo": "DECISAO_DIFERENTE", "motivo": MOTIVOS_DIVERGENCIA.get(x["motivo_divergencia"]),
                           "detalhe": f"Recomendação: {ACOES.get(x['recomendacao'], x['recomendacao'])}. Decisão: {ACOES.get(x['acao'], x['acao'])}."})
         if x["com_ressalva"] and x["documentos_abertos"] == 0:
             lista.append({**base, "tipo": "DECISAO_SEM_CONFERENCIA",
@@ -360,21 +361,52 @@ def _excecoes(itens: list[dict]) -> dict:
     contagem: dict[str, int] = defaultdict(int)
     for e in lista:
         contagem[e["tipo"]] += 1
-    return {"total": len(lista), "por_tipo": dict(contagem), "itens": lista[:60]}
+    # Todas as linhas: cortar aqui escondia os tipos do fim da ordenação e o filtro da tela aparecia vazio.
+    return {"total": len(lista), "por_tipo": dict(contagem), "itens": lista}
+
+
+def valor_em_jogo(flags: dict[str, bool], documento: str, sub_assunto: str, uf: str, causa: float) -> float:
+    """
+    Economia ESTIMADA se o documento que falta chegar: (chance de perder sem ele − com ele) × condenação média
+    × chance de a empresa encontrar o documento. É a única estimativa do painel, pedida de propósito: mostra
+    quanto vale organizar a entrega de documentos, e aparece rotulada como estimativa.
+    """
+    if flags.get(documento, True):
+        return 0.0
+    com = {**flags, documento: True}
+    delta = (table.p_perda(flags["contrato"], flags["extrato"], flags["comprovante"], sub_assunto, uf)
+             - table.p_perda(com["contrato"], com["extrato"], com["comprovante"], sub_assunto, uf))
+    return max(0.0, delta) * RATIO_CONDENACAO.valor * causa * P4.valor
+
+
+CHAVE_DOC = {"CONTRATO": "contrato", "EXTRATO": "extrato", "COMPROVANTE_CREDITO": "comprovante"}
 
 
 def _documentos(connection: sqlite3.Connection, bank_id: str) -> tuple[dict, list[dict]]:
     agora = datetime.now(UTC)
     ultimas = connection.execute("""
-        SELECT c.id, a.feature_vector FROM cases c JOIN analyses a ON a.id = (
+        SELECT c.id, c.uf, c.value_of_claim, c.sub_subject, a.feature_vector FROM cases c JOIN analyses a ON a.id = (
             SELECT id FROM analyses WHERE case_id = c.id ORDER BY created_at DESC LIMIT 1)
         WHERE c.bank_id = ?""", (bank_id,)).fetchall()
-    carteira = {tipo: {"tipo": tipo, "nome": nome, "casos_sem": 0} for tipo, nome in FEATURE_DOC.items()}
+    carteira = {tipo: {"tipo": tipo, "nome": nome, "casos_sem": 0, "valor_em_jogo": 0.0} for tipo, nome in FEATURE_DOC.items()}
+    casos: dict[str, tuple] = {}
     for row in ultimas:
         features = json.loads(row["feature_vector"])
-        for tipo, coluna in FEATURE_DOC.items():
-            if not features.get(coluna):
+        flags = {"contrato": bool(features.get("Contrato")), "extrato": bool(features.get("Extrato")),
+                 "comprovante": bool(features.get("Comprovante de crédito"))}
+        sub = "Golpe" if "golpe" in (row["sub_subject"] or "").lower() else "Generico"
+        causa = float(row["value_of_claim"] or 0.0)
+        casos[row["id"]] = (flags, sub, row["uf"], causa)
+        for tipo, chave in CHAVE_DOC.items():
+            if not flags[chave]:
                 carteira[tipo]["casos_sem"] += 1
+                carteira[tipo]["valor_em_jogo"] += valor_em_jogo(flags, chave, sub, row["uf"], causa)
+
+    def jogo(case_id: str, tipo: str) -> float:
+        if case_id not in casos or tipo not in CHAVE_DOC:
+            return 0.0
+        flags, sub, uf, causa = casos[case_id]
+        return valor_em_jogo(flags, CHAVE_DOC[tipo], sub, uf, causa)
 
     pedidos = [dict(r) for r in connection.execute("""
         SELECT r.*, c.case_number, c.value_of_claim, u.name AS lawyer_name FROM document_requests r
@@ -388,8 +420,9 @@ def _documentos(connection: sqlite3.Connection, bank_id: str) -> tuple[dict, lis
         fila.append({"id": p["id"], "case_id": p["case_id"], "case_number": p["case_number"],
                      "documento": p["document_type"], "documento_nome": DOC_NOMES.get(p["document_type"], p["document_type"]),
                      "advogado": p["lawyer_name"], "dias_em_aberto": (agora - criado).days if criado else None,
-                     "valor_causa": p["value_of_claim"], "motivo_pedido": p["reason"]})
-    fila.sort(key=lambda f: (-(f["valor_causa"] or 0), -(f["dias_em_aberto"] or 0)))
+                     "valor_causa": p["value_of_claim"], "valor_em_jogo": round(jogo(p["case_id"], p["document_type"]), 2),
+                     "motivo_pedido": p["reason"]})
+    fila.sort(key=lambda f: (-f["valor_em_jogo"], -(f["dias_em_aberto"] or 0)))
 
     respondidos = [p for p in pedidos if p["responded_at"]]
     dias_resposta = [(_parse_date(p["responded_at"]) - _parse_date(p["created_at"])).total_seconds() / 86400 for p in respondidos]
@@ -398,22 +431,28 @@ def _documentos(connection: sqlite3.Connection, bank_id: str) -> tuple[dict, lis
         if p["status"] != "DECLARED_UNAVAILABLE":
             continue
         chave = (p["document_type"], p["unavailability_reason"] or "OUTRO")
-        m = motivos.setdefault(chave, {"documento": chave[0], "motivo": chave[1], "casos": 0, "classificados_por_ia": 0})
+        m = motivos.setdefault(chave, {"documento": chave[0], "motivo": chave[1], "casos": 0, "classificados_por_ia": 0, "valor_em_jogo": 0.0})
         m["casos"] += 1
         m["classificados_por_ia"] += p["unavailability_reason_source"] == "IA"
+        m["valor_em_jogo"] += jogo(p["case_id"], p["document_type"])
     status = defaultdict(int)
     for p in pedidos:
         status[p["status"]] += 1
     documentos = {
         "base_historica": base_historica(),
-        "carteira": {"casos_analisados": len(ultimas), "por_documento": list(carteira.values())},
+        "carteira": {"casos_analisados": len(ultimas),
+                     "por_documento": [{**v, "valor_em_jogo": round(v["valor_em_jogo"], 2)} for v in carteira.values()],
+                     "valor_em_jogo_total": round(sum(v["valor_em_jogo"] for v in carteira.values()), 2)},
         "fila_recuperacao": fila[:50], "fila_total": len(fila),
+        "fila_valor_em_jogo": round(sum(f["valor_em_jogo"] for f in fila), 2),
         "pedidos": {"total": len(pedidos), "por_status": dict(status),
                     "dias_para_responder_mediana": round(statistics.median(dias_resposta), 1) if dias_resposta else None,
                     "entregues": _ratio(status["SUBMITTED"], len(respondidos))},
-        "motivos": sorted(({**m, "motivo_nome": MOTIVOS.get(m["motivo"], m["motivo"]),
+        "motivos": sorted(({**m, "valor_em_jogo": round(m["valor_em_jogo"], 2), "motivo_nome": MOTIVOS.get(m["motivo"], m["motivo"]),
                             "documento_nome": DOC_NOMES.get(m["documento"], m["documento"])} for m in motivos.values()),
-                          key=lambda m: -m["casos"]),
+                          key=lambda m: -m["valor_em_jogo"]),
+        "premissa_valor_em_jogo": (f"Estimativa: (chance de a empresa perder sem o documento − com ele) × condenação média "
+                                   f"({_pct(RATIO_CONDENACAO.valor)} da causa) × chance de encontrar o documento ({P4.valor:.0%})."),
     }
     return documentos, list(motivos.values())
 

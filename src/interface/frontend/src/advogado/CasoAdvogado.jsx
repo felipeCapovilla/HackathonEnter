@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { request } from "../api";
 import { useAction, useResource } from "../hooks";
@@ -25,7 +25,18 @@ export function CasoAdvogado({ caseId }) {
     await request(`/cases/${caseId}/analyses`, { method: "POST" });
     recurso.reload();
   });
-  const precisaAvaliar = fase && (fase.codigo === "REAVALIAR" || (fase.documentos_novos && fase.codigo !== "ENCERRADO"));
+  // O advogado não aperta botão para ver a recomendação: sem avaliação (ou com documentos novos antes da
+  // decisão), a tela pede sozinha, uma vez por mudança de documentos.
+  const tentativa = useRef(null);
+  useEffect(() => {
+    if (!detalhe || processando || acao.pending) return;
+    const chave = `${detalhe.fase.codigo}-${detalhe.analyses.length}-${detalhe.documents.length}`;
+    if (["AGUARDANDO_AVALIACAO", "REAVALIAR"].includes(detalhe.fase.codigo) && detalhe.documents.length > 0 && tentativa.current !== chave) {
+      tentativa.current = chave;
+      avaliar();
+    }
+  }, [detalhe, processando, acao.pending]);
+  const precisaAvaliar = fase && fase.documentos_novos && fase.codigo !== "ENCERRADO";
   return <section className="caso-advogado">
     <Link className="voltar" to="/advogado">← Minha fila</Link>
     {recurso.error && <div className="warning" role="alert"><p>{recurso.error}</p><button type="button" onClick={recurso.reload}>Tentar novamente</button></div>}
