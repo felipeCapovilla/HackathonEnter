@@ -243,10 +243,8 @@ def test_ai_rejected_document_is_visible_but_does_not_feed_the_policy(tmp_path, 
         detail = client.get(f"/api/cases/{case_id}").json()
         assert any(d["id"] == document["id"] for d in detail["documents"])
 
-        # A leitura fica salva no mesmo lugar usado pelo card consultivo do advogado.
-        reading = next(r for r in detail["document_readings"] if r["document_id"] == document["id"])
-        assert reading["status"] == "COMPLETED"
-        assert reading["result"]["tipo_documento"] == "RECUSADO"
+        # A classificação automática não cria o resumo consultivo: ele é pedido pelo advogado.
+        assert not any(r["document_id"] == document["id"] for r in detail["document_readings"])
 
         analysis = client.post(f"/api/cases/{case_id}/analyses")
         assert analysis.status_code == 201
@@ -256,8 +254,8 @@ def test_ai_rejected_document_is_visible_but_does_not_feed_the_policy(tmp_path, 
         assert client.delete(f"/api/cases/{case_id}/documents/{document['id']}").status_code == 204
 
 
-def test_ai_confirmed_document_reuses_the_rich_document_reading(tmp_path, monkeypatch):
-    """A classificação automática usa a mesma leitura consultiva (contrato, valores, pontos de atenção)."""
+def test_ai_confirmed_document_does_not_create_consultive_reading(tmp_path, monkeypatch):
+    """A classificação automática identifica o tipo, mas não cria resumo para o banco."""
     from src.utils import document_service as document_service_module
 
     monkeypatch.setattr(
@@ -281,9 +279,7 @@ def test_ai_confirmed_document_reuses_the_rich_document_reading(tmp_path, monkey
         assert document["declared_type"] == "CONTRATO"
 
         detail = client.get(f"/api/cases/{case_id}").json()
-        reading = next(r for r in detail["document_readings"] if r["document_id"] == document["id"])
-        assert reading["result"]["numero_contrato"] == "12345"
-        assert reading["result"]["pontos_de_atencao"] == ["Conferir assinatura na página 3"]
+        assert not any(r["document_id"] == document["id"] for r in detail["document_readings"])
 
         # A política já usa o documento confirmado pela IA como se fosse confirmado pelo usuário.
         analysis = client.post(f"/api/cases/{case_id}/analyses")
@@ -293,10 +289,8 @@ def test_ai_confirmed_document_reuses_the_rich_document_reading(tmp_path, monkey
 
 def test_ai_classification_does_not_trigger_a_second_paid_reading(tmp_path, monkeypatch):
     """
-    Regressão: a classificação automática (document_service) já lê com IA. O gancho
-    pós-extração (ao_extrair, em main.py) também tenta ler por IA para todo documento,
-    de forma consultiva — sem a guarda em ao_extrair, isso duplicava a chamada (e o
-    custo) para todo upload sem tipo declarado.
+    A classificação automática chama a IA uma única vez. O gancho pós-extração não
+    gera leitura consultiva: esta só ocorre por solicitação do advogado.
     """
     from src.interface.backend import main as main_module
     from src.utils import document_service as document_service_module

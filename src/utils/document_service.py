@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -138,22 +137,14 @@ class DocumentService:
                 quality_flags.add("DOCUMENT_WITHOUT_PAGES")
             sample = "\n".join(validation_sample)
             if document.get("type_source") == "AI":
-                # Banco não escolheu o tipo: a mesma leitura por IA usada como
-                # complemento consultivo (src.tools.leitor_documentos) decide o
-                # tipo aqui, ou recusa quando o documento não tem relação com o
-                # processo. A leitura completa fica salva e aparece pro
-                # advogado do jeito de sempre; sem chave ou com falha, cai no
-                # fallback por palavra-chave, que nunca recusa sozinho.
-                modelo = os.getenv("ENTERAGREE_LEITURA_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+                # Banco não escolheu o tipo: a IA classifica o arquivo aqui, mas
+                # esse resultado não é a leitura consultiva. O resumo que aparece
+                # nas telas só é persistido quando o advogado o solicita.
                 try:
                     leitura = ler_documento(path, sample, "não informado (classificação automática pela IA)")
-                except LeituraIndisponivel as exc:
-                    self.repository.save_document_reading(document_id, modelo, "FAILED", None, str(exc))
+                except LeituraIndisponivel:
                     classification = classify_by_keywords(sample)
                 else:
-                    self.repository.save_document_reading(
-                        document_id, modelo, "COMPLETED", leitura.model_dump(mode="json"), None
-                    )
                     rejeitado = leitura.tipo_documento == "RECUSADO"
                     classification = AIDocumentClassification(
                         document_type=None if rejeitado else DocumentType(leitura.tipo_documento),

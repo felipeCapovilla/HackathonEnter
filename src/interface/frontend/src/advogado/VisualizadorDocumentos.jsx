@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { documentDownloadUrl, request } from "../api";
+import { useAction } from "../hooks";
 import { Icon } from "../Brand";
 import { DOCUMENTOS, ORDEM_DOCUMENTOS } from "./textos";
 import { PainelRecolhivel } from "./PainelRecolhivel";
@@ -41,8 +42,29 @@ function documentState(document) {
   return ["success", "Texto disponível"];
 }
 
+/** A leitura é uma ação do advogado: a empresa só enxerga o resultado depois. */
+function LeituraIA({ documento, leitura, ativa, onGerada }) {
+  const action = useAction();
+  if (!["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(documento.status)) return null;
+  const gerar = () => action.run(async () => {
+    await request(`/documents/${documento.id}/leitura`, { method: "POST" });
+    onGerada();
+  });
+  if (!leitura || leitura.status === "FAILED") return <section className="viewer-summary viewer-ai-action">
+    <div><Icon name="spark" /><div><strong>Leitura com IA</strong><p>{leitura?.status === "FAILED" ? `A última tentativa não foi concluída: ${leitura.error || "indisponível"}.` : "Gere um resumo e os pontos de atenção deste documento para apoiar sua análise."}</p></div></div>
+    {ativa ? <button type="button" className="subtle" disabled={action.pending} onClick={gerar}>{action.pending ? "Gerando leitura…" : leitura ? "Tentar novamente" : "Gerar leitura com IA"}</button>
+      : <p className="muted">Leitura com IA indisponível no momento.</p>}
+    {action.error && <p role="alert" className="leitura-alerta">{action.error}</p>}
+  </section>;
+  const result = leitura.result;
+  return <details className="viewer-summary" key={documento.id}><summary><Icon name="spark" />Resumo e pontos de atenção<Icon name="chevronDown" /></summary>
+    <p>{result.resumo}</p>
+    {result.pontos_de_atencao?.length > 0 && <ul>{result.pontos_de_atencao.map((ponto, position) => <li key={position}>{ponto}</li>)}</ul>}
+  </details>;
+}
+
 /** Documentos do processo com navegação por abas e estado real de processamento. */
-export function VisualizadorDocumentos({ documentos, leituras = [], children }) {
+export function VisualizadorDocumentos({ documentos, leituras = [], leituraAtiva = false, onLeituraGerada = () => {}, children }) {
   const ordenados = [...documentos].sort((a, b) => ORDEM_DOCUMENTOS.indexOf(a.declared_type) - ORDEM_DOCUMENTOS.indexOf(b.declared_type));
   const [ativoId, setAtivoId] = useState(null);
   const documento = ordenados.find((item) => item.id === ativoId) || ordenados[0];
@@ -71,10 +93,7 @@ export function VisualizadorDocumentos({ documentos, leituras = [], children }) 
       </div>
       <div className="viewer-document-meta"><span className={`pill ${tone}`}>{state}</span><span>{DOCUMENTOS[documento.declared_type] || documento.declared_type}{documento.page_count ? ` · ${documento.page_count} página(s)` : ""}</span>
         <a href={documentDownloadUrl(documento.id)} target="_blank" rel="noopener noreferrer"><Icon name="external" />Abrir original</a></div>
-      {leitura && <details className="viewer-summary" key={documento.id}><summary><Icon name="spark" />Resumo e pontos de atenção<Icon name="chevronDown" /></summary>
-        <p>{leitura.resumo}</p>
-        {leitura.pontos_de_atencao?.length > 0 && <ul>{leitura.pontos_de_atencao.map((ponto, position) => <li key={position}>{ponto}</li>)}</ul>}
-      </details>}
+      <LeituraIA documento={documento} leitura={leituras.find((item) => item.document_id === documento.id)} ativa={leituraAtiva} onGerada={onLeituraGerada} />
       <div className="visualizador-quadro">
         {documento.status === "FAILED" ? <div className="viewer-state" role="status"><Icon name="files" /><h3>Não foi possível extrair este documento</h3><p>Abra o original para conferir o arquivo ou peça um novo envio à empresa.</p></div>
           : !pronto ? <div className="viewer-state" role="status"><Icon name="clock" /><h3>Preparando a leitura</h3><p>Você pode consultar os outros documentos enquanto este arquivo é processado.</p></div>

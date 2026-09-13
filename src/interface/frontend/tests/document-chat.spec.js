@@ -8,6 +8,7 @@ const documents = [
 async function setup(page, respond, sourceDocuments = documents, overrides = {}) {
   const filters = [];
   const requests = [];
+  const readingRequests = [];
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/auth/me") return route.fulfill({ json: { id: "lawyer-1", name: "Ana Advogada", role: "ADVOGADO_EXTERNO", bank_name: "Banco Unicamp" } });
@@ -21,6 +22,10 @@ async function setup(page, respond, sourceDocuments = documents, overrides = {})
       return route.fulfill({ status: 201, json: { id: `answer-${requests.length}`, role: "ASSISTANT", content: "O comprovante registra a liberação do crédito. Confira a data e o valor na fonte.",
         citations: [{ chunk_id: "c1", document_id: "doc-2", filename: documents[1].original_filename, page_start: 1, page_end: 1, quote: "Crédito liberado." }] } });
     }
+    if (path.endsWith("/leitura")) {
+      readingRequests.push(route.request().method());
+      return route.fulfill({ status: 201, json: { status: "COMPLETED" } });
+    }
     if (path === "/api/cases/case-1") return route.fulfill({ json: {
       case: { id: "case-1", case_number: "0801234-56.2024.8.10.0001", uf: "SP", value_of_claim: 10000 },
       documents: sourceDocuments, document_readings: [], analyses: [], lawyer_decisions: [], document_requests: [],
@@ -32,8 +37,16 @@ async function setup(page, respond, sourceDocuments = documents, overrides = {})
   });
   await page.goto("/advogado/casos/case-1");
   await expect(page.getByRole("button", { name: "Perguntar à IA" })).toBeVisible();
-  return { filters, requests };
+  return { filters, requests, readingRequests };
 }
+
+test("o advogado solicita a leitura com IA no leitor do documento", async ({ page }) => {
+  const { readingRequests } = await setup(page, null, documents, { leitura_ia_ativa: true });
+  const button = page.getByRole("button", { name: "Gerar leitura com IA" });
+  await expect(button).toBeVisible();
+  await button.click();
+  await expect.poll(() => readingRequests).toEqual(["POST"]);
+});
 
 test("chat no topo do leitor preserva conversa, rascunho e seleção ao reabrir, com fontes e foco", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });

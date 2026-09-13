@@ -1,4 +1,4 @@
-"""Leitura por IA ao enviar documento, busca por contrato e valor perdido na sentença desfavorável."""
+"""Leitura por IA solicitada pelo advogado, busca por contrato e valor perdido na sentença desfavorável."""
 from pathlib import Path
 from uuid import uuid4
 
@@ -34,12 +34,12 @@ def _upload(client, case_id, texto, tipo, nome):
     return response.json()
 
 
-def test_leitura_por_ia_ao_enviar_e_busca_por_contrato(tmp_path, monkeypatch):
+def test_leitura_por_ia_somente_advogado_e_visivel_ao_banco(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "teste")
     app = _app(tmp_path)
     with TestClient(app) as empresa, TestClient(app) as advogado:
         _login(app, empresa, "BANCO", "empresa@t.br")
-        _login(app, advogado, "ADVOGADO_EXTERNO", "adv@t.br")
+        lawyer = _login(app, advogado, "ADVOGADO_EXTERNO", "adv@t.br")
         lidos = []
 
         def leitor_falso(caminho, texto, tipo):
@@ -49,10 +49,17 @@ def test_leitura_por_ia_ao_enviar_e_busca_por_contrato(tmp_path, monkeypatch):
 
         app.state.leitor = leitor_falso
         case_id = empresa.post("/api/cases", json={"case_number": "busca-001", "uf": "MA", "value_of_claim": 20000}).json()["id"]
-        _upload(empresa, case_id, CONTRATO, "CONTRATO", "contrato.txt")
+        app.state.repository.assign_lawyer(case_id, lawyer["id"], "banco-unicamp")
+        document = _upload(empresa, case_id, CONTRATO, "CONTRATO", "contrato.txt")
 
-        leituras = empresa.get(f"/api/cases/{case_id}").json()["document_readings"]
+        # O upload não consome IA: a leitura só começa por ação explícita do advogado responsável.
+        assert lidos == []
+        assert empresa.post(f"/api/documents/{document['id']}/leitura").status_code == 403
+        leitura_gerada = advogado.post(f"/api/documents/{document['id']}/leitura")
+        assert leitura_gerada.status_code == 201, leitura_gerada.text
         assert lidos == ["CONTRATO"]
+        # Depois de gerada pelo advogado, a empresa pode consultar o resumo.
+        leituras = empresa.get(f"/api/cases/{case_id}").json()["document_readings"]
         assert leituras[0]["status"] == "COMPLETED" and leituras[0]["result"]["numero_contrato"] == "502348719"
 
         achados = empresa.get("/api/bank/search", params={"q": "502348719"}).json()
@@ -64,29 +71,35 @@ def test_leitura_por_ia_ao_enviar_e_busca_por_contrato(tmp_path, monkeypatch):
         assert advogado.get("/api/bank/search", params={"q": "502348719"}).status_code == 403
 
 
-def test_sem_chave_o_envio_segue_e_a_leitura_manual_avisa(tmp_path, monkeypatch):
+def test_sem_chave_o_envio_segue_e_a_leitura_do_advogado_avisa(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     app = _app(tmp_path)
-    with TestClient(app) as empresa:
+    with TestClient(app) as empresa, TestClient(app) as advogado:
         _login(app, empresa, "BANCO", "empresa@t.br")
+        lawyer = _login(app, advogado, "ADVOGADO_EXTERNO", "adv@t.br")
         case_id = empresa.post("/api/cases", json={"case_number": "sem-chave", "uf": "SP", "value_of_claim": 1000}).json()["id"]
+        app.state.repository.assign_lawyer(case_id, lawyer["id"], "banco-unicamp")
         documento = _upload(empresa, case_id, CONTRATO, "CONTRATO", "contrato.txt")
         assert empresa.get(f"/api/cases/{case_id}").json()["document_readings"] == []
-        assert empresa.post(f"/api/documents/{documento['id']}/leitura").status_code == 503
+        assert empresa.post(f"/api/documents/{documento['id']}/leitura").status_code == 403
+        assert advogado.post(f"/api/documents/{documento['id']}/leitura").status_code == 503
 
 
 def test_falha_do_provedor_fica_registrada_sem_quebrar_o_envio(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "teste")
     app = _app(tmp_path)
-    with TestClient(app) as empresa:
+    with TestClient(app) as empresa, TestClient(app) as advogado:
         _login(app, empresa, "BANCO", "empresa@t.br")
+        lawyer = _login(app, advogado, "ADVOGADO_EXTERNO", "adv@t.br")
 
         def leitor_quebrado(*_):
             raise LeituraIndisponivel("provedor fora do ar")
 
         app.state.leitor = leitor_quebrado
         case_id = empresa.post("/api/cases", json={"case_number": "falha", "uf": "SP", "value_of_claim": 1000}).json()["id"]
-        _upload(empresa, case_id, CONTRATO, "CONTRATO", "contrato.txt")
+        app.state.repository.assign_lawyer(case_id, lawyer["id"], "banco-unicamp")
+        documento = _upload(empresa, case_id, CONTRATO, "CONTRATO", "contrato.txt")
+        assert advogado.post(f"/api/documents/{documento['id']}/leitura").status_code == 201
         leitura = empresa.get(f"/api/cases/{case_id}").json()["document_readings"][0]
         assert leitura["status"] == "FAILED" and leitura["error"] == "provedor fora do ar"
 

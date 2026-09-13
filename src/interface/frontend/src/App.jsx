@@ -390,11 +390,7 @@ function CaseDetail({ caseId, user }) {
   const stage = stageOf(detail, decision);
   const encerrado = stage === "ENCERRADO";
   const busy = action.pending || resource.loading;
-  const aguardandoLeitura = Boolean(detail?.leitura_ia_ativa) && detail.documents.some((document) =>
-    ["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status)
-    && !detail.document_readings?.some((reading) => reading.document_id === document.id)
-    && Date.now() - new Date(document.created_at).getTime() < 3 * 60 * 1000);
-  const processingDocuments = aguardandoLeitura || detail?.documents.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status));
+  const processingDocuments = detail?.documents.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status));
   useEffect(() => {
     if (!processingDocuments || resource.loading || resource.error) return;
     const timer = window.setTimeout(resource.reload, 2000);
@@ -450,7 +446,7 @@ function CaseDetail({ caseId, user }) {
         </select>
         <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
       </article>}
-      <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} readings={detail.document_readings} leituraAtiva={Boolean(detail.leitura_ia_ativa)} valueOfClaim={detail.case.value_of_claim} canUpload={user.role === "BANCO"} encerrado={encerrado} onUploaded={resource.reload} />
+      <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} readings={detail.document_readings} valueOfClaim={detail.case.value_of_claim} canUpload={user.role === "BANCO"} encerrado={encerrado} onUploaded={resource.reload} />
       <article className="panel analysis"><h3>Saída da ferramenta</h3>
         {recommendation ? <>
           <div className={`recommendation ${recommendationClass[recommendation.recommendation] || "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation] || recommendation.recommendation}</strong></div>
