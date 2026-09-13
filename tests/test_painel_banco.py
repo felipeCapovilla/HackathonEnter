@@ -226,3 +226,6 @@ def test_simulated_operation_populates_every_panel_section(tmp_path):
     assert painel["documentos"]["fila_total"] > 0
     assert any(card["origem"] == "operacao" for card in painel["recomendacoes"])
     assert painel["excecoes"]["por_tipo"].get("DECISAO_SEM_CONFERENCIA")
+    for tipo, quantidade in painel["excecoes"]["por_tipo"].items():
+        assert sum(item["tipo"] == tipo for item in painel["excecoes"]["itens"]) == quantidade, "filtro bate com a contagem"
+    assert painel["documentos"]["carteira"]["valor_em_jogo_total"] > 0

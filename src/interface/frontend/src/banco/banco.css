@@ -172,3 +172,30 @@ button.ghost:hover { background: #f6f7fa; box-shadow: none; }
 .weekly-chart .grid.zero { stroke: #c9d0de; }
 .weekly-chart .bar-negative { fill: #c2413b; }
 @media (max-width: 700px) { .lado-a-lado { grid-template-columns: minmax(0, 1fr); } }
+
+/* Ícone informativo das métricas */
+.info-tip { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
+  border: 1px solid #b8c0d0; color: #6c7791; font-size: 10px; font-weight: 700; font-style: normal; line-height: 1; cursor: help;
+  vertical-align: middle; text-transform: none; letter-spacing: 0; }
+.info-tip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+.info-tip-texto { display: none; position: absolute; z-index: 30; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 250px; padding: 9px 11px; border-radius: 8px; background: #1c2742; color: #fff; font-size: 12px; font-weight: 400;
+  line-height: 1.45; text-align: left; white-space: normal; box-shadow: 0 10px 24px -10px #0b0f1a80; }
+.info-tip:hover .info-tip-texto, .info-tip:focus .info-tip-texto { display: block; }
+.data-table th.num .info-tip-texto, .data-table th:last-child .info-tip-texto { left: auto; right: -8px; transform: none; }
+
+/* De onde vem a economia */
+.origem-economia { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+.origem-economia > div { display: grid; gap: 4px; padding: 16px; border-radius: 10px; border-left: 4px solid #c9d0de; background: var(--surface-sunken, #f4f2ee); }
+.origem-economia > div.ganho { border-left-color: #2f9e77; }
+.origem-economia > div.perda { border-left-color: #c2413b; }
+.origem-economia span { font-size: .8rem; color: var(--muted); }
+.origem-economia strong { font-family: var(--font-display, inherit); font-size: 1.6rem; color: #1c2742; }
+.origem-economia small { font-size: .75rem; color: var(--muted); }
+.estimativa { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #f1edfb; color: #5b4a86; font-size: .62rem; font-weight: 600; letter-spacing: .02em; vertical-align: middle; }
+@media (max-width: 700px) { .origem-economia { grid-template-columns: minmax(0, 1fr); } }
+
+/* Ranking de advogados: cabeçalhos longos quebram em duas linhas e o nome não fica espremido */
+.data-table.tabela-advogados th { white-space: normal; vertical-align: bottom; min-width: 76px; max-width: 110px; line-height: 1.35; }
+.tabela-advogados th:first-child { min-width: 24px; }
+.data-table.tabela-advogados th:nth-child(2), .data-table.tabela-advogados td:nth-child(2) { min-width: 190px; max-width: none; }
