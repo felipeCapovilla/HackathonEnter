@@ -49,6 +49,7 @@ from __future__ import annotations
 
 from contracts.schema import FaixaNegociacao, VereditoAcordo
 
+from .linguagem import frequencia
 from .constants import (
     AMPLITUDE_MIN_REL,
     CONCESSAO,
@@ -226,16 +227,16 @@ def avaliar_acordo(
     if walk_away < abertura:
         if limitado_pela_alcada and walk_away_economico >= abertura:
             motivo = (
-                f"Acordar seria mais barato que litigar (R$ {brl(custo_defesa)} esperados), "
-                f"mas a alçada do banco limita a oferta a R$ {brl(walk_away)}, abaixo da "
-                f"abertura de R$ {brl(abertura)}. Sem autorização para ofertar, a recomendação é defesa."
+                f"Fazer acordo sairia mais barato que defender (R$ {brl(custo_defesa)}, em média), "
+                f"mas a alçada da empresa limita a proposta a R$ {brl(walk_away)}, abaixo da "
+                f"proposta inicial de R$ {brl(abertura)}. Sem autorização para oferecer, a recomendação é defender."
             )
         else:
             motivo = (
-                f"Litigar custa menos que a própria oferta de abertura: "
-                f"R$ {brl(custo_defesa)} contra R$ {brl(abertura + honorario_acordo)}. "
-                f"P(derrota) de {pct(p_nao_exito)} está abaixo do limiar de "
-                f"indiferença de {pct(limiar)} deste caso."
+                f"Defender custa menos que a própria proposta inicial de acordo: "
+                f"R$ {brl(custo_defesa)}, em média, contra R$ {brl(abertura + honorario_acordo)}. "
+                f"A chance de perder ({frequencia(p_nao_exito)}) está abaixo do ponto em que "
+                f"o acordo compensa ({frequencia(limiar)})."
             )
         return VereditoAcordo(
             decisao="DEFESA",
@@ -266,24 +267,23 @@ def avaliar_acordo(
         premissas_acordo.append("IC")
 
     economia = custo_defesa - (alvo + honorario_acordo)
-    limite = "limite de alçada" if limitado_pela_alcada else "walk-away"
+    limite = "limite de alçada da empresa" if limitado_pela_alcada else "valor máximo"
     if negociavel:
+        meta = f"A meta é fechar em R$ {brl(alvo)}. " if alvo > abertura + 0.01 else ""
         motivo = (
-            f"Acordo entre R$ {brl(abertura)} e R$ {brl(walk_away)}, mirando "
-            f"R$ {brl(alvo)}. Defender custa R$ {brl(custo_defesa)} esperados; "
-            f"fechar no alvo economiza R$ {brl(economia)}. "
-            f"P(derrota) de {pct(p_nao_exito)} supera o limiar de indiferença de "
-            f"{pct(limiar)} deste caso. "
-            f"Acima de R$ {brl(walk_away)} ({limite}) não é negociação: é defesa."
+            f"Proponha R$ {brl(abertura)} e, se precisar, suba até R$ {brl(walk_away)}. {meta}"
+            f"Defender custaria R$ {brl(custo_defesa)}, em média; fechar em R$ {brl(alvo)} "
+            f"economiza R$ {brl(economia)}. A chance de perder ({frequencia(p_nao_exito)}) passa do "
+            f"ponto em que o acordo compensa ({frequencia(limiar)}). "
+            f"Acima de R$ {brl(walk_away)} ({limite}), defender sai mais barato."
         )
     else:
         motivo = (
-            f"Acordo em R$ {brl(walk_away)} — valor único, não há faixa. "
-            f"O espaço entre a abertura de R$ {brl(abertura)} e o {limite} é de "
-            f"R$ {brl(amplitude)}, pequeno demais para negociar. "
-            f"P(derrota) de {pct(p_nao_exito)} está logo acima do limiar de "
-            f"{pct(limiar)}: litigar custa quase o mesmo. "
-            f"Acima de R$ {brl(walk_away)} não é negociação: é defesa."
+            f"Proponha R$ {brl(walk_away)}, sem margem para negociar: entre a proposta inicial "
+            f"(R$ {brl(abertura)}) e o {limite} há só R$ {brl(amplitude)}. "
+            f"A chance de perder ({frequencia(p_nao_exito)}) está logo acima do ponto em que o acordo "
+            f"compensa ({frequencia(limiar)}): defender custaria quase o mesmo. "
+            f"Acima de R$ {brl(walk_away)}, defender sai mais barato."
         )
 
     return VereditoAcordo(

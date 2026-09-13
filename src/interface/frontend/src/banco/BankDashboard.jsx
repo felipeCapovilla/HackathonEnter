@@ -25,7 +25,7 @@ export default function BankDashboard({ user }) {
   const data = insights.data;
   return <section className="bank-dashboard">
     <div className="bank-toolbar">
-      <div className="bank-tabs" role="tablist" aria-label="Seções do painel do banco">
+      <div className="bank-tabs" role="tablist" aria-label="Seções do painel da empresa">
         {TABS.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={key === tab}
           className={key === tab ? "active" : ""} onClick={() => setParams({ aba: key })}>
           {label}{key === "excecoes" && data?.excecoes.total ? <span className="tab-count">{data.excecoes.total}</span> : null}
@@ -69,7 +69,7 @@ function Overview({ data }) {
       <Kpi tone={e.custo_divergencias > 0 ? "bad" : "good"} label="Custo das divergências" value={brlCompact(e.custo_divergencias)}
         hint="Economia esperada perdida quando a recomendação não foi seguida" />
       <Kpi tone={e.pago_acima_do_alvo > 0 ? "warn" : "good"} label="Pago acima do alvo" value={brlCompact(e.pago_acima_do_alvo)}
-        hint={`${num(e.fechados_acima_walk_away)} acordo(s) acima do walk-away`} />
+        hint={`${num(e.fechados_acima_walk_away)} acordo(s) acima do valor máximo`} />
       <Kpi label="Acordos fechados" value={`${num(e.acordos_fechados)} de ${num(e.acordos_propostos)}`}
         hint={`${num(e.negociacoes_pendentes)} em negociação · ${pct(e.valor_fechado_sobre_causa)} da causa, em média`} />
     </div>
@@ -95,8 +95,8 @@ function Documents({ data }) {
   const base = d.base_historica;
   const max = Math.max(1, ...d.carteira.por_documento.map((doc) => doc.valor_em_jogo));
   return <div className="bank-stack">
-    <SectionHeader eyebrow="DOCUMENTOS · A ALAVANCA DO BANCO" title="Quanto custa o documento que não chega">
-      Contrato e extrato mudam o resultado do processo, e quem entrega os dois é o banco. Esta é a economia que depende só da sua operação.
+    <SectionHeader eyebrow="DOCUMENTOS · A ALAVANCA DA EMPRESA" title="Quanto custa o documento que não chega">
+      Contrato e extrato mudam o resultado do processo, e quem entrega os dois é o empresa. Esta é a economia que depende só da sua operação.
     </SectionHeader>
     <div className="bank-columns">
       <article className="panel hero-panel">
@@ -134,7 +134,7 @@ function Documents({ data }) {
     </article>
     {base && <article className="panel">
       <h3>O que a base histórica mostra</h3>
-      <p className="muted">Em {num(base.casos)} sentenças, sem contrato e sem extrato o banco perde {pct(base.sem_contrato_e_extrato.derrota)} das vezes: são {pct(base.sem_contrato_e_extrato.pct)} dos processos e {brlCompact(base.sem_contrato_e_extrato.pago)} pagos.</p>
+      <p className="muted">Em {num(base.casos)} sentenças, sem contrato e sem extrato a empresa perde {pct(base.sem_contrato_e_extrato.derrota)} das vezes: são {pct(base.sem_contrato_e_extrato.pct)} dos processos e {brlCompact(base.sem_contrato_e_extrato.pago)} pagos.</p>
       <div className="table-scroll"><table className="data-table">
         <thead><tr><th>Documento</th><th className="num">Falta em</th><th className="num">Derrota com</th><th className="num">Derrota sem</th><th className="num">Valor em jogo</th></tr></thead>
         <tbody>{base.documentos.map((doc) => <tr key={doc.tipo} className={doc.muda_resultado ? "" : "row-muted"}>
@@ -155,7 +155,7 @@ function Recommendations({ data }) {
   const areas = useMemo(() => [...new Set(data.recomendacoes.map((card) => card.area))], [data]);
   const cards = data.recomendacoes.filter((card) => !area || card.area === area);
   return <div className="bank-stack">
-    <SectionHeader eyebrow="RECOMENDAÇÕES PARA A OPERAÇÃO DO BANCO" title="O que construir, e quem constrói">
+    <SectionHeader eyebrow="RECOMENDAÇÕES PARA A OPERAÇÃO DA EMPRESA" title="O que construir, e quem constrói">
       Cada recomendação nasce dos motivos que o seu time registrou ao não entregar um documento, ou da base histórica. O valor em jogo vem do motor; a IA só classifica respostas escritas em texto livre.
     </SectionHeader>
     <div className="chips" role="group" aria-label="Filtrar por área responsável">
@@ -207,7 +207,7 @@ function Firms({ data }) {
         </dl>
       </article>;
     })}</div> : <p className="empty-line">Nenhum escritório com decisões registradas.</p>}
-    <p className="footnote">O mercado só aparece quando o escritório atende ao menos {regras.min_outros_clientes} outros clientes e soma {regras.min_decisoes_mercado} decisões fora deste banco.</p>
+    <p className="footnote">O mercado só aparece quando o escritório atende ao menos {regras.min_outros_clientes} outros clientes e soma {regras.min_decisoes_mercado} decisões fora desta empresa.</p>
   </div>;
 }
 
@@ -262,7 +262,7 @@ function Engagement({ data }) {
 }
 
 const EXCEPTION_TYPES = {
-  ACORDO_ACIMA_WALK_AWAY: { label: "Acordo acima do walk-away", impact: "Pago além do walk-away", tone: "bad" },
+  ACORDO_ACIMA_WALK_AWAY: { label: "Acordo acima do valor máximo", impact: "Pago além do valor máximo", tone: "bad" },
   DIVERGENCIA_CARA: { label: "Divergência cara", impact: "Custo esperado da divergência", tone: "warn" },
   DECISAO_SEM_CONFERENCIA: { label: "Decisão sem conferência", impact: "Custo esperado do caso", tone: "neutral" },
 };
@@ -273,7 +273,7 @@ function Exceptions({ data }) {
   const items = x.itens.filter((item) => !type || item.tipo === type);
   return <div className="bank-stack">
     <SectionHeader eyebrow="GESTÃO POR EXCEÇÃO" title="O que fugiu da política">
-      Em vez de acompanhar tudo, olhe o que saiu do combinado: acordo acima do walk-away, divergência com custo esperado acima de {brl(x.limiar_divergencia)} e decisão sem abrir documento quando o motor pediu conferência.
+      Em vez de acompanhar tudo, olhe o que saiu do combinado: acordo acima do valor máximo, divergência com custo esperado acima de {brl(x.limiar_divergencia)} e decisão sem abrir documento quando o motor pediu conferência.
     </SectionHeader>
     <div className="chips" role="group" aria-label="Filtrar exceções">
       <button type="button" className={type ? "chip" : "chip active"} onClick={() => setType("")}>Todas · {num(x.total)}</button>

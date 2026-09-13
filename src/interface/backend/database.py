@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -62,8 +63,7 @@ CREATE TABLE IF NOT EXISTS documents (
     sha256 TEXT NOT NULL,
     quality_flags TEXT NOT NULL DEFAULT '[]',
     request_id TEXT,
-    created_at TEXT NOT NULL,
-    UNIQUE(case_id, sha256)
+    created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS document_pages (
@@ -199,6 +199,15 @@ CREATE TABLE IF NOT EXISTS engagement_events (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS document_ai_readings (
+    document_id TEXT PRIMARY KEY REFERENCES documents(id),
+    model TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('COMPLETED', 'FAILED')),
+    result TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
 CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
@@ -263,8 +272,42 @@ def initialize_database(database_path: Path) -> None:
         for table, name, definition in MIGRATED_COLUMNS:
             if name not in {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}:
                 connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+        _documento_unico_so_entre_vivos(connection)
         connection.execute("CREATE INDEX IF NOT EXISTS cases_bank_lawyer_idx ON cases(bank_id, assigned_lawyer_id)")
         connection.execute("CREATE INDEX IF NOT EXISTS users_firm_idx ON users(law_firm_id)")
+
+
+def _documento_unico_so_entre_vivos(connection: sqlite3.Connection) -> None:
+    """
+    O mesmo arquivo não entra duas vezes no processo, mas pode voltar depois de excluído.
+
+    A primeira versão travava (case_id, sha256) na própria tabela, e a exclusão lógica
+    mantém a linha: reenviar o documento apagado dava 409. A trava vira um índice
+    parcial que só olha documentos vivos. SQLite não remove constraint de tabela,
+    então bancos antigos são reconstruídos uma vez (com foreign keys desligadas,
+    como manda a documentação do SQLite).
+    """
+    sql = connection.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'documents'").fetchone()[0]
+    if re.search(r"UNIQUE\s*\(\s*case_id\s*,\s*sha256\s*\)", sql):
+        colunas = ", ".join(row[1] for row in connection.execute("PRAGMA table_info(documents)"))
+        novo = re.sub(r",\s*UNIQUE\s*\(\s*case_id\s*,\s*sha256\s*\)", "", sql)
+        novo = re.sub(r"^CREATE TABLE\s+(IF NOT EXISTS\s+)?\"?documents\"?", "CREATE TABLE documents_novo", novo)
+        connection.commit()
+        connection.execute("PRAGMA foreign_keys = OFF")
+        try:
+            connection.executescript(f"""
+                BEGIN;
+                {novo};
+                INSERT INTO documents_novo ({colunas}) SELECT {colunas} FROM documents;
+                DROP TABLE documents;
+                ALTER TABLE documents_novo RENAME TO documents;
+                CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
+                COMMIT;
+            """)
+        finally:
+            connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS documents_case_sha_vivos_idx ON documents(case_id, sha256) WHERE deleted_at IS NULL")
 
 
 @contextmanager

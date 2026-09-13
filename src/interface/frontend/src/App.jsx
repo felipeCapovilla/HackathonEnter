@@ -6,11 +6,14 @@ import { Brand, Icon } from "./Brand";
 import { DocumentPanel } from "./DocumentPanel";
 import BankDashboard from "./banco/BankDashboard";
 import { DocumentRequestsPanel } from "./banco/DocumentRequestsPanel";
+import { BuscaProcessos } from "./banco/BuscaProcessos";
+import { ResultadoProcesso } from "./banco/ResultadoProcesso";
 import { useActiveTime } from "./useActiveTime";
 
-const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Recuperar documento", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
+const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Pedir documento", BANCO: "Empresa", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-const actionText = { ACORDO: "Propor acordo", DEFESA: "Disputar a causa", RECUPERAR: "Solicitar o documento ao banco antes de decidir" };
+const actionText = { ACORDO: "Propor acordo", DEFESA: "Seguir com a defesa no processo", RECUPERAR: "Pedir o documento que falta antes de decidir" };
+const documentoFaltante = { contrato: "Contrato", extrato: "Extrato", comprovante_credito: "Comprovante de crédito" };
 const recommendationClass = { ACORDO: "agreement", DEFESA: "defense", RECUPERAR: "recover" };
 const homeFor = (user) => user.role === "BANCO" ? "/banco" : user.role === "ADVOGADO_EXTERNO" ? "/advogado" : "/admin";
 
@@ -47,8 +50,8 @@ function Locked({ children }) {
 const OUTCOMES = {
   ACORDO_ACEITO: { label: "Acordo aceito", hint: "O autor aceitou a proposta", favoravel: true },
   ACORDO_RECUSADO: { label: "Acordo recusado", hint: "O autor não aceitou a proposta", favoravel: false },
-  SENTENCA_FAVORAVEL: { label: "Sentença favorável", hint: "O banco venceu a causa", favoravel: true },
-  SENTENCA_DESFAVORAVEL: { label: "Sentença desfavorável", hint: "O banco foi condenado", favoravel: false },
+  SENTENCA_FAVORAVEL: { label: "Sentença favorável", hint: "A empresa venceu a causa", favoravel: true },
+  SENTENCA_DESFAVORAVEL: { label: "Sentença desfavorável", hint: "A empresa foi condenada", favoravel: false },
 };
 
 function ErrorNotice({ message, onRetry }) {
@@ -84,7 +87,7 @@ function Login({ onLogin, notice }) {
     </aside>
     <section className="login-form-area"><div className="login-card">
     <Brand compact />
-    <p className="eyebrow">Bem-vindo ao EnterOS</p><h1>Acesse sua operação.</h1><p className="login-description">Entre no EnterAgree para acompanhar seus processos e transformar dados em decisões.</p>
+    <p className="eyebrow">Bem-vindo</p><h1>Acesse sua operação.</h1><p className="login-description">Entre para acompanhar seus processos e transformar dados em decisões.</p>
     {notice && <p role="status">{notice}</p>}
     <form onSubmit={submit}>
       <fieldset className="form-fields" disabled={action.pending}>
@@ -103,15 +106,15 @@ function Shell({ user, onLogout, logout, children }) {
   const isCase = pathname.includes("/casos/");
   const isMonitoring = pathname.endsWith("/monitoramento");
   const title = user.role === "ADMIN_GLOBAL" ? "Uma operação conectada." : isMonitoring ? "Resultados que importam." : user.role === "BANCO" ? "Do dado à decisão." : "Seu próximo passo, com clareza.";
-  const description = user.role === "ADMIN_GLOBAL" ? "Gerencie bancos e os profissionais que fazem parte da plataforma." : isMonitoring ? "Efetividade, documentos, escritórios e exceções da política de acordos do seu banco." : user.role === "BANCO" ? "Organize processos, atribua responsáveis e acompanhe cada decisão." : "Consulte seus processos e encontre a recomendação para cada caso.";
+  const description = user.role === "ADMIN_GLOBAL" ? "Gerencie empresas e os profissionais que fazem parte da plataforma." : isMonitoring ? "Efetividade, documentos, escritórios e exceções da política de acordos da sua empresa." : user.role === "BANCO" ? "Organize processos, atribua responsáveis e acompanhe cada decisão." : "Consulte seus processos e encontre a recomendação para cada caso.";
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
   return <div className="app-frame">
     <aside className="sidebar">
-      <div className="sidebar-brand"><Brand /><span>ENTERAGREE <span className="product-tag">ENTEROS</span></span></div>
+      <div className="sidebar-brand"><Brand /></div>
       <nav aria-label="Navegação principal">
         <p className="nav-caption">Espaço de trabalho</p>
         <NavLink to={homeFor(user)} end><Icon name={user.role === "ADMIN_GLOBAL" ? "users" : "files"} />{user.role === "ADMIN_GLOBAL" ? "Administração" : user.role === "BANCO" ? "Processos" : "Meus processos"}</NavLink>
-        {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Painel do banco</NavLink>}
+        {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Painel da empresa</NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-message">Mesma justiça.<br /><span>Mais impacto.</span></div>
         <div className="sidebar-account"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{labels[user.role]}{user.is_manager ? " · gestor" : ""}</span></div></div>
@@ -119,7 +122,7 @@ function Shell({ user, onLogout, logout, children }) {
       </div>
     </aside>
     <main className="shell">
-      <header className="topbar"><div><span className="topbar-product">EnterOS</span><span className="breadcrumb-divider">/</span><span>{user.bank_name || "Administração global"}</span></div>
+      <header className="topbar"><div><span className="topbar-product">{user.bank_name || "Administração global"}</span></div>
         <span className="session-badge"><span />Sessão ativa</span>
       </header>
       <div className="page-content">
@@ -197,6 +200,7 @@ function CaseCard({ item, to }) {
       <span className="case-card-tags">
         <CaseStatus item={item} />
         {!item.assigned_lawyer_id && <span className="assignment-tag">Sem responsável</span>}
+        {item.condemnation_value > 0 && <span className="pill danger">Condenação {money(item.condemnation_value)}</span>}
       </span>
     </span>
     <Icon name="arrow" />
@@ -250,7 +254,7 @@ function CaseList({ cases, user }) {
       <Icon name={tab === "active" ? "files" : "archive"} />
       <p>{tab === "active" ? "Nenhum processo ativo" : "Nenhum processo encerrado"}</p>
       <span>{tab === "active"
-        ? (user.role === "BANCO" ? "Os processos abertos aparecerão aqui." : "Os casos atribuídos pelo banco aparecerão aqui.")
+        ? (user.role === "BANCO" ? "Os processos abertos aparecerão aqui." : "Os casos atribuídos pela empresa aparecerão aqui.")
         : "Um processo entra aqui quando o advogado registra o desfecho."}</span>
     </div>}
   </>;
@@ -283,6 +287,7 @@ function Cases({ user }) {
       <Metric label="Aguardando atribuição" value={items.filter((item) => !item.assigned_lawyer_id).length} />
     </div>}
     {!isBank && <LawyerPerformance />}
+    {isBank && <BuscaProcessos />}
     <ErrorNotice message={action.error} />
     {isBank && <article className="panel">
       <div className="panel-heading"><span className="panel-icon"><Icon name="files" /></span><div><h2>Abrir novo processo</h2><p>Comece pelos dados principais do caso.</p></div></div>
@@ -302,7 +307,7 @@ function Cases({ user }) {
       <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
     </article>}
     <article className="panel">
-      <div className="panel-heading"><div><h2>{isBank ? "Processos do banco" : "Meus processos"}</h2><p>{isBank ? "Da abertura à decisão, em um só lugar." : "Os casos sob sua responsabilidade."}</p></div><span className="count-badge">{items.length}</span></div>
+      <div className="panel-heading"><div><h2>{isBank ? "Processos da empresa" : "Meus processos"}</h2><p>{isBank ? "Da abertura à decisão, em um só lugar." : "Os casos sob sua responsabilidade."}</p></div><span className="count-badge">{items.length}</span></div>
       <ErrorNotice message={cases.error} onRetry={cases.reload} />
       {cases.loading && <p role="status">Carregando processos…</p>}
       {!cases.loading && !cases.error && <CaseList cases={items} user={user} />}
@@ -321,12 +326,15 @@ function CaseRoute({ user }) {
  */
 function OutcomeForm({ caseId, decision, onRegistered }) {
   const action = useAction();
+  const [escolha, setEscolha] = useState(Object.keys(OUTCOMES)[0]);
+  const pedeValor = escolha === "ACORDO_ACEITO" || escolha === "SENTENCA_DESFAVORAVEL";
   const submit = (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     action.run(async () => {
       await sendJson(`/cases/${caseId}/lawyer-decisions/${decision.id}/outcome`, {
         outcome: form.get("outcome"), outcome_note: form.get("outcome_note").trim() || null,
+        value: form.get("value") ? Number(form.get("value")) : null,
       });
       onRegistered();
     });
@@ -349,10 +357,11 @@ function OutcomeForm({ caseId, decision, onRegistered }) {
         <div className="outcome-options">
           {Object.entries(OUTCOMES).map(([value, option], index) =>
             <label className="outcome-option" key={value}>
-              <input type="radio" name="outcome" value={value} defaultChecked={index === 0} required />
+              <input type="radio" name="outcome" value={value} defaultChecked={index === 0} required onChange={() => setEscolha(value)} />
               <span>{option.label}<span className="hint">{option.hint}</span></span>
             </label>)}
         </div>
+        {pedeValor && <label>{escolha === "ACORDO_ACEITO" ? "Valor fechado no acordo" : "Valor da condenação"}<input key={escolha} name="value" type="number" min="0" step="0.01" required defaultValue={escolha === "ACORDO_ACEITO" ? decision.proposed_value ?? "" : ""} /></label>}
         <label>Observação (opcional)<textarea name="outcome_note" maxLength="2000" placeholder="Valor efetivamente acordado, particularidade do juízo, etc." /></label>
         <ErrorNotice message={action.error} />
         <button>{action.pending ? "Registrando…" : <>Registrar desfecho<Icon name="check" /></>}</button>
@@ -373,7 +382,11 @@ function CaseDetail({ caseId, user }) {
   const stage = stageOf(detail, decision);
   const encerrado = stage === "ENCERRADO";
   const busy = action.pending || resource.loading;
-  const processingDocuments = detail?.documents.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status));
+  const aguardandoLeitura = Boolean(detail?.leitura_ia_ativa) && detail.documents.some((document) =>
+    ["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status)
+    && !detail.document_readings?.some((reading) => reading.document_id === document.id)
+    && Date.now() - new Date(document.created_at).getTime() < 3 * 60 * 1000);
+  const processingDocuments = aguardandoLeitura || detail?.documents.some((document) => ["UPLOADED", "EXTRACTING"].includes(document.status));
   useEffect(() => {
     if (!processingDocuments || resource.loading || resource.error) return;
     const timer = window.setTimeout(resource.reload, 2000);
@@ -429,16 +442,17 @@ function CaseDetail({ caseId, user }) {
         </select>
         <ErrorNotice message={lawyers.error} onRetry={lawyers.reload} />
       </article>}
-      <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} canUpload={user.role === "BANCO"} encerrado={encerrado} onUploaded={resource.reload} />
+      <div className="cards"><DocumentPanel caseId={caseId} documents={detail.documents} readings={detail.document_readings} leituraAtiva={Boolean(detail.leitura_ia_ativa)} valueOfClaim={detail.case.value_of_claim} canUpload={user.role === "BANCO"} encerrado={encerrado} onUploaded={resource.reload} />
       <article className="panel analysis"><h3>Saída da ferramenta</h3>
         {recommendation ? <>
           <div className={`recommendation ${recommendationClass[recommendation.recommendation] || "defense"}`}><span><Icon name="spark" />Recomendação da política</span><strong>{labels[recommendation.recommendation] || recommendation.recommendation}</strong></div>
-          <p><b>Ação indicada:</b> {actionText[recommendation.recommendation] || recommendation.recommendation}</p>
-          {recommendation.policy_output?.recuperacao && <div className="price-block"><span>Documento a solicitar · ganho esperado</span><strong>{labels[recommendation.policy_output.recuperacao.documento.toUpperCase()] || recommendation.policy_output.recuperacao.documento} · {money(recommendation.policy_output.recuperacao.ganho_estimado)}</strong></div>}
-          {recommendation.pricing?.target_value != null && <div className="price-block"><span>{recommendation.pricing.negotiable === false ? "Valor único de acordo" : "Faixa de negociação"}</span><strong>{recommendation.pricing.negotiable === false ? money(recommendation.pricing.target_value) : `${money(recommendation.pricing.opening_value)} a ${money(recommendation.pricing.walk_away_value)}`}</strong>{recommendation.pricing.negotiable !== false && <small>Alvo {money(recommendation.pricing.target_value)} · acima de {money(recommendation.pricing.walk_away_value)} é defesa</small>}</div>}
+          <p><b>O que fazer:</b> {actionText[recommendation.recommendation] || recommendation.recommendation}</p>
+          {recommendation.recommendation === "RECUPERAR" && recommendation.policy_output?.recuperacao && <div className="price-block"><span>Documento que falta · economia esperada se ele chegar</span><strong>{documentoFaltante[recommendation.policy_output.recuperacao.documento] || recommendation.policy_output.recuperacao.documento} · {money(recommendation.policy_output.recuperacao.ganho_estimado)}</strong></div>}
+          {recommendation.pricing?.target_value != null && <div className="price-block"><span>{recommendation.pricing.negotiable === false ? "Valor único para propor" : "Quanto oferecer"}</span><strong>{recommendation.pricing.negotiable === false ? money(recommendation.pricing.target_value) : `${money(recommendation.pricing.opening_value)} a ${money(recommendation.pricing.walk_away_value)}`}</strong>{recommendation.pricing.negotiable !== false && <small>Comece em {money(recommendation.pricing.opening_value)}{recommendation.pricing.target_value > recommendation.pricing.opening_value + 0.01 ? ` · meta ${money(recommendation.pricing.target_value)}` : ""} · acima de {money(recommendation.pricing.walk_away_value)}, defender sai mais barato</small>}</div>}
           <ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
         </> : <div className="empty-state"><Icon name="spark" /><p>Ainda sem recomendação</p><span>{isLawyer ? "Use “Avaliar risco e recomendação” para calcular o caminho mais barato." : "O advogado responsável ainda não avaliou este processo."}</span></div>}
       </article></div>
+      {user.role === "BANCO" && <ResultadoProcesso detail={detail} decision={decision} recommendation={recommendation} />}
       {user.role === "BANCO" && <DocumentRequestsPanel requests={detail.document_requests} onChanged={resource.reload} />}
       {isLawyer && recommendation && !decision && <article className="panel decision">
         <div className="panel-heading"><span className="panel-icon"><Icon name="check" /></span>
@@ -507,9 +521,9 @@ function ContractPanel({ banks }) {
   };
   const initialValue = (honorario) => honorario.tipo === "fixo" ? honorario.valor : percent(honorario.valor);
   const pct = (value) => `${(value * 100).toFixed(1)}%`;
-  return <article className="panel contract-panel"><h2>Contrato banco–escritório</h2>
+  return <article className="panel contract-panel"><h2>Contrato empresa–escritório</h2>
     <p className="muted">Só entram termos que mudam o custo entre acordar e defender. Mensalidade e valor fixo por caso novo são pagos em qualquer desfecho e não afetam a decisão.</p>
-    <label>Banco<select aria-label="Banco do contrato" value={selected} onChange={(event) => { setBankId(event.target.value); setPreview(null); }}>
+    <label>Empresa<select aria-label="Empresa do contrato" value={selected} onChange={(event) => { setBankId(event.target.value); setPreview(null); }}>
       {(banks || []).map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
     </select></label>
     <ErrorNotice message={contract.error} onRetry={contract.reload} />
@@ -527,7 +541,7 @@ function ContractPanel({ banks }) {
         <label>Duração esperada (meses)<input name="duracao_meses" type="number" min="0" max="120" step="1" defaultValue={parameters.duracao_meses} /></label>
       </div>
       <label>Teto de alçada (% do valor da causa, opcional)<input name="teto_alcada_fator" type="number" min="1" max="100" step="1" defaultValue={percent(parameters.teto_alcada_fator)} /></label>
-      <label>Concessão na negociação (% do espaço entre abertura e walk-away)<input name="concessao" type="number" min="0" max="100" step="1" defaultValue={percent(parameters.concessao)} /></label>
+      <label>Quanto ceder na negociação (% entre a proposta inicial e o valor máximo)<input name="concessao" type="number" min="0" max="100" step="1" defaultValue={percent(parameters.concessao)} /></label>
       <div className="contract-row">
         <button type="button" className="ghost" onClick={onSimulate}>{simulate.pending ? "Simulando…" : "Simular impacto na carteira"}</button>
         <button>{save.pending ? "Salvando…" : "Salvar nova versão"}</button>
@@ -581,9 +595,9 @@ function Admin() {
     <ErrorNotice message={banks.error} onRetry={banks.reload} />
     <ErrorNotice message={bankAction.error} />
     <form onSubmit={addBank}><fieldset className="form-fields" disabled={bankAction.pending}>
-      <label>Nome<input name="name" required minLength="2" maxLength="120" /></label><button>{bankAction.pending ? "Salvando…" : "Cadastrar banco"}</button>
+      <label>Nome<input name="name" required minLength="2" maxLength="120" /></label><button>{bankAction.pending ? "Salvando…" : "Cadastrar empresa"}</button>
     </fieldset></form>
-    {banks.loading && <p role="status">Carregando bancos…</p>}
+    {banks.loading && <p role="status">Carregando empresas…</p>}
     <ul>{(banks.data || []).map((bank) => <li key={bank.id}>{bank.name}</li>)}</ul>
   </article><article className="panel">
     <div className="panel-heading"><span className="panel-icon"><Icon name="users" /></span><div><h2>Advogados e usuários</h2><p>Quem acessa a plataforma e com qual perfil.</p></div></div>
@@ -595,7 +609,7 @@ function Admin() {
       <label>Senha inicial (15+ caracteres)<input name="password" type="password" minLength="15" maxLength="128" required autoComplete="new-password" /></label>
       <label>Perfil<select name="role" value={role} onChange={(event) => setRole(event.target.value)}><option value="ADVOGADO_EXTERNO">Advogado externo</option><option value="BANCO">Banco</option><option value="ADMIN_GLOBAL">Admin global</option></select></label>
       <label>Banco<select aria-label="Banco" name="bank_id" value={bankId ?? banks.data?.[0]?.id ?? ""} onChange={(event) => setBankId(event.target.value)} required={role !== "ADMIN_GLOBAL"} disabled={role === "ADMIN_GLOBAL" || banks.loading}>
-        <option value="">Selecione o banco</option>{(banks.data || []).map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+        <option value="">Selecione a empresa</option>{(banks.data || []).map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
       </select></label>
       <button disabled={role !== "ADMIN_GLOBAL" && (banks.loading || Boolean(banks.error))}>{userAction.pending ? "Salvando…" : "Cadastrar usuário"}</button>
     </fieldset></form>

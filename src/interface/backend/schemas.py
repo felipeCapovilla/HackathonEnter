@@ -134,6 +134,7 @@ class CaseRecord(CaseCreate):
     decided: bool = False
     outcome: DecisionOutcome | None = None
     document_count: int = 0
+    condemnation_value: float | None = None
 
 
 class DocumentRecord(BaseModel):
@@ -281,6 +282,7 @@ class EngagementEventCreate(BaseModel):
 class LawyerDecisionOutcomeCreate(BaseModel):
     outcome: DecisionOutcome
     outcome_note: str | None = Field(default=None, max_length=2000)
+    value: float | None = Field(default=None, ge=0, description="Valor fechado no acordo aceito ou valor da condenação")
 
 
 class LawyerPerformance(BaseModel):

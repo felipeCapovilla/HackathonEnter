@@ -28,6 +28,7 @@ class Settings:
     cors_origins: tuple[str, ...] = DEFAULT_CORS_ORIGINS
     auth_required: bool = True
     dossie_auto_analysis: bool = True
+    leitura_ia: bool = True
 
 
 def get_settings() -> Settings:
@@ -48,4 +49,5 @@ def get_settings() -> Settings:
         ),
         auth_required=os.getenv("ENTERAGREE_AUTH_REQUIRED", "true").lower() not in {"0", "false", "no"},
         dossie_auto_analysis=os.getenv("ENTERAGREE_DOSSIE_AUTO", "true").lower() not in {"0", "false", "no"},
+        leitura_ia=os.getenv("ENTERAGREE_LEITURA_IA", "true").lower() not in {"0", "false", "no"},
     )

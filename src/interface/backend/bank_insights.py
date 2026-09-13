@@ -23,7 +23,7 @@ ARTEFATO_BASE = Path(__file__).resolve().parents[3] / "artefatos" / "insights_ba
 
 MIN_DECISOES_RANKING = 20       # abaixo disso o advogado aparece com "amostra insuficiente"
 MIN_OUTROS_CLIENTES = 2         # benchmark anônimo: o escritório precisa atender outros 2 clientes...
-MIN_DECISOES_MERCADO = 50       # ...e somar 50 decisões fora deste banco
+MIN_DECISOES_MERCADO = 50       # ...e somar 50 decisões fora desta empresa
 LIMIAR_DIVERGENCIA = 1000.0     # divergência com custo esperado acima disso vira exceção
 MIN_CASOS_SEGMENTO = 10         # tipo de caso com menos processos não entra no ranking de tempo
 FEATURE_DOC = {"CONTRATO": ("Contrato", "contrato"), "EXTRATO": ("Extrato", "extrato"),
@@ -357,7 +357,7 @@ def _escritorios(itens_banco: list[dict], todos: list[dict], bank_id: str) -> li
             "advogados": len({x["lawyer_id"] for x in grupo}), **resumo,
             "mercado": mercado, "leitura": leitura,
             "motivo_sem_mercado": None if mercado else
-            f"Benchmark anônimo exige ao menos {MIN_OUTROS_CLIENTES} outros clientes e {MIN_DECISOES_MERCADO} decisões fora deste banco.",
+            f"Benchmark anônimo exige ao menos {MIN_OUTROS_CLIENTES} outros clientes e {MIN_DECISOES_MERCADO} decisões fora desta empresa.",
         })
     return sorted(linhas, key=lambda r: -(r["indice"] if r["indice"] is not None else -9))
 
@@ -395,7 +395,7 @@ def _excecoes(itens: list[dict]) -> dict:
                 "escritorio": x["law_firm_name"], "data": x["decidido_em"].isoformat() if x["decidido_em"] else None}
         if x["acima_walk_away"]:
             lista.append({**base, "tipo": "ACORDO_ACIMA_WALK_AWAY", "impacto": round(x["fechado"] - float(x["walk_away"]), 2),
-                          "detalhe": f"Fechou em {_brl(x['fechado'])}; walk-away era {_brl(float(x['walk_away']))}."})
+                          "detalhe": f"Fechou em {_brl(x['fechado'])}; valor máximo era {_brl(float(x['walk_away']))}."})
         if x["custo_divergencia"] >= LIMIAR_DIVERGENCIA:
             lista.append({**base, "tipo": "DIVERGENCIA_CARA", "impacto": round(x["custo_divergencia"], 2),
                           "detalhe": f"Política recomendou {x['recomendacao']}; advogado escolheu {x['acao']}."})
