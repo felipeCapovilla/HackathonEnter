@@ -956,6 +956,16 @@ class Repository:
                 result = excluded.result, error = excluded.error, created_at = excluded.created_at""", record)
         return {**record, "result": result}
 
+    def get_document_reading(self, document_id: str) -> dict | None:
+        with connection_for(self.database_path) as connection:
+            row = connection.execute(
+                "SELECT * FROM document_ai_readings WHERE document_id = ?", (document_id,)
+            ).fetchone()
+        record = _row(row)
+        if record is not None:
+            record["result"] = json.loads(record["result"]) if record["result"] else None
+        return record
+
     def list_document_readings(self, case_id: str) -> list[dict]:
         with connection_for(self.database_path) as connection:
             rows = connection.execute(

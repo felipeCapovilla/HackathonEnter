@@ -289,3 +289,37 @@ def test_ai_confirmed_document_reuses_the_rich_document_reading(tmp_path, monkey
         analysis = client.post(f"/api/cases/{case_id}/analyses")
         assert analysis.status_code == 201
         assert analysis.json()["feature_vector"]["Contrato"] == 1
+
+
+def test_ai_classification_does_not_trigger_a_second_paid_reading(tmp_path, monkeypatch):
+    """
+    Regressão: a classificação automática (document_service) já lê com IA. O gancho
+    pós-extração (ao_extrair, em main.py) também tenta ler por IA para todo documento,
+    de forma consultiva — sem a guarda em ao_extrair, isso duplicava a chamada (e o
+    custo) para todo upload sem tipo declarado.
+    """
+    from src.interface.backend import main as main_module
+    from src.utils import document_service as document_service_module
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-not-real")
+    calls: list[str] = []
+
+    def fake_ler_documento(caminho, texto, tipo_declarado):
+        calls.append(tipo_declarado)
+        return LeituraDocumento(tipo_documento="CONTRATO", resumo="Contrato de mútuo.")
+
+    monkeypatch.setattr(document_service_module, "ler_documento", fake_ler_documento)
+    monkeypatch.setattr(main_module, "ler_documento", fake_ler_documento)
+
+    app = create_app(_ai_settings(tmp_path))
+    with TestClient(app) as client:
+        case_id = _create_case(client)
+        upload = client.post(
+            f"/api/cases/{case_id}/documents",
+            data={"source_party": "BANCO"},
+            files={"file": ("contrato.txt", "texto qualquer", "text/plain")},
+        )
+        document = _wait_for(client, case_id, upload.json()["id"])
+        assert document["type_status"] == "AI_CONFIRMED"
+
+    assert len(calls) == 1

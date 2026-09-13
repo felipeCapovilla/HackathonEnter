@@ -116,6 +116,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         def ao_extrair(document_id: str) -> None:
             analisar_dossie_ao_extrair(document_id)
+            # Upload sem tipo declarado já leu com IA para classificar (document_service.py).
+            # Reler aqui seria uma segunda chamada paga pelo mesmo conteúdo.
+            if app.state.repository.get_document_reading(document_id) is not None:
+                return
             if app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip():
                 try:
                     ler_com_ia(document_id)
