@@ -11,7 +11,7 @@ from src.interface.backend.auth import hash_password
 from src.interface.backend.config import Settings
 from src.interface.backend.database import connection_for
 from src.interface.backend.main import create_app
-from src.utils.ai_document_classifier import AIDocumentClassification
+from src.tools.leitor_documentos import LeituraDocumento
 
 
 def settings(tmp_path: Path) -> Settings:
@@ -221,9 +221,9 @@ def test_ai_rejected_document_is_visible_but_does_not_feed_the_policy(tmp_path, 
 
     monkeypatch.setattr(
         document_service_module,
-        "classify_document_type",
-        lambda text: AIDocumentClassification(
-            document_type=None, rejected=True, reason="Não tem relação com o processo.", source="IA",
+        "ler_documento",
+        lambda caminho, texto, tipo_declarado: LeituraDocumento(
+            tipo_documento="RECUSADO", resumo="Não tem relação com o processo.",
         ),
     )
     app = create_app(_ai_settings(tmp_path))
@@ -240,8 +240,13 @@ def test_ai_rejected_document_is_visible_but_does_not_feed_the_policy(tmp_path, 
         assert document["ai_type_reason"] == "Não tem relação com o processo."
 
         # Continua visível na lista (não é soft-delete) e não trava a avaliação do processo.
-        listed = client.get(f"/api/cases/{case_id}").json()["documents"]
-        assert any(d["id"] == document["id"] for d in listed)
+        detail = client.get(f"/api/cases/{case_id}").json()
+        assert any(d["id"] == document["id"] for d in detail["documents"])
+
+        # A leitura fica salva no mesmo lugar usado pelo card consultivo do advogado.
+        reading = next(r for r in detail["document_readings"] if r["document_id"] == document["id"])
+        assert reading["status"] == "COMPLETED"
+        assert reading["result"]["tipo_documento"] == "RECUSADO"
 
         analysis = client.post(f"/api/cases/{case_id}/analyses")
         assert analysis.status_code == 201
@@ -249,3 +254,38 @@ def test_ai_rejected_document_is_visible_but_does_not_feed_the_policy(tmp_path, 
 
         # O banco ainda pode excluir o documento recusado e reenviar.
         assert client.delete(f"/api/cases/{case_id}/documents/{document['id']}").status_code == 204
+
+
+def test_ai_confirmed_document_reuses_the_rich_document_reading(tmp_path, monkeypatch):
+    """A classificação automática usa a mesma leitura consultiva (contrato, valores, pontos de atenção)."""
+    from src.utils import document_service as document_service_module
+
+    monkeypatch.setattr(
+        document_service_module,
+        "ler_documento",
+        lambda caminho, texto, tipo_declarado: LeituraDocumento(
+            tipo_documento="CONTRATO", resumo="Contrato de mútuo entre banco e cliente.",
+            numero_contrato="12345", valor_principal=5000.0, pontos_de_atencao=["Conferir assinatura na página 3"],
+        ),
+    )
+    app = create_app(_ai_settings(tmp_path))
+    with TestClient(app) as client:
+        case_id = _create_case(client)
+        upload = client.post(
+            f"/api/cases/{case_id}/documents",
+            data={"source_party": "BANCO"},
+            files={"file": ("contrato.txt", "texto qualquer, a leitura está mockada", "text/plain")},
+        )
+        document = _wait_for(client, case_id, upload.json()["id"])
+        assert document["type_status"] == "AI_CONFIRMED"
+        assert document["declared_type"] == "CONTRATO"
+
+        detail = client.get(f"/api/cases/{case_id}").json()
+        reading = next(r for r in detail["document_readings"] if r["document_id"] == document["id"])
+        assert reading["result"]["numero_contrato"] == "12345"
+        assert reading["result"]["pontos_de_atencao"] == ["Conferir assinatura na página 3"]
+
+        # A política já usa o documento confirmado pela IA como se fosse confirmado pelo usuário.
+        analysis = client.post(f"/api/cases/{case_id}/analyses")
+        assert analysis.status_code == 201
+        assert analysis.json()["feature_vector"]["Contrato"] == 1

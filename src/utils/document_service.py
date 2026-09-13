@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -13,7 +14,8 @@ from fastapi import HTTPException, UploadFile
 from pypdf import PdfReader
 
 from src.interface.backend.config import Settings
-from .ai_document_classifier import classify_document_type
+from src.tools.leitor_documentos import LeituraIndisponivel, ler_documento
+from .ai_document_classifier import AIDocumentClassification, classify_by_keywords
 from .document_type_validator import validate_document_type
 from src.interface.backend.repository import Repository
 from src.interface.backend.schemas import DocumentStatus, DocumentType, DocumentTypeStatus, SourceParty
@@ -136,9 +138,27 @@ class DocumentService:
                 quality_flags.add("DOCUMENT_WITHOUT_PAGES")
             sample = "\n".join(validation_sample)
             if document.get("type_source") == "AI":
-                # Banco não escolheu o tipo: a IA classifica pelo conteúdo extraído,
-                # ou recusa quando o documento não tem relação com o processo.
-                classification = classify_document_type(sample)
+                # Banco não escolheu o tipo: a mesma leitura por IA usada como
+                # complemento consultivo (src.tools.leitor_documentos) decide o
+                # tipo aqui, ou recusa quando o documento não tem relação com o
+                # processo. A leitura completa fica salva e aparece pro
+                # advogado do jeito de sempre; sem chave ou com falha, cai no
+                # fallback por palavra-chave, que nunca recusa sozinho.
+                modelo = os.getenv("ENTERAGREE_LEITURA_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+                try:
+                    leitura = ler_documento(path, sample, "não informado (classificação automática pela IA)")
+                except LeituraIndisponivel as exc:
+                    self.repository.save_document_reading(document_id, modelo, "FAILED", None, str(exc))
+                    classification = classify_by_keywords(sample)
+                else:
+                    self.repository.save_document_reading(
+                        document_id, modelo, "COMPLETED", leitura.model_dump(mode="json"), None
+                    )
+                    rejeitado = leitura.tipo_documento == "RECUSADO"
+                    classification = AIDocumentClassification(
+                        document_type=None if rejeitado else DocumentType(leitura.tipo_documento),
+                        rejected=rejeitado, reason=leitura.resumo, source="IA",
+                    )
                 if classification.rejected:
                     declared_type = DocumentType.OUTRO
                     detected_type = None
