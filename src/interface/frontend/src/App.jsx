@@ -6,6 +6,8 @@ import { Brand, Icon } from "./Brand";
 import { DocumentPanel } from "./DocumentPanel";
 import BankDashboard from "./banco/BankDashboard";
 import { DocumentRequestsPanel } from "./banco/DocumentRequestsPanel";
+import { ResetPasswordAction } from "./banco/ui";
+import "./banco/banco.css";
 import { BuscaProcessos } from "./banco/BuscaProcessos";
 import { ResultadoProcesso } from "./banco/ResultadoProcesso";
 import { MinhaFila } from "./advogado/MinhaFila";
@@ -120,9 +122,11 @@ function Shell({ user, onLogout, logout, children }) {
         <p className="nav-caption">Espaço de trabalho</p>
         <NavLink to={homeFor(user)} end><Icon name={user.role === "ADMIN_GLOBAL" ? "users" : "files"} />{user.role === "ADMIN_GLOBAL" ? "Administração" : user.role === "BANCO" ? "Processos" : "Meus processos"}</NavLink>
         {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Painel da empresa</NavLink>}
+        {user.role === "ADMIN_GLOBAL" && <NavLink to="/admin/auditoria"><Icon name="shield" />Auditoria</NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-message">Mesma justiça.<br /><span>Mais impacto.</span></div>
         <div className="sidebar-account"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{labels[user.role]}{user.is_manager ? " · gestor" : ""}</span></div></div>
+        <NavLink to="/conta" className="account-link"><Icon name="lock" />Minha conta</NavLink>
         <button className="logout-button" disabled={logout.pending} onClick={onLogout}><Icon name="logout" />{logout.pending ? "Saindo…" : "Sair"}</button>
       </div>
     </aside>
@@ -562,6 +566,77 @@ function ContractPanel({ banks }) {
   </article>;
 }
 
+/**
+ * Troca da própria senha, disponível para qualquer perfil logado.
+ *
+ * O backend revoga todas as sessões do usuário quando a senha muda — a sua
+ * inclusa. Por isso, depois do sucesso, o evento de sessão expirada é
+ * disparado direto: reaproveita o mesmo caminho que já trata 401 em qualquer
+ * outra tela (mensagem e redirecionamento para o login).
+ */
+function MyAccount() {
+  const action = useAction();
+  const [done, setDone] = useState(false);
+  const submit = (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const newPassword = form.get("new_password");
+    if (newPassword !== form.get("confirm_password")) {
+      action.run(async () => { throw new Error("A confirmação não corresponde à nova senha."); });
+      return;
+    }
+    action.run(async () => {
+      await request("/auth/change-password", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current_password: form.get("current_password"), new_password: newPassword }),
+      });
+      setDone(true);
+      window.dispatchEvent(new Event(SESSION_EXPIRED));
+    });
+  };
+  return <article className="panel">
+    <div className="panel-heading"><span className="panel-icon"><Icon name="lock" /></span><div><h2>Minha conta</h2><p>Troque sua senha de acesso.</p></div></div>
+    {done ? <p role="status">Senha alterada. Entrando novamente…</p> : <form onSubmit={submit}>
+      <fieldset className="form-fields" disabled={action.pending}>
+        <label>Senha atual<input name="current_password" type="password" required autoComplete="current-password" /></label>
+        <label>Nova senha (15+ caracteres)<input name="new_password" type="password" minLength="15" maxLength="128" required autoComplete="new-password" /></label>
+        <label>Confirmar nova senha<input name="confirm_password" type="password" minLength="15" maxLength="128" required autoComplete="new-password" /></label>
+        <ErrorNotice message={action.error} />
+        <button>{action.pending ? "Salvando…" : "Trocar senha"}</button>
+      </fieldset>
+    </form>}
+  </article>;
+}
+
+function AuditPanel() {
+  const events = useResource("/admin/audit-events");
+  const verify = useAction();
+  const [chain, setChain] = useState(null);
+  const runVerify = () => verify.run(async () => setChain(await request("/admin/audit-events/verify")));
+  return <article className="panel full-width">
+    <div className="panel-heading"><span className="panel-icon"><Icon name="shield" /></span>
+      <div><h2>Auditoria</h2><p>Rastro de ações da plataforma. Só admite inserção — nada aqui pode ser editado ou apagado.</p></div>
+    </div>
+    <div className="bank-toolbar-meta" style={{ marginBottom: "var(--s4)" }}>
+      <button type="button" className="ghost" onClick={runVerify} disabled={verify.pending}>{verify.pending ? "Verificando…" : "Verificar integridade da cadeia"}</button>
+      {chain && <span className={chain.valid ? "pill success" : "pill danger"}>{chain.valid ? `Íntegra (${chain.checked} eventos)` : `Violação detectada em ${chain.broken_at_id}`}</span>}
+      <button type="button" className="ghost" onClick={events.reload} disabled={events.loading}>{events.loading ? "Atualizando…" : "Atualizar"}</button>
+    </div>
+    <ErrorNotice message={events.error} onRetry={events.reload} />
+    {events.loading && !events.data && <p role="status">Carregando eventos…</p>}
+    {events.data && <div className="table-scroll"><table className="data-table">
+      <thead><tr><th>Quando</th><th>Ator</th><th>Ação</th><th>Entidade</th><th>Motivo</th></tr></thead>
+      <tbody>{events.data.map((event) => <tr key={event.id}>
+        <td>{new Date(event.created_at).toLocaleString("pt-BR")}</td>
+        <td>{event.actor_name || "Sistema"}</td>
+        <td>{event.action}</td>
+        <td>{event.entity_type} · {event.entity_id.slice(0, 8)}</td>
+        <td>{event.reason || "—"}</td>
+      </tr>)}</tbody>
+    </table></div>}
+  </article>;
+}
+
 function Admin() {
   const banks = useResource("/admin/banks");
   const users = useResource("/admin/users");
@@ -618,7 +693,10 @@ function Admin() {
       <button disabled={role !== "ADMIN_GLOBAL" && (banks.loading || Boolean(banks.error))}>{userAction.pending ? "Salvando…" : "Cadastrar usuário"}</button>
     </fieldset></form>
     {users.loading && <p role="status">Carregando usuários…</p>}
-    <ul>{(users.data || []).map((user) => <li key={user.id}>{user.name} · {labels[user.role]} · {user.is_active ? "ativo" : "inativo"}</li>)}</ul>
+    <ul className="admin-user-list">{(users.data || []).map((user) => <li key={user.id}>
+      <span>{user.name} · {labels[user.role]} · {user.is_active ? "ativo" : "inativo"}</span>
+      <ResetPasswordAction endpoint={`/admin/users/${user.id}/password`} />
+    </li>)}</ul>
   </article><ContractPanel banks={banks.data} /></section>;
 }
 
@@ -667,6 +745,8 @@ export default function App() {
       <Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <MinhaFila desempenho={<LawyerPerformance />} /> : <Navigate to={base} replace />} />
       <Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CasoAdvogadoRota /> : <Navigate to={base} replace />} />
       <Route path="/admin" element={user.role === "ADMIN_GLOBAL" ? <Admin /> : <Navigate to={base} replace />} />
+      <Route path="/admin/auditoria" element={user.role === "ADMIN_GLOBAL" ? <AuditPanel /> : <Navigate to={base} replace />} />
+      <Route path="/conta" element={<MyAccount />} />
       <Route path="*" element={<Navigate to={base} replace />} />
     </Routes>
   </Shell>;
