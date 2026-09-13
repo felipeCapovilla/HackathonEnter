@@ -24,6 +24,7 @@ from src.utils.document_type_validator import validate_document_type
 from .monitoring import build_monitoring_summary
 from .bank_insights import build_bank_insights
 from src.utils.motivo_indisponibilidade import classificar_motivo
+from src.tools.leitor_documentos import LeituraIndisponivel, ler_documento
 from src.policy.service import PolicyService
 from contracts.schema import ParametrosContrato
 from .repository import Repository
@@ -93,8 +94,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except (LookupError, ValueError, DossieUnavailableError) as exc:
                 logger.info("Análise automática do dossiê %s não realizada: %s", document_id, exc)
 
+        def ler_com_ia(document_id: str) -> dict | None:
+            """Leitura por IA do documento; falha vira registro FAILED, nunca erro para quem enviou."""
+            repository_ = app.state.repository
+            document = repository_.get_document_internal(document_id)
+            if document is None or document.get("deleted_at"):
+                return None
+            modelo = os.getenv("ENTERAGREE_LEITURA_MODEL", "gpt-4o-mini")
+            texto = repository_.get_document_text_sample(document_id, 24_000)
+            try:
+                leitura = app.state.leitor(Path(document["file_path"]), texto, document["declared_type"])
+            except LeituraIndisponivel as exc:
+                return repository_.save_document_reading(document_id, modelo, "FAILED", None, str(exc))
+            return repository_.save_document_reading(document_id, modelo, "COMPLETED", leitura.model_dump(mode="json"), None)
+
+        def ao_extrair(document_id: str) -> None:
+            analisar_dossie_ao_extrair(document_id)
+            if app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip():
+                try:
+                    ler_com_ia(document_id)
+                except Exception:  # noqa: BLE001 - a leitura é complemento; o documento já está processado
+                    logger.exception("Leitura por IA do documento %s falhou", document_id)
+
+        app.state.leitor = ler_documento
+        app.state.ler_com_ia = ler_com_ia
         app.state.documents = DocumentService(
-            app.state.repository, app_settings, on_extraction_completed=analisar_dossie_ao_extrair
+            app.state.repository, app_settings, on_extraction_completed=ao_extrair
         )
         def contrato_do_banco(bank_id: str | None, law_firm_id: str | None = None) -> ParametrosContrato:
             record = app.state.repository.resolve_bank_contract(bank_id, law_firm_id) if bank_id else None
@@ -141,7 +166,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def require_manager(user: dict) -> dict:
         require_role(user, UserRole.BANCO)
         if user["role"] != "SYSTEM" and not user.get("is_manager"):
-            raise HTTPException(403, "Somente o gestor do banco altera o contrato.")
+            raise HTTPException(403, "Somente o gestor da empresa altera o contrato.")
         return user
 
     def require_open_case(case_id: str, acao: str) -> None:
@@ -261,7 +286,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def require_firm_of_bank(bank_id: str, law_firm_id: str | None) -> None:
         if law_firm_id and law_firm_id not in {firm["id"] for firm in repository().list_law_firms(bank_id)}:
-            raise HTTPException(404, "Escritório não atua para este banco.")
+            raise HTTPException(404, "Escritório não atua para esta empresa.")
 
     def contract_preview(bank_id: str, law_firm_id: str | None, payload: ParametrosContrato) -> dict:
         from src.policy.preview import simular
@@ -357,6 +382,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         documents = repository().list_documents(case_id)
         return {
             "negotiation_outcomes": repository().list_negotiation_outcomes(case_id),
+            "document_readings": repository().list_document_readings(case_id),
+            # A tela espera a leitura por IA só quando ela de fato vai acontecer.
+            "leitura_ia_ativa": bool(app_settings.leitura_ia and os.getenv("OPENAI_API_KEY", "").strip()),
             "judicial_outcomes": repository().list_judicial_outcomes(case_id),
             "case": case,
             # ABERTO | DECIDIDO | ENCERRADO — a tela habilita ações a partir disto.
@@ -635,8 +663,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         case_id: str, decision_id: str, payload: LawyerDecisionOutcomeCreate, request: Request
     ) -> dict:
         """Fecha o processo: como terminou de verdade. Só o advogado do caso registra."""
-        require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
-        require_case(case_id, request)
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        case = require_case(case_id, request)
         decision = repository().get_decision(decision_id)
         if decision is None or decision["case_id"] != case_id:
             raise HTTPException(404, "Decisão não encontrada para este processo.")
@@ -648,6 +676,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(409, str(exc)) from exc
         if updated is None:
             raise HTTPException(404, "Decisão não encontrada.")
+        # O valor informado vira o registro detalhado que o painel da empresa usa
+        # (quanto custou a sentença, por quanto o acordo fechou).
+        lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
+        desfecho = payload.outcome.value
+        if desfecho == "SENTENCA_FAVORAVEL":
+            repository().create_judicial_outcome(case_id, JudicialOutcomeCreate(result="EXITO"), lawyer_id)
+        elif desfecho == "SENTENCA_DESFAVORAVEL" and payload.value is not None:
+            repository().create_judicial_outcome(
+                case_id, JudicialOutcomeCreate(result="NAO_EXITO", condemnation_value=payload.value), lawyer_id)
+        elif desfecho == "ACORDO_ACEITO" and payload.value is not None and decision["action"] == "ACORDO":
+            repository().create_negotiation_outcome(case_id, NegotiationOutcomeCreate(
+                status="ACEITO", offered_value=decision["proposed_value"], closed_value=payload.value), lawyer_id)
         return updated
 
     @app.get("/api/lawyer/performance", response_model=LawyerPerformance)
@@ -655,6 +695,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Números do próprio advogado. Êxito e aderência medem coisas diferentes."""
         user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         return repository().lawyer_performance(user["id"], frozenset(FAVORABLE_OUTCOMES))
+
+    @app.post("/api/documents/{document_id}/leitura", status_code=201)
+    def ler_documento_com_ia(document_id: str, request: Request) -> dict:
+        """Refaz (ou faz pela primeira vez) a leitura por IA de um documento do processo."""
+        user = require_role(current_user(request), UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
+        document = repository().get_document(document_id)
+        if document is None:
+            raise HTTPException(404, "Documento não encontrado.")
+        require_case_access(repository(), document["case_id"], user)
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            raise HTTPException(503, "Leitura por IA indisponível: configure OPENAI_API_KEY no servidor.")
+        return app.state.ler_com_ia(document_id)
+
+    @app.get("/api/bank/search")
+    def bank_search(q: str, request: Request) -> list[dict]:
+        """Painel de busca da empresa: processo, número do contrato ou nome da parte."""
+        user = require_role(current_user(request), UserRole.BANCO)
+        termo = q.strip()
+        if len(termo) < 3:
+            raise HTTPException(422, "Digite ao menos 3 caracteres para buscar.")
+        return repository().search_cases(user["bank_id"], termo)
 
     @app.get("/api/monitoring", response_model=MonitoringSummary)
     def monitoring(request: Request) -> dict:

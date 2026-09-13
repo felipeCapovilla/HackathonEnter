@@ -13,7 +13,8 @@ from contracts.schema import CaseFeatures, ParametrosContrato, PlanoRecuperacao,
 from . import table
 from .constants import CUSTO_MENSAL_TEMPO, DURACAO_MESES, P4, P5, POLICY_VERSION, RATIO_CONDENACAO
 from .gate import avaliar_gate, contrato_efetivo
-from .valor_acordo import avaliar_acordo, pct
+from .linguagem import descrever_caso, frequencia, nivel_de_risco
+from .valor_acordo import avaliar_acordo, brl
 
 
 def _p_tabela(c: CaseFeatures, *, com_contrato: bool | None = None,
@@ -63,19 +64,18 @@ def _plano_recuperacao(c: CaseFeatures, valor_causa: float, contrato: Parametros
     if not c.contrato and c.dossie:
         forte = bool(c.analise_dossie and c.analise_dossie.analisou_assinatura_contrato)
         doc, conf = "contrato", ("alta" if forte else "media")
-        fund = ("O dossiê periciou a assinatura aposta no instrumento contratual: "
-                "o contrato existe e não foi juntado." if forte else
-                "Dossiê presente; confirmar se periciou assinatura em contrato.")
+        fund = ("O dossiê conferiu a assinatura do contrato: o contrato existe, só não foi enviado." if forte else
+                "Há dossiê, mas não está claro se ele conferiu a assinatura do contrato.")
         p_novo = _p_tabela(c, com_contrato=True)
     elif not c.extrato and c.laudo:
         doc, conf = "extrato", "media"
-        fund = "O laudo descreve a liberação do crédito em conta: o extrato daquela conta existe."
+        fund = "O laudo mostra o dinheiro caindo na conta do autor: o extrato dessa conta existe."
         p_novo = _p_tabela(c, com_extrato=True)
     elif not c.extrato:
-        doc, conf, fund = "extrato", "baixa", "Extrato ausente, sem sinal interno de que exista."
+        doc, conf, fund = "extrato", "baixa", "Falta o extrato, e nada indica que ele exista."
         p_novo = _p_tabela(c, com_extrato=True)
     elif not c.contrato:
-        doc, conf, fund = "contrato", "baixa", "Contrato ausente, sem sinal interno de que exista."
+        doc, conf, fund = "contrato", "baixa", "Falta o contrato, e nada indica que ele exista."
         p_novo = _p_tabela(c, com_contrato=True)
     else:
         return None
@@ -108,20 +108,23 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
     valor_informado = c.valor_causa > 0
     valor_causa = c.valor_causa if valor_informado else 1.0
     if not valor_informado:
-        alertas.append("Valor da causa ausente: decisão calculada em proporção, sem valor de acordo sugerido.")
+        alertas.append("Sem o valor da causa não dá para sugerir quanto oferecer: a recomendação foi calculada em proporção.")
 
     veredito = _avaliar(valor_causa, p, contrato)
     rec = _plano_recuperacao(c, valor_causa, contrato, _custo_do_melhor_caminho(veredito, valor_causa, contrato))
 
     segmento = table.chave(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto)
-    fonte = "fonte externa" if externa else "tabela de segmentos"
+    caso = descrever_caso(contrato_efetivo(c), c.extrato, c.comprovante_credito, c.sub_assunto)
+    fonte = " (estimativa de um modelo externo)" if externa else ""
     just = [gate.motivo,
-            f"Segmento {segmento}: P(derrota) {pct(p)} ({fonte}); limiar deste caso {pct(veredito.p_estrela)}."]
+            f"Em casos parecidos ({caso}), a chance de a empresa perder é {nivel_de_risco(p)}: "
+            f"{frequencia(p)}{fonte}. O acordo compensa a partir de {frequencia(veredito.p_estrela)}."]
     premissas = [*veredito.premissas_usadas, CUSTO_MENSAL_TEMPO.id, DURACAO_MESES.id]
 
     if rec and rec.confianca == "alta":
         acao = "RECUPERAR"
-        just.append(f"{rec.fundamento} Ganho esperado de R$ {rec.ganho_estimado:,.2f} sobre a melhor opção atual.")
+        just.append(f"{rec.fundamento} Se ele chegar, a economia esperada é de R$ {brl(rec.ganho_estimado)} "
+                    "em relação ao melhor caminho de hoje.")
         just.append(f"Se o documento não vier: {veredito.motivo}")
         premissas.append(P4.id)
     elif veredito.decisao == "ACORDO":
@@ -131,7 +134,7 @@ def decidir(c: CaseFeatures, contrato: ParametrosContrato | None = None, *,
         acao = "DEFENDER"
         just.append(veredito.motivo)
         if not gate.defesa_disponivel:
-            alertas.append("Gate fechado: defender aqui exige justificativa registrada.")
+            alertas.append("Defender aqui vai contra a prova disponível: se escolher defesa, registre o motivo.")
     if rec and rec.confianca != "alta":
         premissas.append(P5.id)
 

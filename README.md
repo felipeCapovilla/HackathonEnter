@@ -48,7 +48,7 @@ export ENTERAGREE_AUTH_REQUIRED=true
 python -m uvicorn src.interface.backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Para a análise automática do dossiê, exporte `OPENAI_API_KEY` no mesmo terminal antes de iniciar a API.
+Para a análise automática do dossiê e a leitura por IA de cada documento enviado, exporte `OPENAI_API_KEY` no mesmo terminal antes de iniciar a API (`ENTERAGREE_LEITURA_IA=false` desliga só a leitura).
 Para a prévia de contrato do admin, gere os CSVs da base uma vez:
 `python -m scripts.exportar_base_csv --xlsx caminho/Hackaton_Enter_Base_Candidatos.xlsx`.
 O frontend roda com os mesmos comandos `npm` acima.

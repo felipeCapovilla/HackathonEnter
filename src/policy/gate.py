@@ -43,17 +43,16 @@ def avaliar_gate(c: CaseFeatures) -> ResultadoGate:
     alerta = None
     if nao_conforme and c.contrato:
         alerta = (
-            "Contradição: o banco juntou contrato, mas o dossiê do próprio banco "
-            "aponta NÃO CONFORMIDADE da assinatura. O contrato foi desconsiderado "
-            "como prova e o documento não deve ser levado aos autos."
+            "Atenção: a empresa enviou o contrato, mas o próprio dossiê diz que a assinatura "
+            "não confere. O contrato não foi usado como prova e não deve ser levado ao processo."
         )
 
     if not contrato_vale and not c.extrato:
         return ResultadoGate(
             defesa_disponivel=False,
             motivo=(
-                "Sem contrato válido e sem extrato o banco não satisfaz o ônus "
-                "probatório do art. 373, II do CPC. Segmento com 2,7% de êxito histórico."
+                "Sem contrato válido e sem extrato, a empresa não consegue provar que o empréstimo "
+                "existiu (art. 373, II do CPC): em casos assim, a defesa vence só 3 em cada 100."
             ),
             exige_justificativa=True,
             contrato_invalidado=nao_conforme and c.contrato,
@@ -62,7 +61,8 @@ def avaliar_gate(c: CaseFeatures) -> ResultadoGate:
 
     return ResultadoGate(
         defesa_disponivel=True,
-        motivo="Prova mínima presente." if not nao_conforme else "Prova mínima presente (contrato desconsiderado).",
+        motivo=("A empresa tem a prova mínima da contratação (contrato ou extrato)." if not nao_conforme else
+                "A empresa tem a prova mínima da contratação, mas o contrato foi desconsiderado porque a assinatura não confere."),
         exige_justificativa=False,
         contrato_invalidado=nao_conforme and c.contrato,
         alerta=alerta,

@@ -2,6 +2,42 @@ import { useState } from "react";
 import { documentDownloadUrl, request } from "./api";
 import { useAction } from "./hooks";
 import { Icon } from "./Brand";
+import "./banco/banco.css";
+
+const moeda = (value) => value == null ? null : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+/** O que a IA leu no documento. Só alerta; não muda tipo nem cadastro sozinha. */
+function LeituraIA({ document, leitura, leituraAtiva, valueOfClaim, onRefresh }) {
+  const action = useAction();
+  const ler = () => action.run(async () => {
+    await request(`/documents/${document.id}/leitura`, { method: "POST" });
+    onRefresh();
+  });
+  if (!["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status)) return null;
+  if (!leitura && !leituraAtiva) return null;
+  if (!leitura || leitura.status === "FAILED") {
+    return <div className="leitura-ia">
+      <p className="muted">{leitura ? `Leitura por IA indisponível: ${leitura.error}` : "Documento ainda sem leitura por IA."}</p>
+      <button type="button" className="subtle" disabled={action.pending} onClick={ler}>{action.pending ? "Lendo…" : "Ler com IA"}</button>
+      {action.error && <p role="alert" className="leitura-alerta">{action.error}</p>}
+    </div>;
+  }
+  const r = leitura.result;
+  const campos = [
+    ["Contrato nº", r.numero_contrato], ["Valor", moeda(r.valor_principal)], ["Data", r.data_referencia],
+    ["Parte autora", r.nome_parte_autora], ["Valor da causa", moeda(r.valor_causa)], ["UF", r.uf],
+    ["Alega golpe", r.alega_golpe == null ? null : r.alega_golpe ? "Sim" : "Não"],
+  ].filter(([, valor]) => valor);
+  const tipoDiverge = r.tipo_documento && r.tipo_documento !== "OUTRO" && r.tipo_documento !== document.declared_type;
+  const causaDiverge = r.valor_causa && valueOfClaim && Math.abs(r.valor_causa - valueOfClaim) > 1;
+  return <div className="leitura-ia">
+    <p><Icon name="spark" className="tiny" /> <b>Leitura da IA:</b> {r.resumo}</p>
+    {tipoDiverge && <p className="leitura-alerta">A IA acha que este documento é {documentTypes[r.tipo_documento] || r.tipo_documento}, não {documentTypes[document.declared_type] || document.declared_type}.</p>}
+    {causaDiverge && <p className="leitura-alerta">O valor da causa nos autos ({moeda(r.valor_causa)}) é diferente do cadastrado ({moeda(valueOfClaim)}).</p>}
+    {campos.length > 0 && <dl>{campos.map(([rotulo, valor]) => <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>)}</dl>}
+    {r.pontos_de_atencao?.length > 0 && <ul>{r.pontos_de_atencao.map((ponto, index) => <li key={index}>{ponto}</li>)}</ul>}
+  </div>;
+}
 
 const documentTypes = {
   AUTOS: "Autos do processo",
@@ -65,7 +101,7 @@ function DeleteDocument({ caseId, document, onDeleted }) {
   </div>;
 }
 
-export function DocumentPanel({ caseId, documents, canUpload, encerrado = false, onUploaded }) {
+export function DocumentPanel({ caseId, documents, readings = [], leituraAtiva = false, valueOfClaim = null, canUpload, encerrado = false, onUploaded }) {
   // Depois do desfecho a prova é histórica: nem entra documento novo, nem sai o
   // que já sustentou a recomendação emitida.
   const podeEditar = canUpload && !encerrado;
@@ -96,7 +132,7 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
     </div>
     {encerrado && canUpload && <p className="locked"><Icon name="lock" />Processo encerrado: os documentos não podem mais ser alterados.</p>}
     {podeEditar && <form className="document-upload" onSubmit={upload}>
-      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
+      <p className="muted" id="document-upload-help">Envie os documentos da empresa para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
       <fieldset className="form-fields" disabled={action.pending}>
         <label>Tipo de documento<select name="declared_type" required defaultValue="">
           <option value="">Selecione o tipo</option>
@@ -117,10 +153,11 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
         </div>
         <span>
           {documentTypes[document.declared_type] || document.declared_type}
-          {" · "}{document.source_party === "BANCO" ? "Enviado pelo banco" : "Enviado pelo advogado"}
+          {" · "}{document.source_party === "BANCO" ? "Enviado pela empresa" : "Enviado pelo advogado"}
           {document.page_count > 0 && ` · ${document.page_count} página(s)`}
         </span>
         <DocumentNotice document={document} />
+        <LeituraIA document={document} leitura={readings.find((reading) => reading.document_id === document.id)} leituraAtiva={leituraAtiva} valueOfClaim={valueOfClaim} onRefresh={onUploaded} />
         <div className="document-actions">
           <a href={documentDownloadUrl(document.id)} target="_blank" rel="noopener noreferrer" aria-label={`Baixar ${document.original_filename}`}>Baixar original</a>
           {/* Só o banco exclui, e só o que ele mesmo enviou: o gate documental é dele. */}
@@ -130,7 +167,7 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
     })}</ul> : <div className="empty-state">
       <Icon name="files" />
       <p>Nenhum documento enviado</p>
-      <span>{podeEditar ? "Envie contrato, extrato e comprovante de crédito — são eles que decidem o caso." : "O banco não enviou documentos para este processo."}</span>
+      <span>{podeEditar ? "Envie contrato, extrato e comprovante de crédito — são eles que decidem o caso." : "A empresa ainda não enviou documentos para este processo."}</span>
     </div>}
   </article>;
 }

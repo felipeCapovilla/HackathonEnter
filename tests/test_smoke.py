@@ -56,7 +56,7 @@ def test_dossie_nao_conforme_invalida_o_contrato():
     base, r = decidir(CASO_01), decidir(c)
     assert r.p_perda > base.p_perda, "contrato deveria ter sido desconsiderado"
     assert r.segmento.startswith("C0"), r.segmento
-    assert any("NÃO CONFORMIDADE" in a for a in r.alertas)
+    assert any("assinatura não confere" in a for a in r.alertas)
 
 
 def test_terceira_via_quando_o_documento_muda_a_melhor_opcao():
