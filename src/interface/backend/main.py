@@ -22,12 +22,23 @@ from src.utils.document_service import DocumentService
 from src.utils.dossie_service import DossieService, DossieUnavailableError
 from src.utils.document_type_validator import validate_document_type
 from .monitoring import build_monitoring_summary
+from .bank_insights import build_bank_insights
+from src.utils.motivo_indisponibilidade import classificar_motivo
 from src.policy.service import PolicyService
 from contracts.schema import ParametrosContrato
 from .repository import Repository
 from .schemas import (
     AnalysisRecord,
     BankContractRecord,
+    BankContractUpdate,
+    EngagementEventCreate,
+    EngagementEventType,
+    JudicialOutcomeCreate,
+    JudicialOutcomeRecord,
+    LawFirmCreate,
+    LawFirmRecord,
+    NegotiationOutcomeCreate,
+    NegotiationOutcomeRecord,
     ContractPreview,
     CaseCreate,
     CaseAssignment,
@@ -85,8 +96,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.documents = DocumentService(
             app.state.repository, app_settings, on_extraction_completed=analisar_dossie_ao_extrair
         )
-        def contrato_do_banco(bank_id: str | None) -> ParametrosContrato:
-            record = app.state.repository.get_active_bank_contract(bank_id) if bank_id else None
+        def contrato_do_banco(bank_id: str | None, law_firm_id: str | None = None) -> ParametrosContrato:
+            record = app.state.repository.resolve_bank_contract(bank_id, law_firm_id) if bank_id else None
             if record is None:
                 return ParametrosContrato()
             return ParametrosContrato.model_validate({**record["parameters"], "versao": f"{bank_id}-v{record['version']}"})
@@ -117,6 +128,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def require_case(case_id: str, request: Request) -> dict:
         return require_case_access(repository(), case_id, current_user(request))
+
+    def track(user: dict, case_id: str, event_type: EngagementEventType, document_id: str | None = None) -> None:
+        """Engajamento é medido só para o advogado externo, e nunca derruba a requisição."""
+        if user.get("role") != UserRole.ADVOGADO_EXTERNO.value:
+            return
+        try:
+            repository().record_engagement(case_id, user["id"], event_type.value, document_id)
+        except Exception:  # noqa: BLE001 - telemetria não pode impedir o trabalho do advogado
+            logger.exception("Falha ao registrar engajamento %s do caso %s", event_type, case_id)
+
+    def require_manager(user: dict) -> dict:
+        require_role(user, UserRole.BANCO)
+        if user["role"] != "SYSTEM" and not user.get("is_manager"):
+            raise HTTPException(403, "Somente o gestor do banco altera o contrato.")
+        return user
 
     def require_open_case(case_id: str, acao: str) -> None:
         """
@@ -177,6 +203,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
+    @app.get("/api/admin/law-firms", response_model=list[LawFirmRecord])
+    def admin_law_firms(request: Request) -> list[dict]:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        return repository().list_law_firms()
+
+    @app.post("/api/admin/law-firms", response_model=LawFirmRecord, status_code=201)
+    def create_law_firm(payload: LawFirmCreate, request: Request) -> dict:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        try:
+            return repository().create_law_firm(payload.name)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
     @app.get("/api/admin/users", response_model=list[UserRecord])
     def admin_users(request: Request) -> list[dict]:
         require_role(current_user(request), UserRole.ADMIN_GLOBAL)
@@ -189,8 +228,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(422, "Administradores não possuem banco; usuários operacionais exigem banco.")
         if payload.bank_id and repository().get_bank(payload.bank_id) is None:
             raise HTTPException(422, "Banco não encontrado.")
+        if payload.law_firm_id and (payload.role != UserRole.ADVOGADO_EXTERNO or repository().get_law_firm(payload.law_firm_id) is None):
+            raise HTTPException(422, "Escritório só se aplica a advogado externo e precisa existir.")
+        if payload.is_manager and payload.role != UserRole.BANCO:
+            raise HTTPException(422, "Somente usuários do banco podem ser gestores.")
         try:
-            return repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
+            return repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "law_firm_id": payload.law_firm_id, "is_manager": payload.is_manager, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
@@ -205,43 +248,83 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Usuário não encontrado.")
         return user
 
-    def contract_record(bank_id: str) -> dict:
-        record = repository().get_active_bank_contract(bank_id)
+    def contract_record(bank_id: str, law_firm_id: str | None = None) -> dict:
+        record = repository().get_active_bank_contract(bank_id, law_firm_id)
+        inherited = False
+        if record is None and law_firm_id:
+            record, inherited = repository().get_active_bank_contract(bank_id), True
         if record is None:
-            return {"bank_id": bank_id, "version": 0, "parameters": ParametrosContrato().model_dump()}
-        return {**record, "parameters": {**record["parameters"], "versao": f"{bank_id}-v{record['version']}"}}
+            return {"bank_id": bank_id, "version": 0, "parameters": ParametrosContrato().model_dump(),
+                    "law_firm_id": law_firm_id, "inherited_from_bank": bool(law_firm_id)}
+        return {**record, "law_firm_id": law_firm_id, "inherited_from_bank": inherited,
+                "parameters": {**record["parameters"], "versao": f"{bank_id}-v{record['version']}"}}
+
+    def require_firm_of_bank(bank_id: str, law_firm_id: str | None) -> None:
+        if law_firm_id and law_firm_id not in {firm["id"] for firm in repository().list_law_firms(bank_id)}:
+            raise HTTPException(404, "Escritório não atua para este banco.")
+
+    def contract_preview(bank_id: str, law_firm_id: str | None, payload: ParametrosContrato) -> dict:
+        from src.policy.preview import simular
+        try:
+            return simular(app.state.contract_provider(bank_id, law_firm_id), payload)
+        except FileNotFoundError as exc:
+            raise HTTPException(503, "Base histórica indisponível para a prévia.") from exc
 
     def require_bank(bank_id: str) -> None:
         if repository().get_bank(bank_id) is None:
             raise HTTPException(404, "Banco não encontrado.")
 
     @app.get("/api/admin/banks/{bank_id}/contract", response_model=BankContractRecord)
-    def admin_bank_contract(bank_id: str, request: Request) -> dict:
+    def admin_bank_contract(bank_id: str, request: Request, law_firm_id: str | None = None) -> dict:
         require_role(current_user(request), UserRole.ADMIN_GLOBAL)
         require_bank(bank_id)
-        return contract_record(bank_id)
+        return contract_record(bank_id, law_firm_id)
 
     @app.post("/api/admin/banks/{bank_id}/contract", response_model=BankContractRecord, status_code=201)
-    def save_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request) -> dict:
+    def save_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request, law_firm_id: str | None = None) -> dict:
         user = require_role(current_user(request), UserRole.ADMIN_GLOBAL)
         require_bank(bank_id)
-        repository().create_bank_contract(bank_id, payload.model_dump(exclude={"versao"}), user.get("id"))
-        return contract_record(bank_id)
+        if law_firm_id and repository().get_law_firm(law_firm_id) is None:
+            raise HTTPException(404, "Escritório não encontrado.")
+        repository().create_bank_contract(bank_id, payload.model_dump(exclude={"versao"}), user.get("id"), law_firm_id)
+        return contract_record(bank_id, law_firm_id)
 
     @app.post("/api/admin/banks/{bank_id}/contract/preview", response_model=ContractPreview)
-    def preview_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request) -> dict:
+    def preview_bank_contract(bank_id: str, payload: ParametrosContrato, request: Request, law_firm_id: str | None = None) -> dict:
         require_role(current_user(request), UserRole.ADMIN_GLOBAL)
         require_bank(bank_id)
-        from src.policy.preview import simular
-        try:
-            return simular(app.state.contract_provider(bank_id), payload)
-        except FileNotFoundError as exc:
-            raise HTTPException(503, "Base histórica indisponível para a prévia.") from exc
+        return contract_preview(bank_id, law_firm_id, payload)
 
     @app.get("/api/bank/contract", response_model=BankContractRecord)
-    def bank_contract(request: Request) -> dict:
+    def bank_contract(request: Request, law_firm_id: str | None = None) -> dict:
         user = require_role(current_user(request), UserRole.BANCO)
-        return contract_record(user["bank_id"])
+        require_firm_of_bank(user["bank_id"], law_firm_id)
+        return contract_record(user["bank_id"], law_firm_id)
+
+    @app.post("/api/bank/contract", response_model=BankContractRecord, status_code=201)
+    def bank_save_contract(payload: BankContractUpdate, request: Request, law_firm_id: str | None = None) -> dict:
+        user = require_manager(current_user(request))
+        require_firm_of_bank(user["bank_id"], law_firm_id)
+        repository().create_bank_contract(user["bank_id"], payload.parametros.model_dump(exclude={"versao"}),
+                                          user.get("id"), law_firm_id, payload.justificativa.strip())
+        return contract_record(user["bank_id"], law_firm_id)
+
+    @app.post("/api/bank/contract/preview", response_model=ContractPreview)
+    def bank_preview_contract(payload: ParametrosContrato, request: Request, law_firm_id: str | None = None) -> dict:
+        user = require_manager(current_user(request))
+        require_firm_of_bank(user["bank_id"], law_firm_id)
+        return contract_preview(user["bank_id"], law_firm_id, payload)
+
+    @app.get("/api/bank/law-firms", response_model=list[LawFirmRecord])
+    def bank_law_firms(request: Request) -> list[dict]:
+        user = require_role(current_user(request), UserRole.BANCO)
+        return repository().list_law_firms(user["bank_id"])
+
+    @app.get("/api/bank/insights")
+    def bank_insights(request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.BANCO)
+        with connection_for(app_settings.database_path) as connection:
+            return build_bank_insights(connection, user["bank_id"])
 
     @app.get("/api/bank/lawyers", response_model=list[UserRecord])
     def bank_lawyers(request: Request) -> list[dict]:
@@ -268,9 +351,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/cases/{case_id}")
     def get_case(case_id: str, request: Request) -> dict:
-        case = require_case(case_id, request)
+        user = current_user(request)
+        case = require_case_access(repository(), case_id, user)
+        track(user, case_id, EngagementEventType.CASE_OPENED)
         documents = repository().list_documents(case_id)
         return {
+            "negotiation_outcomes": repository().list_negotiation_outcomes(case_id),
+            "judicial_outcomes": repository().list_judicial_outcomes(case_id),
             "case": case,
             # ABERTO | DECIDIDO | ENCERRADO — a tela habilita ações a partir disto.
             "stage": repository().case_stage(case_id),
@@ -359,7 +446,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         document = repository().get_document(document_id)
         if document is None:
             raise HTTPException(404, "Documento não encontrado.")
-        require_case_access(repository(), document["case_id"], current_user(request))
+        user = current_user(request)
+        require_case_access(repository(), document["case_id"], user)
+        if page_number == 1:
+            track(user, document["case_id"], EngagementEventType.DOCUMENT_OPENED, document_id)
         page = repository().get_page(document_id, page_number)
         if page is None:
             raise HTTPException(404, "Página extraída não encontrada.")
@@ -372,7 +462,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # para a auditoria das análises que já o usaram.
         if document is None or document.get("deleted_at"):
             raise HTTPException(404, "Documento não encontrado.")
-        require_case_access(repository(), document["case_id"], current_user(request))
+        user = current_user(request)
+        require_case_access(repository(), document["case_id"], user)
+        track(user, document["case_id"], EngagementEventType.DOCUMENT_OPENED, document_id)
         path = Path(document["file_path"])
         if not path.exists():
             raise HTTPException(410, "Arquivo original não está mais disponível.")
@@ -442,11 +534,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/cases/{case_id}/analyses", response_model=AnalysisRecord, status_code=201)
     def analyse_case(case_id: str, request: Request) -> dict:
-        require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
         require_case(case_id, request)
         require_open_case(case_id, "gerar nova avaliação")
         try:
-            return app.state.policy.evaluate(case_id)
+            analysis = app.state.policy.evaluate(case_id)
+            track(user, case_id, EngagementEventType.ANALYSIS_RUN)
+            return analysis
         except FileNotFoundError as exc:
             raise HTTPException(503, "Artefato do modelo não disponível.") from exc
 
@@ -467,8 +561,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             DocumentRequestStatus.CANCELLED,
         }:
             raise HTTPException(422, "Resposta documental inválida.")
+        motivo, fonte = None, None
+        if payload.status == DocumentRequestStatus.DECLARED_UNAVAILABLE:
+            if payload.unavailability_reason is not None:
+                motivo, fonte = payload.unavailability_reason.value, "INFORMADO"
+            else:
+                motivo, fonte = classificar_motivo(payload.reason, document_request["document_type"])
         try:
-            response = repository().respond_to_document_request(request_id, payload.status, payload.reason)
+            response = repository().respond_to_document_request(request_id, payload.status, payload.reason, motivo, fonte)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
         if response is None:
@@ -477,8 +577,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/cases/{case_id}/lawyer-decisions", status_code=201)
     def create_lawyer_decision(case_id: str, analysis_id: str, payload: LawyerDecisionCreate, request: Request) -> dict:
-        require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
-        require_case(case_id, request)
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        case = require_case(case_id, request)
         # Uma decisão por processo. A segunda não seria revisão: viraria um
         # segundo registro competindo com o primeiro no cálculo de aderência,
         # e o desfecho ficaria pendurado em qual dos dois?
@@ -490,7 +590,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         analysis = repository().get_analysis(analysis_id)
         if analysis is None or analysis["case_id"] != case_id:
             raise HTTPException(422, "Análise inválida para este processo.")
-        return repository().create_lawyer_decision(case_id, analysis_id, payload)
+        lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
+        decision = repository().create_lawyer_decision(case_id, analysis_id, payload, lawyer_id)
+        track(user, case_id, EngagementEventType.DECISION_REGISTERED)
+        return decision
+
+    @app.post("/api/cases/{case_id}/negotiation-outcomes", response_model=NegotiationOutcomeRecord, status_code=201)
+    def create_negotiation_outcome(case_id: str, payload: NegotiationOutcomeCreate, request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        case = require_case(case_id, request)
+        require_open_case(case_id, "registrar resultado da negociação")
+        lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
+        try:
+            outcome = repository().create_negotiation_outcome(case_id, payload, lawyer_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        track(user, case_id, EngagementEventType.OUTCOME_REGISTERED)
+        return outcome
+
+    @app.post("/api/cases/{case_id}/judicial-outcomes", response_model=JudicialOutcomeRecord, status_code=201)
+    def create_judicial_outcome(case_id: str, payload: JudicialOutcomeCreate, request: Request) -> dict:
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        case = require_case(case_id, request)
+        lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
+        outcome = repository().create_judicial_outcome(case_id, payload, lawyer_id)
+        track(user, case_id, EngagementEventType.OUTCOME_REGISTERED)
+        return outcome
+
+    @app.post("/api/cases/{case_id}/engagement", status_code=204)
+    def record_engagement(case_id: str, payload: EngagementEventCreate, request: Request) -> Response:
+        """Tela do advogado: tempo ativo (aba visível) e abertura de documento pelo visualizador."""
+        user = require_role(current_user(request), UserRole.ADVOGADO_EXTERNO)
+        require_case(case_id, request)
+        if payload.document_id:
+            document = repository().get_document(payload.document_id)
+            if document is None or document["case_id"] != case_id:
+                raise HTTPException(422, "Documento não pertence a este processo.")
+        if user["role"] == UserRole.ADVOGADO_EXTERNO.value and (payload.active_seconds or payload.event_type == "DOCUMENT_OPENED"):
+            repository().record_engagement(case_id, user["id"], payload.event_type, payload.document_id, payload.active_seconds)
+        return Response(status_code=204)
 
     @app.post("/api/cases/{case_id}/lawyer-decisions/{decision_id}/outcome", status_code=201)
     def register_decision_outcome(

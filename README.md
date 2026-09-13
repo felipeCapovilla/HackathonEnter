@@ -41,6 +41,7 @@ Na raiz do repositório:
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt openai
 python -m scripts.seed_demo --confirm-demo
+python -m scripts.seed_operacao_simulada --confirm-demo   # opcional: popula o painel do banco
 export ENTERAGREE_RUNTIME_DIR="$PWD/.runtime/demo"
 export ENTERAGREE_DATABASE_PATH="$ENTERAGREE_RUNTIME_DIR/enteragree.db"
 export ENTERAGREE_AUTH_REQUIRED=true
@@ -51,6 +52,10 @@ Para a análise automática do dossiê, exporte `OPENAI_API_KEY` no mesmo termin
 Para a prévia de contrato do admin, gere os CSVs da base uma vez:
 `python -m scripts.exportar_base_csv --xlsx caminho/Hackaton_Enter_Base_Candidatos.xlsx`.
 O frontend roda com os mesmos comandos `npm` acima.
+
+A operação simulada (também precisa dos CSVs) cria 1.160 processos sorteados da base real, 5 escritórios e 13
+advogados sem login, para o **Painel do banco** (`banco@demo.local`, que vira gestor) ter dados.
+Use `--reset` para recriá-la. O que é real e o que é simulado está em [docs/painel_banco.md](docs/painel_banco.md).
 
 Acesse **http://127.0.0.1:5173**. A API atende em `http://127.0.0.1:8000` e expõe
 documentação em `/docs`. O frontend escolhe o mesmo hostname da página para a API.

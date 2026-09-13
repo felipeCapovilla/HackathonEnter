@@ -4,6 +4,9 @@ import { request, sendJson, SESSION_EXPIRED } from "./api";
 import { useAction, useResource } from "./hooks";
 import { Brand, Icon } from "./Brand";
 import { DocumentPanel } from "./DocumentPanel";
+import BankDashboard from "./banco/BankDashboard";
+import { DocumentRequestsPanel } from "./banco/DocumentRequestsPanel";
+import { useActiveTime } from "./useActiveTime";
 
 const labels = { ACORDO: "Acordo", DEFESA: "Defesa", RECUPERAR: "Recuperar documento", BANCO: "Banco", ADVOGADO_EXTERNO: "Advogado externo", ADMIN_GLOBAL: "Admin global" };
 const money = (value) => value == null ? "—" : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -100,7 +103,7 @@ function Shell({ user, onLogout, logout, children }) {
   const isCase = pathname.includes("/casos/");
   const isMonitoring = pathname.endsWith("/monitoramento");
   const title = user.role === "ADMIN_GLOBAL" ? "Uma operação conectada." : isMonitoring ? "Resultados que importam." : user.role === "BANCO" ? "Do dado à decisão." : "Seu próximo passo, com clareza.";
-  const description = user.role === "ADMIN_GLOBAL" ? "Gerencie bancos e os profissionais que fazem parte da plataforma." : isMonitoring ? "Acompanhe decisões e a aderência à política de acordos do seu banco." : user.role === "BANCO" ? "Organize processos, atribua responsáveis e acompanhe cada decisão." : "Consulte seus processos e encontre a recomendação para cada caso.";
+  const description = user.role === "ADMIN_GLOBAL" ? "Gerencie bancos e os profissionais que fazem parte da plataforma." : isMonitoring ? "Efetividade, documentos, escritórios e exceções da política de acordos do seu banco." : user.role === "BANCO" ? "Organize processos, atribua responsáveis e acompanhe cada decisão." : "Consulte seus processos e encontre a recomendação para cada caso.";
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
   return <div className="app-frame">
     <aside className="sidebar">
@@ -108,10 +111,10 @@ function Shell({ user, onLogout, logout, children }) {
       <nav aria-label="Navegação principal">
         <p className="nav-caption">Espaço de trabalho</p>
         <NavLink to={homeFor(user)} end><Icon name={user.role === "ADMIN_GLOBAL" ? "users" : "files"} />{user.role === "ADMIN_GLOBAL" ? "Administração" : user.role === "BANCO" ? "Processos" : "Meus processos"}</NavLink>
-        {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Monitoramento</NavLink>}
+        {user.role === "BANCO" && <NavLink to="/banco/monitoramento"><Icon name="chart" />Painel do banco</NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-message">Mesma justiça.<br /><span>Mais impacto.</span></div>
-        <div className="sidebar-account"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{labels[user.role]}</span></div></div>
+        <div className="sidebar-account"><span className="avatar">{initials}</span><div><strong>{user.name}</strong><span>{labels[user.role]}{user.is_manager ? " · gestor" : ""}</span></div></div>
         <button className="logout-button" disabled={logout.pending} onClick={onLogout}><Icon name="logout" />{logout.pending ? "Saindo…" : "Sair"}</button>
       </div>
     </aside>
@@ -361,6 +364,7 @@ function OutcomeForm({ caseId, decision, onRegistered }) {
 function CaseDetail({ caseId, user }) {
   const resource = useResource(`/cases/${caseId}`);
   const lawyers = useResource(user.role === "BANCO" ? "/bank/lawyers" : null);
+  useActiveTime(caseId, user.role === "ADVOGADO_EXTERNO");
   const action = useAction();
   const detail = resource.data;
   const recommendation = detail?.analyses?.[0];
@@ -435,6 +439,7 @@ function CaseDetail({ caseId, user }) {
           <ul>{recommendation.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul>
         </> : <div className="empty-state"><Icon name="spark" /><p>Ainda sem recomendação</p><span>{isLawyer ? "Use “Avaliar risco e recomendação” para calcular o caminho mais barato." : "O advogado responsável ainda não avaliou este processo."}</span></div>}
       </article></div>
+      {user.role === "BANCO" && <DocumentRequestsPanel requests={detail.document_requests} onChanged={resource.reload} />}
       {isLawyer && recommendation && !decision && <article className="panel decision">
         <div className="panel-heading"><span className="panel-icon"><Icon name="check" /></span>
           <div><h3>Registrar decisão</h3><p>O que você vai fazer neste processo.</p></div></div>
@@ -451,22 +456,6 @@ function CaseDetail({ caseId, user }) {
       {isLawyer && decision && <OutcomeForm caseId={caseId} decision={decision} onRegistered={resource.reload} />}
     </>}
   </section>;
-}
-
-function Monitoring() {
-  const resource = useResource("/monitoring");
-  const data = resource.data;
-  return <article className="panel">
-    <div className="panel-heading"><span className="panel-icon"><Icon name="chart" /></span>
-      <div><h2>Monitoramento do banco</h2><p>Decisões emitidas e aderência à política.</p></div></div>
-    <ErrorNotice message={resource.error} onRetry={resource.reload} />
-    {resource.loading && <p role="status">Carregando…</p>}
-    {data && <div className="monitor">
-      <Metric label="Análises" value={data.total_analyses} />
-      <Metric label="Decisões" value={data.total_lawyer_decisions} />
-      <Metric label="Aderência" value={rate(data.adherence_rate)} hint="Decisões que seguiram a recomendação" />
-    </div>}
-  </article>;
 }
 
 const HONORARIOS = [
@@ -656,7 +645,7 @@ export default function App() {
     <Routes>
       <Route path="/banco" element={user.role === "BANCO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
       <Route path="/banco/casos/:caseId" element={user.role === "BANCO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
-      <Route path="/banco/monitoramento" element={user.role === "BANCO" ? <Monitoring /> : <Navigate to={base} replace />} />
+      <Route path="/banco/monitoramento" element={user.role === "BANCO" ? <BankDashboard user={user} /> : <Navigate to={base} replace />} />
       <Route path="/advogado" element={user.role === "ADVOGADO_EXTERNO" ? <Cases user={user} /> : <Navigate to={base} replace />} />
       <Route path="/advogado/casos/:caseId" element={user.role === "ADVOGADO_EXTERNO" ? <CaseRoute user={user} /> : <Navigate to={base} replace />} />
       <Route path="/admin" element={user.role === "ADMIN_GLOBAL" ? <Admin /> : <Navigate to={base} replace />} />
