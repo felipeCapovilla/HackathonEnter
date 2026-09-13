@@ -237,6 +237,51 @@ CREATE TABLE IF NOT EXISTS document_ai_readings (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    sha256 TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    page_start INTEGER NOT NULL,
+    page_end INTEGER NOT NULL,
+    text_content TEXT NOT NULL,
+    token_estimate INTEGER NOT NULL,
+    embedding_model TEXT,
+    embedding_json TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(document_id, sha256, chunk_index)
+);
+
+CREATE TABLE IF NOT EXISTS document_chat_conversations (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    -- "system" is used by the authentication-disabled test/demo mode.
+    created_by_user_id TEXT NOT NULL,
+    document_filter TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS document_chat_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES document_chat_conversations(id),
+    role TEXT NOT NULL CHECK(role IN ('USER', 'ASSISTANT')),
+    content TEXT NOT NULL,
+    citations TEXT NOT NULL DEFAULT '[]',
+    retrieval_mode TEXT,
+    model TEXT,
+    prompt_version TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS document_chat_retrievals (
+    message_id TEXT NOT NULL REFERENCES document_chat_messages(id),
+    -- Keep the historical chunk id even after its source is erased.
+    chunk_id TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    score REAL NOT NULL,
+    PRIMARY KEY(message_id, chunk_id)
+);
+
 CREATE INDEX IF NOT EXISTS documents_case_idx ON documents(case_id);
 CREATE INDEX IF NOT EXISTS document_pages_document_idx ON document_pages(document_id);
 CREATE INDEX IF NOT EXISTS dossie_analyses_document_idx ON dossie_analyses(document_id, created_at);
@@ -251,6 +296,9 @@ CREATE INDEX IF NOT EXISTS bank_contracts_bank_idx ON bank_contracts(bank_id, ve
 CREATE INDEX IF NOT EXISTS negotiation_case_idx ON negotiation_outcomes(case_id, created_at);
 CREATE INDEX IF NOT EXISTS judicial_case_idx ON judicial_outcomes(case_id, created_at);
 CREATE INDEX IF NOT EXISTS engagement_case_idx ON engagement_events(case_id, user_id, event_type);
+CREATE INDEX IF NOT EXISTS document_chunks_document_idx ON document_chunks(document_id, chunk_index);
+CREATE INDEX IF NOT EXISTS chat_conversations_case_idx ON document_chat_conversations(case_id, created_at);
+CREATE INDEX IF NOT EXISTS chat_messages_conversation_idx ON document_chat_messages(conversation_id, created_at);
 CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at);
 CREATE INDEX IF NOT EXISTS audit_events_case_idx ON audit_events(case_id);
 """
@@ -296,6 +344,10 @@ def initialize_database(database_path: Path) -> None:
         for name in ("uploaded_by_user_id", "deleted_at", "deleted_by_user_id"):
             if name not in document_columns:
                 connection.execute(f"ALTER TABLE documents ADD COLUMN {name} TEXT")
+        chunk_columns = {row[1] for row in connection.execute("PRAGMA table_info(document_chunks)")}
+        for name, definition in (("embedding_model", "TEXT"), ("embedding_json", "TEXT")):
+            if name not in chunk_columns:
+                connection.execute(f"ALTER TABLE document_chunks ADD COLUMN {name} {definition}")
         decision_columns = {row[1] for row in connection.execute("PRAGMA table_info(lawyer_decisions)")}
         for name in ("outcome", "outcome_at", "outcome_note"):
             if name not in decision_columns:

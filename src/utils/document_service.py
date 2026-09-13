@@ -209,6 +209,13 @@ class DocumentService:
                 type_status=DocumentTypeStatus(document["type_status"]),
             )
         # Fora do try da extração: uma falha no passo seguinte não marca o documento como falho.
+        if completed:
+            try:
+                from .document_chunk_service import DocumentChunkService
+                DocumentChunkService(self.repository, self.settings.rag_chunk_chars, self.settings.rag_chunk_overlap_chars,
+                                     self.settings.rag_embedding_model).index_document(document_id)
+            except Exception:
+                logger.exception("Document indexing failed for %s", document_id)
         if completed and self.on_extraction_completed is not None:
             try:
                 self.on_extraction_completed(document_id)

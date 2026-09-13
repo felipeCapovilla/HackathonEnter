@@ -46,7 +46,12 @@ def tipo_do_arquivo(nome: str) -> DocumentType:
 def _apagar(database_path: Path, case_id: str, document_dir: Path) -> None:
     with connection_for(database_path) as connection:
         documentos = "SELECT id FROM documents WHERE case_id = ?"
-        for tabela in ("document_ai_readings", "document_pages", "dossie_analyses", "dossie_analysis_claims"):
+        conversas = "SELECT id FROM document_chat_conversations WHERE case_id = ?"
+        mensagens = f"SELECT id FROM document_chat_messages WHERE conversation_id IN ({conversas})"
+        connection.execute(f"DELETE FROM document_chat_retrievals WHERE message_id IN ({mensagens})", (case_id,))
+        connection.execute(f"DELETE FROM document_chat_messages WHERE conversation_id IN ({conversas})", (case_id,))
+        connection.execute("DELETE FROM document_chat_conversations WHERE case_id = ?", (case_id,))
+        for tabela in ("document_ai_readings", "document_pages", "document_chunks", "dossie_analyses", "dossie_analysis_claims"):
             connection.execute(f"DELETE FROM {tabela} WHERE document_id IN ({documentos})", (case_id,))
         for tabela in TABELAS_POR_CASO:
             connection.execute(f"DELETE FROM {tabela} WHERE case_id = ?", (case_id,))

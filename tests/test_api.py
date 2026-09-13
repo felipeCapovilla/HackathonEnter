@@ -44,6 +44,7 @@ def test_upload_confirms_type_and_creates_auditable_analysis(tmp_path: Path) -> 
         detail = client.get(f"/api/cases/{case_id}").json()
         assert detail["documents"][0]["type_status"] == "CONFIRMED"
         assert detail["documents"][0]["status"] == "COMPLETED"
+        assert app.state.repository.list_case_chunks(case_id)
 
         analysis = client.post(f"/api/cases/{case_id}/analyses")
         assert analysis.status_code == 201
@@ -64,6 +65,21 @@ def test_upload_confirms_type_and_creates_auditable_analysis(tmp_path: Path) -> 
         assert decision.status_code == 201
         monitoring = client.get("/api/monitoring").json()
         assert monitoring["adherence_rate"] == 1.0
+
+
+def test_document_chat_creates_conversation_and_requires_provider(tmp_path: Path) -> None:
+    app = create_app(_settings(tmp_path))
+    with TestClient(app) as client:
+        case_id = _create_case(client)
+        conversation = client.post(f"/api/cases/{case_id}/document-chat/conversations", json={})
+        assert conversation.status_code == 201
+        response = client.post(
+            f"/api/cases/{case_id}/document-chat/conversations/{conversation.json()['id']}/messages",
+            json={"question": "Há documento disponível?"},
+        )
+        assert response.status_code == 201
+        assert response.json()["citations"] == []
+        assert "Não há texto extraído" in response.json()["content"]
 
 
 def test_mismatched_document_requires_confirmation(tmp_path: Path) -> None:

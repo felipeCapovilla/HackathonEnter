@@ -22,7 +22,25 @@
 .caso-fase strong { font-size: var(--text-md); }
 .aviso-mudanca { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-md); background: var(--primary-soft); border: 1px solid var(--primary-border); color: var(--primary-text); }
 .caso-grade { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); gap: 20px; align-items: start; }
+.caso-documentos-coluna { display: grid; gap: 16px; min-width: 0; }
+/* O leitor acompanha o fluxo da página; o chat abre na camada de diálogo. */
+.caso-documentos-coluna .visualizador { position: static; }
 .caso-coluna { display: grid; gap: 16px; min-width: 0; }
+.case-panel-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.case-panel-controls > span { margin-right: auto; font-size: 13px; color: var(--muted); }
+.case-panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+.case-panel-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 14px 18px; background: transparent; color: var(--fg); border: 0; border-radius: var(--r-lg); text-align: left; }
+.case-panel-toggle:hover { background: var(--surface-sunken); box-shadow: none; }
+.case-panel-toggle > span { display: grid; gap: 4px; min-width: 0; }
+.case-panel-toggle strong { font-size: 14px; font-weight: 600; }
+.case-panel-toggle small { color: var(--muted); font-size: 13px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-panel-toggle > .icon { width: 16px; height: 16px; color: var(--muted); transform: rotate(180deg); }
+.case-panel.is-collapsed > .case-panel-toggle > .icon { transform: none; }
+.case-panel-body { border-top: 1px solid var(--border); }
+.case-panel-body[hidden] { display: none; }
+.case-panel-body > .panel { margin: 0; border: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); box-shadow: none; }
+.case-panel > .dc-launcher { border-top: 1px solid var(--border); }
+.case-panel.is-collapsed > .dc-launcher { border-bottom: 0; border-radius: 0 0 var(--r-lg) var(--r-lg); }
 
 .visualizador { position: sticky; top: 16px; padding: 0 !important; overflow: hidden; display: grid; }
 .visualizador-abas { display: flex; gap: 4px; overflow-x: auto; padding: 10px 10px 0; border-bottom: 1px solid var(--border); }
