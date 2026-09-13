@@ -77,14 +77,14 @@ def test_probabilidade_externa_substitui_a_tabela_sem_perder_o_gate():
     assert r.p_perda == 0.05
     assert r.acao == "DEFENDER"
     assert r.gate_defesa_disponivel is False
-    assert any("justificativa" in a for a in r.alertas)
+    assert any("registre o motivo" in a for a in r.alertas)
 
 
 def test_valor_da_causa_ausente_decide_sem_sugerir_valor():
     r = decidir(caso(valor_causa=0.0, contrato=False, extrato=False))
     assert r.acao == "ACORDAR"
     assert r.acordo is None
-    assert any("Valor da causa ausente" in a for a in r.alertas)
+    assert any("Sem o valor da causa" in a for a in r.alertas)
 
 
 def test_toda_recomendacao_carrega_versoes():

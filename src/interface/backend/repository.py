@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .database import connection_for
+from .fluxo import calcular_fase
 from .schemas import (
     CaseCreate,
     DocumentRequestCreate,
@@ -35,6 +36,16 @@ def _now() -> str:
 
 def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _trecho(texto: str, termo: str, margem: int = 70) -> str:
+    """Pedaço do texto em volta do termo encontrado, numa linha só."""
+    plano = " ".join(texto.split())
+    posicao = plano.casefold().find(termo.casefold())
+    if posicao < 0:
+        return plano[: margem * 2]
+    inicio, fim = max(0, posicao - margem), min(len(plano), posicao + len(termo) + margem)
+    return ("…" if inicio else "") + plano[inicio:fim] + ("…" if fim < len(plano) else "")
 
 
 def _row(row: sqlite3.Row | None) -> dict | None:
@@ -233,7 +244,9 @@ class Repository:
                        EXISTS(SELECT 1 FROM lawyer_decisions AS decision
                                WHERE decision.case_id = cases.id) AS decided,
                        (SELECT COUNT(*) FROM documents
-                         WHERE documents.case_id = cases.id AND documents.deleted_at IS NULL) AS document_count
+                         WHERE documents.case_id = cases.id AND documents.deleted_at IS NULL) AS document_count,
+                       (SELECT judicial.condemnation_value FROM judicial_outcomes AS judicial
+                         WHERE judicial.case_id = cases.id ORDER BY judicial.created_at DESC LIMIT 1) AS condemnation_value
                    FROM cases{where} ORDER BY cases.created_at DESC""",
                 parameters,
             ).fetchall()
@@ -753,8 +766,10 @@ class Repository:
         with connection_for(self.database_path) as connection:
             connection.execute(
                 """INSERT INTO lawyer_decisions (
-                    id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id
-                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at, :lawyer_id)""",
+                    id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id,
+                    divergence_reason, requested_document
+                ) VALUES (:id, :case_id, :analysis_id, :action, :reason, :proposed_value, :created_at, :lawyer_id,
+                    :divergence_reason, :requested_document)""",
                 record,
             )
         return record
@@ -772,8 +787,8 @@ class Repository:
                       **payload.model_dump(mode="json"), "created_at": _now()}
             connection.execute(
                 """INSERT INTO negotiation_outcomes (id, case_id, decision_id, lawyer_id, status, offered_value,
-                counter_value, closed_value, created_at) VALUES (:id, :case_id, :decision_id, :lawyer_id, :status,
-                :offered_value, :counter_value, :closed_value, :created_at)""", record)
+                counter_value, closed_value, created_at, divergence_reason, reason) VALUES (:id, :case_id, :decision_id,
+                :lawyer_id, :status, :offered_value, :counter_value, :closed_value, :created_at, :divergence_reason, :reason)""", record)
             if record["status"] == "ACEITO":
                 # Acordo aceito é desfecho: encerra o processo no ciclo de vida da decisão.
                 self._close_decision(connection, decision["id"], "ACORDO_ACEITO", record["created_at"])
@@ -907,6 +922,88 @@ class Repository:
             "outcomes": outcomes,
             "actions": actions,
         }
+
+    def case_flow(self, case_id: str) -> dict:
+        """Fase e próxima ação do processo (máquina de estados em fluxo.py)."""
+        with connection_for(self.database_path) as connection:
+            def linhas(sql: str) -> list[dict]:
+                return [dict(row) for row in connection.execute(sql, (case_id,)).fetchall()]
+            dados = {
+                "caso": _row(connection.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()),
+                "analyses": linhas("SELECT id, recommendation, pricing, created_at FROM analyses WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+                "decisions": linhas("SELECT * FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+                "documents": linhas("SELECT created_at FROM documents WHERE case_id = ? AND deleted_at IS NULL"),
+                "requests": linhas("SELECT id, document_type, status, created_at, responded_at FROM document_requests WHERE case_id = ?"),
+                "negotiations": linhas("SELECT * FROM negotiation_outcomes WHERE case_id = ? ORDER BY created_at DESC"),
+                "judicials": linhas("SELECT * FROM judicial_outcomes WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
+            }
+        return calcular_fase(**dados)
+
+    def lawyer_queue(self, lawyer_id: str) -> list[dict]:
+        """Processos do advogado na ordem da próxima ação: o que precisa dele primeiro."""
+        itens = [{**case, "fase": self.case_flow(case["id"])} for case in self.list_cases(lawyer_id=lawyer_id)]
+        return sorted(itens, key=lambda item: (item["fase"]["prioridade"], -item["fase"]["dias_parado"]))
+
+    def save_document_reading(self, document_id: str, model: str, status: str,
+                              result: dict | None, error: str | None) -> dict:
+        record = {"document_id": document_id, "model": model, "status": status,
+                  "result": _json(result) if result is not None else None, "error": error, "created_at": _now()}
+        with connection_for(self.database_path) as connection:
+            connection.execute(
+                """INSERT INTO document_ai_readings (document_id, model, status, result, error, created_at)
+                VALUES (:document_id, :model, :status, :result, :error, :created_at)
+                ON CONFLICT(document_id) DO UPDATE SET model = excluded.model, status = excluded.status,
+                result = excluded.result, error = excluded.error, created_at = excluded.created_at""", record)
+        return {**record, "result": result}
+
+    def list_document_readings(self, case_id: str) -> list[dict]:
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                """SELECT r.* FROM document_ai_readings r JOIN documents d ON d.id = r.document_id
+                WHERE d.case_id = ? AND d.deleted_at IS NULL ORDER BY r.created_at""", (case_id,)).fetchall()
+        return [{**dict(row), "result": json.loads(row["result"]) if row["result"] else None} for row in rows]
+
+    def search_cases(self, bank_id: str, termo: str, limit: int = 30) -> list[dict]:
+        """
+        Busca de processos da empresa pelo que a operação tem em mãos: número do processo,
+        número do contrato ou nome da parte. Procura no cadastro, na leitura por IA e no
+        texto extraído de cada página — o texto cobre o caso em que não houve leitura por IA.
+        """
+        like = f"%{termo}%"
+        alvo = termo.casefold()
+        encontrados: dict[str, dict] = {}
+
+        def adicionar(row: sqlite3.Row, onde: str, trecho: str, document_id: str | None = None, pagina: int | None = None) -> None:
+            item = encontrados.setdefault(row["case_id"], {
+                "case_id": row["case_id"], "case_number": row["case_number"], "uf": row["uf"],
+                "value_of_claim": row["value_of_claim"], "assigned_lawyer_id": row["assigned_lawyer_id"], "matches": []})
+            if len(item["matches"]) < 3 and not any(m["onde"] == onde for m in item["matches"]):
+                item["matches"].append({"onde": onde, "trecho": trecho, "document_id": document_id, "pagina": pagina})
+
+        colunas = "c.id AS case_id, c.case_number, c.uf, c.value_of_claim, c.assigned_lawyer_id"
+        with connection_for(self.database_path) as connection:
+            for row in connection.execute(
+                    f"SELECT {colunas} FROM cases c WHERE c.bank_id = ? AND c.case_number LIKE ? LIMIT ?",
+                    (bank_id, like, limit)):
+                adicionar(row, "Número do processo", row["case_number"])
+            for row in connection.execute(
+                    f"""SELECT {colunas}, r.result, d.id AS document_id, d.original_filename
+                    FROM document_ai_readings r JOIN documents d ON d.id = r.document_id AND d.deleted_at IS NULL
+                    JOIN cases c ON c.id = d.case_id
+                    WHERE c.bank_id = ? AND r.status = 'COMPLETED' AND r.result LIKE ? LIMIT 200""", (bank_id, like)):
+                leitura = json.loads(row["result"])
+                if alvo in (leitura.get("numero_contrato") or "").casefold():
+                    adicionar(row, f"Contrato nº {leitura['numero_contrato']}", f"Lido por IA em {row['original_filename']}", row["document_id"])
+                if alvo in (leitura.get("nome_parte_autora") or "").casefold():
+                    adicionar(row, "Parte autora", leitura["nome_parte_autora"], row["document_id"])
+            for row in connection.execute(
+                    f"""SELECT {colunas}, p.text_content, p.page_number, d.id AS document_id, d.original_filename
+                    FROM document_pages p JOIN documents d ON d.id = p.document_id AND d.deleted_at IS NULL
+                    JOIN cases c ON c.id = d.case_id
+                    WHERE c.bank_id = ? AND p.text_content LIKE ? LIMIT 200""", (bank_id, like)):
+                adicionar(row, f"{row['original_filename']}, página {row['page_number']}",
+                          _trecho(row["text_content"], termo), row["document_id"], row["page_number"])
+        return list(encontrados.values())[:limit]
 
     def record_audit_event(
         self, *, actor_user_id: str | None, action: str, entity_type: str, entity_id: str,

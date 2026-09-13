@@ -67,17 +67,17 @@ export function ContractManager({ user }) {
     });
   };
   const status = !record ? "" : record.inherited_from_bank
-    ? `SEM CONTRATO PRÓPRIO · VALE O PADRÃO DO BANCO${record.version ? ` (V${record.version})` : ""}`
+    ? `SEM CONTRATO PRÓPRIO · VALE O PADRÃO DA EMPRESA${record.version ? ` (V${record.version})` : ""}`
     : record.version === 0 ? "CONTRATO PADRÃO · NENHUMA VERSÃO CADASTRADA" : `VERSÃO VIGENTE · V${record.version} · ${date(record.created_at)}`;
 
   return <div className="bank-stack">
     <SectionHeader eyebrow="CONTRATO COM OS ESCRITÓRIOS" title="Os números que o motor usa">
-      Honorários, custo do tempo, alçada e concessão mudam a fronteira entre acordar e defender. Cada escritório pode ter contrato próprio; sem ele, vale o padrão do banco.
+      Honorários, custo do tempo, alçada e concessão mudam a fronteira entre acordar e defender. Cada escritório pode ter contrato próprio; sem ele, vale o padrão da empresa.
     </SectionHeader>
-    {!canEdit && <div className="bank-notice info">Somente o gestor do banco altera o contrato. Você vê a versão vigente.</div>}
+    {!canEdit && <div className="bank-notice info">Somente o gestor da empresa altera o contrato. Você vê a versão vigente.</div>}
     <article className="panel contract-manager">
       <label>Contrato de<select value={firmId} onChange={(event) => { setFirmId(event.target.value); reset(); }} disabled={firms.loading}>
-        <option value="">Padrão do banco</option>
+        <option value="">Padrão da empresa</option>
         {(firms.data || []).map((firm) => <option key={firm.id} value={firm.id}>{firm.name}</option>)}
       </select></label>
       <Notice message={firms.error} onRetry={firms.reload} />
@@ -97,7 +97,7 @@ export function ContractManager({ user }) {
           </div>
           <div className="contract-row">
             <label>Teto de alçada (% da causa, opcional)<input name="teto_alcada_fator" type="number" min="1" max="100" step="1" defaultValue={percent(parameters.teto_alcada_fator)} /></label>
-            <label>Concessão na negociação (% do espaço até o walk-away)<input name="concessao" type="number" min="0" max="100" step="1" defaultValue={percent(parameters.concessao)} /></label>
+            <label>Concessão na negociação (% do espaço até o valor máximo)<input name="concessao" type="number" min="0" max="100" step="1" defaultValue={percent(parameters.concessao)} /></label>
           </div>
           {canEdit && <label>Justificativa da nova versão<textarea name="justificativa" minLength="10" maxLength="1000" required placeholder="Ex.: aditivo assinado em 09/2026 reduziu o honorário por acordo fechado." /></label>}
           {canEdit && <div className="contract-row">

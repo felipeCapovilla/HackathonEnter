@@ -2,6 +2,43 @@ import { useState } from "react";
 import { documentDownloadUrl, request } from "./api";
 import { useAction } from "./hooks";
 import { Icon } from "./Brand";
+import "./banco/banco.css";
+
+const moeda = (value) => value == null ? null : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+
+/** O que a IA leu no documento. Só alerta; não muda tipo nem cadastro sozinha. */
+function LeituraIA({ document, leitura, leituraAtiva, valueOfClaim, onRefresh }) {
+  const action = useAction();
+  const ler = () => action.run(async () => {
+    await request(`/documents/${document.id}/leitura`, { method: "POST" });
+    onRefresh();
+  });
+  if (!["COMPLETED", "COMPLETED_WITH_WARNINGS"].includes(document.status)) return null;
+  if (!leitura && !leituraAtiva) return null;
+  if (!leitura || leitura.status === "FAILED") {
+    return <div className="leitura-ia">
+      <p className="muted">{leitura ? `Leitura por IA indisponível: ${leitura.error}` : "Documento ainda sem leitura por IA."}</p>
+      <button type="button" className="subtle" disabled={action.pending} onClick={ler}>{action.pending ? "Lendo…" : "Ler com IA"}</button>
+      {action.error && <p role="alert" className="leitura-alerta">{action.error}</p>}
+    </div>;
+  }
+  const r = leitura.result;
+  const campos = [
+    ["Contrato nº", r.numero_contrato], ["Valor", moeda(r.valor_principal)], ["Data", r.data_referencia],
+    ["Parte autora", r.nome_parte_autora], ["Valor da causa", moeda(r.valor_causa)], ["UF", r.uf],
+    ["Alega golpe", r.alega_golpe == null ? null : r.alega_golpe ? "Sim" : "Não"],
+  ].filter(([, valor]) => valor);
+  // Tipo classificado automaticamente já É a leitura da IA — nunca "diverge" da própria origem.
+  const tipoDiverge = document.type_source !== "AI" && r.tipo_documento && r.tipo_documento !== "OUTRO" && r.tipo_documento !== document.declared_type;
+  const causaDiverge = r.valor_causa && valueOfClaim && Math.abs(r.valor_causa - valueOfClaim) > 1;
+  return <div className="leitura-ia">
+    <p><Icon name="spark" className="tiny" /> <b>Leitura da IA:</b> {r.resumo}</p>
+    {tipoDiverge && <p className="leitura-alerta">A IA acha que este documento é {documentTypes[r.tipo_documento] || r.tipo_documento}, não {documentTypes[document.declared_type] || document.declared_type}.</p>}
+    {causaDiverge && <p className="leitura-alerta">O valor da causa nos autos ({moeda(r.valor_causa)}) é diferente do cadastrado ({moeda(valueOfClaim)}).</p>}
+    {campos.length > 0 && <dl>{campos.map(([rotulo, valor]) => <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>)}</dl>}
+    {r.pontos_de_atencao?.length > 0 && <ul>{r.pontos_de_atencao.map((ponto, index) => <li key={index}>{ponto}</li>)}</ul>}
+  </div>;
+}
 
 const documentTypes = {
   AUTOS: "Autos do processo",
@@ -12,6 +49,7 @@ const documentTypes = {
   DEMONSTRATIVO_DIVIDA: "Demonstrativo de evolução da dívida",
   LAUDO_REFERENCIADO: "Laudo referenciado",
   OUTRO: "Outro documento",
+  RECUSADO: "documento sem relação com o processo",
 };
 
 const statuses = {
@@ -28,7 +66,7 @@ function DocumentNotice({ document }) {
   if (["UPLOADED", "EXTRACTING"].includes(document.status)) return null;
   return <>
     {document.type_status === "AI_REJECTED" && <p className="warning">A IA recusou este documento: {document.ai_type_reason || "não tem relação aparente com o processo."} Se for engano, exclua e reenvie, ou reclassifique pela API.</p>}
-    {document.type_status === "AI_CONFIRMED" && <p className="muted">Classificado automaticamente pela IA como {documentTypes[document.declared_type] || document.declared_type}. {document.ai_type_reason}</p>}
+    {document.type_status === "AI_CONFIRMED" && <p className="muted">Classificado automaticamente pela IA como {documentTypes[document.declared_type] || document.declared_type} — veja a leitura completa abaixo.</p>}
     {document.type_status === "MISMATCH" && <p className="warning">O conteúdo parece ser {documentTypes[document.detected_type] || "outro tipo de documento"}, diferente do tipo informado. A divergência precisa ser resolvida antes de usar este documento na análise.</p>}
     {document.type_status === "UNCONFIRMED" && <p className="muted">Não foi possível confirmar o tipo pelo conteúdo. Isso não comprova que o documento seja inválido.</p>}
     {document.quality_flags?.includes("LOW_TEXT_COVERAGE_TODO_OCR") && <p className="warning">Pouco texto disponível. A leitura por OCR ainda não está implementada; envie uma versão com texto selecionável, se disponível.</p>}
@@ -67,7 +105,7 @@ function DeleteDocument({ caseId, document, onDeleted }) {
   </div>;
 }
 
-export function DocumentPanel({ caseId, documents, canUpload, encerrado = false, onUploaded }) {
+export function DocumentPanel({ caseId, documents, readings = [], leituraAtiva = false, valueOfClaim = null, canUpload, encerrado = false, onUploaded }) {
   // Depois do desfecho a prova é histórica: nem entra documento novo, nem sai o
   // que já sustentou a recomendação emitida.
   const podeEditar = canUpload && !encerrado;
@@ -98,7 +136,7 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
     </div>
     {encerrado && canUpload && <p className="locked"><Icon name="lock" />Processo encerrado: os documentos não podem mais ser alterados.</p>}
     {podeEditar && <form className="document-upload" onSubmit={upload}>
-      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Uma IA lê o conteúdo e classifica o tipo automaticamente; documentos sem relação com o processo são recusados. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
+      <p className="muted" id="document-upload-help">Envie os documentos da empresa para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Uma IA lê o conteúdo e classifica o tipo automaticamente; documentos sem relação com o processo são recusados. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
       <fieldset className="form-fields" disabled={action.pending}>
         <label>Arquivo do documento<input name="file" type="file" accept=".pdf,.txt" required aria-describedby="document-upload-help" /></label>
         <button>{action.pending ? "Enviando e classificando…" : <>Enviar documento<Icon name="arrow" /></>}</button>
@@ -117,10 +155,11 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
           {document.type_source === "AI" && ["UPLOADED", "EXTRACTING"].includes(document.status)
             ? "Classificando tipo…"
             : documentTypes[document.declared_type] || document.declared_type}
-          {" · "}{document.source_party === "BANCO" ? "Enviado pelo banco" : "Enviado pelo advogado"}
+          {" · "}{document.source_party === "BANCO" ? "Enviado pela empresa" : "Enviado pelo advogado"}
           {document.page_count > 0 && ` · ${document.page_count} página(s)`}
         </span>
         <DocumentNotice document={document} />
+        <LeituraIA document={document} leitura={readings.find((reading) => reading.document_id === document.id)} leituraAtiva={leituraAtiva} valueOfClaim={valueOfClaim} onRefresh={onUploaded} />
         <div className="document-actions">
           <a href={documentDownloadUrl(document.id)} target="_blank" rel="noopener noreferrer" aria-label={`Baixar ${document.original_filename}`}>Baixar original</a>
           {/* Só o banco exclui, e só o que ele mesmo enviou: o gate documental é dele. */}
@@ -130,7 +169,7 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
     })}</ul> : <div className="empty-state">
       <Icon name="files" />
       <p>Nenhum documento enviado</p>
-      <span>{podeEditar ? "Envie contrato, extrato e comprovante de crédito — são eles que decidem o caso." : "O banco não enviou documentos para este processo."}</span>
+      <span>{podeEditar ? "Envie contrato, extrato e comprovante de crédito — são eles que decidem o caso." : "A empresa ainda não enviou documentos para este processo."}</span>
     </div>}
   </article>;
 }

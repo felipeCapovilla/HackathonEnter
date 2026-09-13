@@ -42,13 +42,14 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt openai
 python -m scripts.seed_demo --confirm-demo
 python -m scripts.seed_operacao_simulada --confirm-demo   # opcional: popula o painel do banco
+python -m scripts.seed_casos_exemplo --confirm-demo      # os 2 processos da Enter, com PDFs, para a advogada demo
 export ENTERAGREE_RUNTIME_DIR="$PWD/.runtime/demo"
 export ENTERAGREE_DATABASE_PATH="$ENTERAGREE_RUNTIME_DIR/enteragree.db"
 export ENTERAGREE_AUTH_REQUIRED=true
 python -m uvicorn src.interface.backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Para a análise automática do dossiê, exporte `OPENAI_API_KEY` no mesmo terminal antes de iniciar a API.
+Para a análise automática do dossiê e a leitura por IA de cada documento enviado, exporte `OPENAI_API_KEY` no mesmo terminal antes de iniciar a API (`ENTERAGREE_LEITURA_IA=false` desliga só a leitura).
 Para a prévia de contrato do admin, gere os CSVs da base uma vez:
 `python -m scripts.exportar_base_csv --xlsx caminho/Hackaton_Enter_Base_Candidatos.xlsx`.
 O frontend roda com os mesmos comandos `npm` acima.

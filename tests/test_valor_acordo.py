@@ -160,7 +160,7 @@ def test_faixa_curta_vira_valor_unico():
     assert f.negociavel is False
     assert f.alvo == f.walk_away
     assert f.amplitude < f.abertura * AMPLITUDE_MIN_REL.valor
-    assert "valor único" in v.motivo
+    assert "sem margem para negociar" in v.motivo
 
 
 def test_amplitude_minima_nao_move_a_decisao():
@@ -267,7 +267,7 @@ def test_motivo_fala_em_reais():
     """O advogado lê reais, não probabilidade crua."""
     v = avaliar_acordo(C, BUCKETS[3])
     assert "R$" in v.motivo
-    assert "não é negociação: é defesa" in v.motivo
+    assert "defender sai mais barato" in v.motivo
 
 
 # ── Bordas ───────────────────────────────────────────────────────────────────

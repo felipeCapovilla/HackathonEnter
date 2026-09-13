@@ -16,7 +16,7 @@ const MOTIVOS = [
 const MOTIVO_NOME = Object.fromEntries(MOTIVOS);
 const DOCUMENTOS = { CONTRATO: "Contrato", EXTRATO: "Extrato", COMPROVANTE_CREDITO: "Comprovante de crédito", DOSSIE: "Dossiê",
   DEMONSTRATIVO_DIVIDA: "Demonstrativo da dívida", LAUDO_REFERENCIADO: "Laudo referenciado", AUTOS: "Autos", OUTRO: "Outro" };
-const STATUS = { REQUESTED: ["Aguardando o banco", "warn"], SUBMITTED: ["Entregue", "good"], DECLARED_UNAVAILABLE: ["Indisponível", "bad"], CANCELLED: ["Cancelado", "neutral"] };
+const STATUS = { REQUESTED: ["Aguardando a empresa", "warn"], SUBMITTED: ["Entregue", "good"], DECLARED_UNAVAILABLE: ["Indisponível", "bad"], CANCELLED: ["Cancelado", "neutral"] };
 const FONTE = { IA: " · classificado por IA", REGRA: " · classificado automaticamente" };
 
 export function DocumentRequestsPanel({ requests, onChanged }) {

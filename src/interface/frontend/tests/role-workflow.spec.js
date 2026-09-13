@@ -91,7 +91,7 @@ test("banco envia multipart, aguarda processamento e limpa formulário sem recar
   expect(uploads).toBe(1);
   await page.reload();
   await expect(page.locator(".document-list")).toContainText("contrato.txt");
-  await expect(page.locator(".document-list")).toContainText("Enviado pelo banco");
+  await expect(page.locator(".document-list")).toContainText("Enviado pela empresa");
 });
 
 test("erro de upload preserva seleção e permite tentar novamente", async ({ page }) => {
