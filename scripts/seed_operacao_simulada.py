@@ -174,6 +174,11 @@ def simular(database_path: Path, *, reset: bool = False, agora: datetime | None 
                 VALUES (?, ?, ?, '!sem-login', 'ADVOGADO_EXTERNO', ?, 1, ?, ?, 0)""",
                 (user_id, nome, email, bank_id, criado, firm_id))
             advogados.setdefault(bank_id, []).append({"id": user_id, "firm": firm_id, "perfil": PERFIS[perfil]})
+        # A advogada demo também atua na operação, com perfil exemplar: a fila dela tem processos em
+        # todas as fases e ela aparece no ranking com histórico, como os demais advogados.
+        demo = connection.execute("SELECT id FROM users WHERE email = 'advogada@demo.local'").fetchone()
+        if demo:
+            advogados["banco-unicamp"].append({"id": demo["id"], "firm": ESCRITORIOS[0][0], "perfil": PERFIS["exemplar"]})
 
         # Contrato próprio de um escritório: defesa perdida mais cara muda a fronteira acordo x defesa.
         contrato_nogueira = ParametrosContrato(

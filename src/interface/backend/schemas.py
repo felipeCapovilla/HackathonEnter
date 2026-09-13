@@ -148,6 +148,7 @@ class CaseRecord(CaseCreate):
     outcome: DecisionOutcome | None = None
     document_count: int = 0
     condemnation_value: float | None = None
+    fase: dict | None = None  # fase do fluxo (fluxo.py), a mesma que o advogado vê
 
 
 class DocumentRecord(BaseModel):

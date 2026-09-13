@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,6 +23,7 @@ from src.interface.backend.database import connection_for
 from src.interface.backend.repository import Repository
 from src.interface.backend.schemas import CaseCreate, DocumentType, SourceParty
 from src.policy.service import PolicyService
+from src.tools.leitor_documentos import LeituraIndisponivel, ler_documento
 from src.utils.document_service import DocumentService
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +63,28 @@ def _apagar(database_path: Path, case_id: str, document_dir: Path) -> None:
     shutil.rmtree(document_dir / case_id, ignore_errors=True)
 
 
+def _ler(documento: dict, texto: str) -> tuple[str, dict | None, str | None]:
+    try:
+        leitura = ler_documento(Path(documento["file_path"]), texto, documento["declared_type"])
+    except LeituraIndisponivel as exc:
+        return "FAILED", None, str(exc)
+    return "COMPLETED", leitura.model_dump(mode="json"), None
+
+
+def ler_com_ia(repository: Repository, document_ids: list[str]) -> list[str]:
+    """Leitura por IA já pronta na demo, a mesma da rota de leitura. Só roda com OPENAI_API_KEY."""
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        return []
+    modelo = os.getenv("ENTERAGREE_LEITURA_MODEL", "gpt-4o-mini")
+    documentos = [repository.get_document_internal(document_id) for document_id in document_ids]
+    textos = [repository.get_document_text_sample(document["id"], 24_000) for document in documentos]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        resultados = list(pool.map(_ler, documentos, textos))
+    for documento, (status, resultado, erro) in zip(documentos, resultados):
+        repository.save_document_reading(documento["id"], modelo, status, resultado, erro)
+    return [status for status, _, _ in resultados]
+
+
 def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
     seed_demo(database_path)
     repository = Repository(database_path)
@@ -69,6 +94,9 @@ def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
     documentos = DocumentService(repository, settings)
     advogada = repository.get_user_by_email("advogada@demo.local")
     empresa = repository.get_user_by_email("banco@demo.local")
+    for case in repository.list_cases(bank_id="banco-unicamp"):
+        if case["case_number"].startswith("smoke-"):  # sobra de teste manual: não pode aparecer na demo
+            _apagar(database_path, case["id"], settings.document_dir)
     existentes = {case["case_number"]: case for case in repository.list_cases(bank_id="banco-unicamp")}
     resumo = []
     for caso in CASOS:
@@ -83,7 +111,7 @@ def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
             bank_id="banco-unicamp", created_by_user_id=empresa["id"])
         pasta = settings.document_dir / registro["id"]
         pasta.mkdir(parents=True, exist_ok=True)
-        tipos = []
+        tipos, enviados = [], []
         for pdf in sorted((EXEMPLOS / caso["pasta"]).glob("*.pdf")):
             conteudo = pdf.read_bytes()
             sha = hashlib.sha256(conteudo).hexdigest()
@@ -93,10 +121,13 @@ def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
                                                    declared_type=tipo_do_arquivo(pdf.name), source_party=SourceParty.BANCO,
                                                    sha256=sha, request_id=None)
             documentos.process_document(documento["id"])
+            enviados.append(documento["id"])
             processado = repository.get_document(documento["id"])
             tipos.append(f"{processado['declared_type']}:{processado['type_status']}")
         PolicyService(repository).evaluate(registro["id"])  # a advogada abre o processo com a recomendação pronta
-        resumo.append({"numero": caso["numero"], "situacao": "criado", "documentos": tipos})
+        leituras = ler_com_ia(repository, enviados)
+        resumo.append({"numero": caso["numero"], "situacao": "criado", "documentos": tipos,
+                       "leituras_ia": f"{leituras.count('COMPLETED')}/{len(enviados)}" if leituras else "sem OPENAI_API_KEY"})
     return resumo
 
 
@@ -109,7 +140,7 @@ def main() -> int:
     if not arguments.confirm_demo:
         parser.error("Informe --confirm-demo para criar os processos de exemplo.")
     for item in semear(arguments.database, reset=arguments.reset):
-        print(f"{item['numero']}: {item['situacao']}", *item.get("documentos", []))
+        print(f"{item['numero']}: {item['situacao']}", *item.get("documentos", []), item.get("leituras_ia", ""))
     return 0
 
 

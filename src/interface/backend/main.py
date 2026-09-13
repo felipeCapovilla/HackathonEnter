@@ -475,7 +475,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def list_cases(request: Request) -> list[dict]:
         user = current_user(request)
         require_role(user, UserRole.BANCO, UserRole.ADVOGADO_EXTERNO)
-        return repository().list_cases(user["bank_id"], user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else None)
+        casos = repository().list_cases(user["bank_id"], user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else None)
+        # Mesma fase para empresa e advogado: a lista não pode dizer "aguardando" o que já tem recomendação.
+        return [{**caso, "fase": repository().case_flow(caso["id"])} for caso in casos]
 
     @app.get("/api/cases/{case_id}")
     def get_case(case_id: str, request: Request) -> dict:
