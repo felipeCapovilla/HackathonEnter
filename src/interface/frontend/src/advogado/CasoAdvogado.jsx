@@ -40,7 +40,11 @@ export function CasoAdvogado({ caseId }) {
   const precisaAvaliar = fase && fase.documentos_novos && fase.codigo !== "ENCERRADO";
   const needsEvaluation = !recomendacao || ["AGUARDANDO_AVALIACAO", "REAVALIAR"].includes(fase?.codigo);
   const preferredTab = needsEvaluation && fase?.codigo !== "ENCERRADO" ? "evaluation" : "action";
-  const activeTab = tabChoice && tabChoice.phase === fase?.codigo ? tabChoice.tab : preferredTab;
+  // Ao abrir o processo começa na avaliação; se a fase mudar depois, segue a etapa atual.
+  const faseAoAbrir = useRef({});
+  if (fase && !(caseId in faseAoAbrir.current)) faseAoAbrir.current[caseId] = fase.codigo;
+  const abaInicial = faseAoAbrir.current[caseId] === fase?.codigo ? "evaluation" : preferredTab;
+  const activeTab = tabChoice && tabChoice.phase === fase?.codigo ? tabChoice.tab : abaInicial;
   const phaseHasAction = fase && !["AGUARDANDO_AVALIACAO", "REAVALIAR"].includes(fase.codigo);
   useEffect(() => {
     if (!processando || recurso.loading) return undefined;
