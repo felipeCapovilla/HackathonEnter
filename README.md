@@ -1,6 +1,6 @@
 # ENTER | Política de acordos
 
-EnterAgree é a aplicação de política de acordos para casos de não reconhecimento
+EnterOS é a aplicação de política de acordos para casos de não reconhecimento
 de empréstimo. Para cada caso, recomenda defender, acordar ou recuperar o documento
 que falta, a partir de uma tabela de segmentos medida na base histórica, do preço
 derivado do custo esperado da defesa e de evidência documental auditável. Banco,
