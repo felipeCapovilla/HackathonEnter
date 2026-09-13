@@ -66,6 +66,10 @@ from .schemas import (
     UserRecord,
     UserUpdate,
     TypeConfirmation,
+    ChangePasswordRequest,
+    ResetPasswordRequest,
+    AuditEventRecord,
+    AuditChainStatus,
 )
 
 
@@ -138,6 +142,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception:  # noqa: BLE001 - telemetria não pode impedir o trabalho do advogado
             logger.exception("Falha ao registrar engajamento %s do caso %s", event_type, case_id)
 
+    def audit(user: dict | None, action: str, entity_type: str, entity_id: str,
+              case_id: str | None = None, reason: str | None = None) -> None:
+        """Auditoria nunca derruba a requisição principal: é rastro, não regra de negócio."""
+        actor_id = user.get("id") if user and user.get("role") != "SYSTEM" else None
+        try:
+            repository().record_audit_event(
+                actor_user_id=actor_id, action=action, entity_type=entity_type,
+                entity_id=entity_id, case_id=case_id, reason=reason,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Falha ao registrar evento de auditoria %s/%s", action, entity_type)
+
     def require_manager(user: dict) -> dict:
         require_role(user, UserRole.BANCO)
         if user["role"] != "SYSTEM" and not user.get("is_manager"):
@@ -161,13 +177,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/auth/login", response_model=SessionUser)
     def login(payload: LoginRequest, response: Response) -> dict:
-        user = repository().get_user_by_email(normalize_email(payload.email))
+        email = normalize_email(payload.email)
+        user = repository().get_user_by_email(email)
         if user is None or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
+            audit(None, "LOGIN_FAILED", "USER", (user or {}).get("id") or email)
             raise HTTPException(401, "E-mail ou senha inválidos.")
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
         repository().create_session(hashlib.sha256(token.encode()).hexdigest(), user["id"], csrf, session_expiry())
         response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", secure=False, max_age=8 * 3600)
         response.headers["Cache-Control"] = "no-store"
+        audit(user, "LOGIN", "USER", user["id"])
         return {**user, "csrf_token": csrf}
 
     @app.get("/api/auth/me", response_model=SessionUser | None)
@@ -184,11 +203,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def logout(request: Request, response: Response) -> Response:
         token = request.cookies.get(COOKIE_NAME)
         if token:
+            user = repository().get_session_user(hashlib.sha256(token.encode()).hexdigest())
             repository().revoke_session(hashlib.sha256(token.encode()).hexdigest())
+            if user:
+                audit(user, "LOGOUT", "USER", user["id"])
         response.status_code = status.HTTP_204_NO_CONTENT
         response.headers["Cache-Control"] = "no-store"
         response.delete_cookie(COOKIE_NAME)
         return response
+
+    @app.post("/api/auth/change-password", status_code=204)
+    def change_password(payload: ChangePasswordRequest, request: Request) -> Response:
+        """Autoatendimento: troca a própria senha. Revoga todas as sessões, a atual incluída — login de novo."""
+        user = current_user(request)
+        if user["role"] == "SYSTEM":
+            raise HTTPException(403, "Autenticação necessária para trocar a senha.")
+        record = repository().get_user(user["id"])
+        if record is None or not verify_password(payload.current_password, record["password_hash"]):
+            raise HTTPException(401, "Senha atual incorreta.")
+        repository().update_user(user["id"], {"password_hash": hash_password(payload.new_password)})
+        audit(user, "PASSWORD_CHANGED", "USER", user["id"])
+        return Response(status_code=204)
 
     @app.get("/api/admin/banks", response_model=list[BankRecord])
     def admin_banks(request: Request) -> list[dict]:
@@ -232,21 +267,55 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(422, "Escritório só se aplica a advogado externo e precisa existir.")
         if payload.is_manager and payload.role != UserRole.BANCO:
             raise HTTPException(422, "Somente usuários do banco podem ser gestores.")
+        admin = current_user(request)
         try:
-            return repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "law_firm_id": payload.law_firm_id, "is_manager": payload.is_manager, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
+            created = repository().create_user({"id": str(secrets.token_hex(16)), "name": payload.name.strip(), "email": normalize_email(payload.email), "password_hash": hash_password(payload.password), "role": payload.role.value, "bank_id": payload.bank_id, "law_firm_id": payload.law_firm_id, "is_manager": payload.is_manager, "is_active": True, "created_at": datetime.now(UTC).isoformat()})
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
+        audit(admin, "USER_CREATED", "USER", created["id"], reason=f"role={created['role']}")
+        return created
 
     @app.patch("/api/admin/users/{user_id}", response_model=UserRecord)
     def update_user(user_id: str, payload: UserUpdate, request: Request) -> dict:
-        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        admin = require_role(current_user(request), UserRole.ADMIN_GLOBAL)
         changes = payload.model_dump(exclude_none=True)
         if "password" in changes:
             changes["password_hash"] = hash_password(changes.pop("password"))
+            action = "PASSWORD_RESET"
+        elif "is_active" in changes:
+            action = "USER_ACTIVATED" if changes["is_active"] else "USER_DEACTIVATED"
+        else:
+            action = "USER_UPDATED"
         user = repository().update_user(user_id, changes)
         if user is None:
             raise HTTPException(404, "Usuário não encontrado.")
+        audit(admin, action, "USER", user_id)
         return user
+
+    @app.patch("/api/admin/users/{user_id}/password", status_code=204)
+    def admin_reset_password(user_id: str, payload: ResetPasswordRequest, request: Request) -> Response:
+        admin = require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        updated = repository().update_user(user_id, {"password_hash": hash_password(payload.new_password)})
+        if updated is None:
+            raise HTTPException(404, "Usuário não encontrado.")
+        audit(admin, "PASSWORD_RESET", "USER", user_id)
+        return Response(status_code=204)
+
+    @app.get("/api/admin/audit-events", response_model=list[AuditEventRecord])
+    def admin_audit_events(
+        request: Request, limit: int = 100, before_rowid: int | None = None,
+        action: str | None = None, entity_type: str | None = None, case_id: str | None = None,
+    ) -> list[dict]:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        return repository().list_audit_events(
+            limit=min(max(limit, 1), 500), before_rowid=before_rowid,
+            action=action, entity_type=entity_type, case_id=case_id,
+        )
+
+    @app.get("/api/admin/audit-events/verify", response_model=AuditChainStatus)
+    def admin_verify_audit_chain(request: Request) -> dict:
+        require_role(current_user(request), UserRole.ADMIN_GLOBAL)
+        return repository().verify_audit_chain()
 
     def contract_record(bank_id: str, law_firm_id: str | None = None) -> dict:
         record = repository().get_active_bank_contract(bank_id, law_firm_id)
@@ -287,6 +356,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if law_firm_id and repository().get_law_firm(law_firm_id) is None:
             raise HTTPException(404, "Escritório não encontrado.")
         repository().create_bank_contract(bank_id, payload.model_dump(exclude={"versao"}), user.get("id"), law_firm_id)
+        audit(user, "BANK_CONTRACT_UPDATED", "BANK", bank_id, reason=f"law_firm_id={law_firm_id}")
         return contract_record(bank_id, law_firm_id)
 
     @app.post("/api/admin/banks/{bank_id}/contract/preview", response_model=ContractPreview)
@@ -307,6 +377,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         require_firm_of_bank(user["bank_id"], law_firm_id)
         repository().create_bank_contract(user["bank_id"], payload.parametros.model_dump(exclude={"versao"}),
                                           user.get("id"), law_firm_id, payload.justificativa.strip())
+        audit(user, "BANK_CONTRACT_UPDATED", "BANK", user["bank_id"], reason=payload.justificativa.strip())
         return contract_record(user["bank_id"], law_firm_id)
 
     @app.post("/api/bank/contract/preview", response_model=ContractPreview)
@@ -330,6 +401,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def bank_lawyers(request: Request) -> list[dict]:
         user = require_role(current_user(request), UserRole.BANCO)
         return [candidate for candidate in repository().list_users(user["bank_id"]) if candidate["role"] == UserRole.ADVOGADO_EXTERNO.value and candidate["is_active"]]
+
+    @app.patch("/api/bank/users/{user_id}/password", status_code=204)
+    def bank_reset_password(user_id: str, payload: ResetPasswordRequest, request: Request) -> Response:
+        """Gestor do banco redefine a senha de um usuário do próprio banco (não admin)."""
+        manager = require_manager(current_user(request))
+        target = repository().get_user(user_id)
+        if target is None or target["bank_id"] != manager["bank_id"]:
+            raise HTTPException(404, "Usuário não encontrado neste banco.")
+        repository().update_user(user_id, {"password_hash": hash_password(payload.new_password)})
+        audit(manager, "PASSWORD_RESET", "USER", user_id)
+        return Response(status_code=204)
 
     @app.post("/api/cases", response_model=CaseRecord, status_code=status.HTTP_201_CREATED)
     def create_case(payload: CaseCreate, request: Request) -> dict:
@@ -379,6 +461,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(422, str(exc)) from exc
         if case is None:
             raise HTTPException(404, "Processo não encontrado.")
+        audit(user, "CASE_ASSIGNED", "CASE", case_id, case_id=case_id, reason=f"lawyer_id={payload.assigned_lawyer_id}")
         return case
 
     @app.post("/api/cases/{case_id}/documents", response_model=DocumentRecord, status_code=201)
@@ -386,7 +469,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         case_id: str,
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
-        declared_type: DocumentType = Form(...),
+        declared_type: DocumentType | None = Form(default=None),
         source_party: SourceParty = Form(...),
         request_id: str | None = Form(default=None),
         request: Request = None,
@@ -410,6 +493,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
+        audit(user, "DOCUMENT_UPLOADED", "DOCUMENT", document["id"], case_id=case_id,
+              reason="classificação automática por IA" if declared_type is None else f"declarado como {declared_type.value}")
         background_tasks.add_task(document_service().process_document, document["id"])
         return document
 
@@ -439,6 +524,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Documento não encontrado neste processo.")
         if internal:
             Path(internal["file_path"]).unlink(missing_ok=True)
+        audit(user, "DOCUMENT_DELETED", "DOCUMENT", document_id, case_id=case_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @app.get("/api/documents/{document_id}/pages/{page_number}")
@@ -530,6 +616,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detected_type=validation.detected_type,
                 type_status=validation.status,
             )
+        audit(user, f"DOCUMENT_TYPE_{payload.action}", "DOCUMENT", document_id,
+              case_id=document["case_id"], reason=payload.reason)
         return repository().get_document(document_id)  # type: ignore[return-value]
 
     @app.post("/api/cases/{case_id}/analyses", response_model=AnalysisRecord, status_code=201)
@@ -593,6 +681,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lawyer_id = user["id"] if user["role"] == UserRole.ADVOGADO_EXTERNO.value else case.get("assigned_lawyer_id")
         decision = repository().create_lawyer_decision(case_id, analysis_id, payload, lawyer_id)
         track(user, case_id, EngagementEventType.DECISION_REGISTERED)
+        audit(user, "LAWYER_DECISION_REGISTERED", "CASE", case_id, case_id=case_id, reason=payload.action)
         return decision
 
     @app.post("/api/cases/{case_id}/negotiation-outcomes", response_model=NegotiationOutcomeRecord, status_code=201)

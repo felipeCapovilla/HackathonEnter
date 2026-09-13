@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useResource } from "../hooks";
 import { ContractManager } from "./ContractManager";
 import { WeeklyChart } from "./WeeklyChart";
-import { Bar, Kpi, Notice, Pill, SectionHeader } from "./ui";
+import { Bar, Kpi, Notice, Pill, ResetPasswordAction, SectionHeader } from "./ui";
 import { brl, brlCompact, date, index as fmtIndex, indexTone, minutes, num, pct, segmentLabel } from "./format";
 import "./banco.css";
 
@@ -16,6 +16,7 @@ const TABS = [
   ["engajamento", "Engajamento"],
   ["excecoes", "Exceções"],
   ["contrato", "Contrato"],
+  ["equipe", "Equipe"],
 ];
 
 export default function BankDashboard({ user }) {
@@ -23,6 +24,7 @@ export default function BankDashboard({ user }) {
   const tab = TABS.some(([key]) => key === params.get("aba")) ? params.get("aba") : "geral";
   const insights = useResource("/bank/insights");
   const data = insights.data;
+  const standalone = tab === "contrato" || tab === "equipe";
   return <section className="bank-dashboard">
     <div className="bank-toolbar">
       <div className="bank-tabs" role="tablist" aria-label="Seções do painel do banco">
@@ -34,10 +36,10 @@ export default function BankDashboard({ user }) {
       <div className="bank-toolbar-meta">
         {data?.casos_simulados > 0 && <span className="sim-badge" title="Processos sorteados da base real de 60 mil sentenças. O comportamento dos advogados e a resposta da parte autora são simulados.">
           Operação simulada · {num(data.casos_simulados)} de {num(data.casos)} processos</span>}
-        {data && tab !== "contrato" && <button type="button" className="ghost" onClick={insights.reload} disabled={insights.loading}>{insights.loading ? "Atualizando…" : "Atualizar"}</button>}
+        {data && !standalone && <button type="button" className="ghost" onClick={insights.reload} disabled={insights.loading}>{insights.loading ? "Atualizando…" : "Atualizar"}</button>}
       </div>
     </div>
-    {tab === "contrato" ? <ContractManager user={user} /> : <>
+    {tab === "contrato" ? <ContractManager user={user} /> : tab === "equipe" ? <Team user={user} /> : <>
       <Notice message={insights.error} onRetry={insights.reload} />
       {!data && insights.loading && <p role="status">Calculando indicadores da operação…</p>}
       {data && tab === "geral" && <Overview data={data} />}
@@ -49,6 +51,21 @@ export default function BankDashboard({ user }) {
       {data && tab === "excecoes" && <Exceptions data={data} />}
     </>}
   </section>;
+}
+
+/** Gestor redefine a senha dos advogados ativos do banco. Sem tela própria para isso ainda. */
+function Team({ user }) {
+  const lawyers = useResource("/bank/lawyers");
+  if (!user.is_manager) return <p className="muted">Somente o gestor do banco redefine senha da equipe.</p>;
+  return <div className="bank-stack">
+    <SectionHeader eyebrow="EQUIPE" title="Advogados com acesso" children="Redefina a senha de um advogado do seu banco quando ele esquecer a própria." />
+    <Notice message={lawyers.error} onRetry={lawyers.reload} />
+    {lawyers.loading && <p role="status">Carregando equipe…</p>}
+    {lawyers.data && <ul className="admin-user-list">{lawyers.data.map((lawyer) => <li key={lawyer.id}>
+      <span>{lawyer.name} · {lawyer.email}{lawyer.law_firm_name ? ` · ${lawyer.law_firm_name}` : ""}</span>
+      <ResetPasswordAction endpoint={`/bank/users/${lawyer.id}/password`} />
+    </li>)}</ul>}
+  </div>;
 }
 
 function Overview({ data }) {

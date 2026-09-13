@@ -35,7 +35,7 @@ FEATURE_LABELS = {
     "laudo": "Laudo referenciado",
 }
 ACAO_PARA_API = {"ACORDAR": "ACORDO", "DEFENDER": "DEFESA", "RECUPERAR": "RECUPERAR"}
-USABLE_TYPE = {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value}
+USABLE_TYPE = {DocumentTypeStatus.CONFIRMED.value, DocumentTypeStatus.USER_CONFIRMED.value, DocumentTypeStatus.AI_CONFIRMED.value}
 USABLE_STATUS = {DocumentStatus.COMPLETED.value, DocumentStatus.COMPLETED_WITH_WARNINGS.value}
 
 # (bank_id, law_firm_id) -> contrato vigente. O escritório vem do advogado atribuído ao caso.
@@ -179,6 +179,8 @@ class PolicyService:
             limitations.append("Dossiê presente sem análise concluída: a recomendação não usa o conteúdo dele.")
         if DocumentTypeStatus.UNCONFIRMED.value in type_statuses:
             limitations.append("Há documento não confirmado, que não ativou nenhuma variável da política.")
+        if DocumentTypeStatus.AI_REJECTED.value in type_statuses:
+            limitations.append("Há documento recusado pela IA por não ter relação com o processo; ele foi mantido para auditoria mas não conta como evidência.")
         if any(document["quality_flags"] for document in documents):
             limitations.append("Métrica de qualidade de OCR permanece pendente; páginas com pouco texto foram sinalizadas.")
         usable = any(document["type_status"] in USABLE_TYPE for document in documents)

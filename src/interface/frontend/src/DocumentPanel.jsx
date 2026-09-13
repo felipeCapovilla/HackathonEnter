@@ -27,6 +27,8 @@ function DocumentNotice({ document }) {
   if (document.status === "FAILED") return <p className="warning">Não foi possível extrair o conteúdo. Verifique o arquivo e envie uma versão legível.</p>;
   if (["UPLOADED", "EXTRACTING"].includes(document.status)) return null;
   return <>
+    {document.type_status === "AI_REJECTED" && <p className="warning">A IA recusou este documento: {document.ai_type_reason || "não tem relação aparente com o processo."} Se for engano, exclua e reenvie, ou reclassifique pela API.</p>}
+    {document.type_status === "AI_CONFIRMED" && <p className="muted">Classificado automaticamente pela IA como {documentTypes[document.declared_type] || document.declared_type}. {document.ai_type_reason}</p>}
     {document.type_status === "MISMATCH" && <p className="warning">O conteúdo parece ser {documentTypes[document.detected_type] || "outro tipo de documento"}, diferente do tipo informado. A divergência precisa ser resolvida antes de usar este documento na análise.</p>}
     {document.type_status === "UNCONFIRMED" && <p className="muted">Não foi possível confirmar o tipo pelo conteúdo. Isso não comprova que o documento seja inválido.</p>}
     {document.quality_flags?.includes("LOW_TEXT_COVERAGE_TODO_OCR") && <p className="warning">Pouco texto disponível. A leitura por OCR ainda não está implementada; envie uma versão com texto selecionável, se disponível.</p>}
@@ -96,14 +98,10 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
     </div>
     {encerrado && canUpload && <p className="locked"><Icon name="lock" />Processo encerrado: os documentos não podem mais ser alterados.</p>}
     {podeEditar && <form className="document-upload" onSubmit={upload}>
-      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
+      <p className="muted" id="document-upload-help">Envie os documentos do banco para o advogado responsável. Formatos aceitos: PDF e TXT, um arquivo por envio. Uma IA lê o conteúdo e classifica o tipo automaticamente; documentos sem relação com o processo são recusados. Dossiês são enviados à OpenAI para análise automática assim que o processamento termina.</p>
       <fieldset className="form-fields" disabled={action.pending}>
-        <label>Tipo de documento<select name="declared_type" required defaultValue="">
-          <option value="">Selecione o tipo</option>
-          {Object.entries(documentTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
         <label>Arquivo do documento<input name="file" type="file" accept=".pdf,.txt" required aria-describedby="document-upload-help" /></label>
-        <button>{action.pending ? "Enviando documento…" : <>Enviar documento<Icon name="arrow" /></>}</button>
+        <button>{action.pending ? "Enviando e classificando…" : <>Enviar documento<Icon name="arrow" /></>}</button>
       </fieldset>
       {action.error && <div className="warning" role="alert">{action.error}</div>}
       {notice && <p role="status">{notice}</p>}
@@ -116,7 +114,9 @@ export function DocumentPanel({ caseId, documents, canUpload, encerrado = false,
           <span className={`pill ${status.tone}`}>{status.label}</span>
         </div>
         <span>
-          {documentTypes[document.declared_type] || document.declared_type}
+          {document.type_source === "AI" && ["UPLOADED", "EXTRACTING"].includes(document.status)
+            ? "Classificando tipo…"
+            : documentTypes[document.declared_type] || document.declared_type}
           {" · "}{document.source_party === "BANCO" ? "Enviado pelo banco" : "Enviado pelo advogado"}
           {document.page_count > 0 && ` · ${document.page_count} página(s)`}
         </span>
