@@ -3,6 +3,7 @@
 
 ## Link do Vídeo: https://www.youtube.com/watch?v=yI8_-BOWEvU   
 
+## Link Apresentação: 
 EnterOS é a aplicação de política de acordos para casos de não reconhecimento
 de empréstimo. Para cada caso, recomenda defender, acordar ou recuperar o documento
 que falta, a partir de uma tabela de segmentos medida na base histórica, do preço
