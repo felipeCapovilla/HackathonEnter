@@ -87,6 +87,10 @@ TEXTO_MOTIVO = {
     "SISTEMA_SEM_EXPORTACAO": "Sistema legado não permite exportar o documento por operação.",
     "OUTRO": "Área responsável não retornou dentro do prazo.",
 }
+# O contrato padrão vira uma versão registrada, com os mesmos parâmetros do padrão: a aba Contrato
+# mostra histórico e justificativa, e nenhuma recomendação muda.
+JUSTIFICATIVA_PADRAO = ("Contrato padrão 2026: mensalidade e valor fixo por processo novo são pagos em qualquer "
+                        "desfecho e não mudam a decisão; honorários por desfecho ficam em cada escritório.")
 MOTIVOS_DE_DIVERGENCIA = ("FATO_NOVO", "ENTENDIMENTO_LOCAL", "PROVA_MAIS_FRACA", "PROVA_MAIS_FORTE", "SINAL_DO_AUTOR")
 DOCUMENTO_DO_PLANO = {"contrato": "CONTRATO", "extrato": "EXTRATO", "comprovante_credito": "COMPROVANTE_CREDITO"}
 TIPOS_DOCUMENTO = {"contrato": "CONTRATO", "extrato": "EXTRATO", "comprovante_credito": "COMPROVANTE_CREDITO",
@@ -133,6 +137,8 @@ def limpar(connection) -> None:
     ids_escritorios = tuple(e[0] for e in ESCRITORIOS)
     marcadores = ",".join("?" * len(ids_escritorios))
     connection.execute(f"DELETE FROM bank_contracts WHERE law_firm_id IN ({marcadores})", ids_escritorios)
+    connection.execute("DELETE FROM bank_contracts WHERE bank_id = 'banco-unicamp' AND law_firm_id IS NULL AND justification = ?",
+                       (JUSTIFICATIVA_PADRAO,))
     connection.execute("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"%@{DOMINIO}",))
     connection.execute("DELETE FROM users WHERE email LIKE ?", (f"%@{DOMINIO}",))
     connection.execute(f"UPDATE users SET law_firm_id = NULL WHERE law_firm_id IN ({marcadores})", ids_escritorios)
@@ -179,6 +185,13 @@ def simular(database_path: Path, *, reset: bool = False, agora: datetime | None 
         demo = connection.execute("SELECT id FROM users WHERE email = 'advogada@demo.local'").fetchone()
         if demo:
             advogados["banco-unicamp"].append({"id": demo["id"], "firm": ESCRITORIOS[0][0], "perfil": PERFIS["exemplar"]})
+
+        connection.execute(
+            """INSERT INTO bank_contracts (id, bank_id, version, parameters, created_by_user_id, created_at, law_firm_id, justification)
+            VALUES (?, 'banco-unicamp', (SELECT COALESCE(MAX(version), 0) + 1 FROM bank_contracts WHERE bank_id = 'banco-unicamp'),
+            ?, ?, ?, NULL, ?)""",
+            (str(uuid4()), json.dumps(ParametrosContrato().model_dump(exclude={"versao"})), gestor["id"] if gestor else None,
+             _iso(agora - timedelta(days=150)), JUSTIFICATIVA_PADRAO))
 
         # Contrato próprio de um escritório: defesa perdida mais cara muda a fronteira acordo x defesa.
         contrato_nogueira = ParametrosContrato(

@@ -85,6 +85,34 @@ def ler_com_ia(repository: Repository, document_ids: list[str]) -> list[str]:
     return [status for status, _, _ in resultados]
 
 
+def _fila_comeca_pelos_exemplos(database_path: Path, repository: Repository, advogada: dict) -> int:
+    """A fila da advogada demo abre pelos processos com PDFs: simulados sem documento que passariam
+    na frente vão para um colega do mesmo escritório. Os números do painel do banco não mudam."""
+    numeros = {caso["numero"] for caso in CASOS}
+    fila = repository.lawyer_queue(advogada["id"])
+    exemplos = [item for item in fila if item["case_number"] in numeros]
+    if not exemplos:
+        return 0
+    corte = max(item["fase"]["prioridade"] for item in exemplos)
+    na_frente = [item["id"] for item in fila if item["case_number"] not in numeros and item.get("is_simulated")
+                 and item["fase"]["prioridade"] <= corte]
+    if not na_frente:
+        return 0
+    with connection_for(database_path) as connection:
+        colega = connection.execute(
+            """SELECT id FROM users WHERE role = 'ADVOGADO_EXTERNO' AND id != ? AND law_firm_id = ? AND bank_id = ?
+            ORDER BY name LIMIT 1""", (advogada["id"], advogada.get("law_firm_id"), advogada["bank_id"])).fetchone()
+        if colega is None:
+            return 0
+        marcas = ",".join("?" * len(na_frente))
+        connection.execute(f"UPDATE cases SET assigned_lawyer_id = ? WHERE id IN ({marcas})", (colega["id"], *na_frente))
+        for tabela, coluna in (("lawyer_decisions", "lawyer_id"), ("negotiation_outcomes", "lawyer_id"),
+                               ("judicial_outcomes", "lawyer_id"), ("engagement_events", "user_id")):
+            connection.execute(f"UPDATE {tabela} SET {coluna} = ? WHERE case_id IN ({marcas}) AND {coluna} = ?",
+                               (colega["id"], *na_frente, advogada["id"]))
+    return len(na_frente)
+
+
 def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
     seed_demo(database_path)
     repository = Repository(database_path)
@@ -128,6 +156,9 @@ def semear(database_path: Path, *, reset: bool = False) -> list[dict]:
         leituras = ler_com_ia(repository, enviados)
         resumo.append({"numero": caso["numero"], "situacao": "criado", "documentos": tipos,
                        "leituras_ia": f"{leituras.count('COMPLETED')}/{len(enviados)}" if leituras else "sem OPENAI_API_KEY"})
+    movidos = _fila_comeca_pelos_exemplos(database_path, repository, repository.get_user_by_email("advogada@demo.local"))
+    if movidos:
+        resumo.append({"numero": "fila da advogada demo", "situacao": f"{movidos} processo(s) simulado(s) passados a um colega"})
     return resumo
 
 
