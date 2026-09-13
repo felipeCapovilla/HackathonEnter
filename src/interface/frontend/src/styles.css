@@ -417,6 +417,11 @@ form, .form-fields { display: grid; gap: var(--s5); }
 .login-description { font-size: var(--text-base); color: var(--muted); margin-bottom: var(--s8); line-height: 1.65; }
 .login-card form { margin-top: var(--s6); }
 .login-card button { margin-top: var(--s1); justify-content: space-between; padding-left: var(--s5); padding-right: var(--s5); min-height: 50px; font-size: var(--text-base); }
+.password-field { position: relative; display: block; }
+.password-field input { padding-right: 48px; }
+.login-card .password-toggle { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 42px; min-height: 42px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); }
+.login-card .password-toggle:hover { color: var(--text); background: transparent; }
+.password-toggle .icon { width: 20px; height: 20px; }
 .login-footnote { display: flex; align-items: center; justify-content: center; gap: var(--s2); font-size: var(--text-sm); color: var(--faint); margin-top: var(--s6); }
 .login-footnote .icon { width: 15px; height: 15px; }
 .login-signature { position: absolute; bottom: var(--s4); font-size: var(--text-xs); color: var(--faint); letter-spacing: .16em; }

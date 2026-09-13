@@ -67,6 +67,7 @@ function Metric({ label, value, hint, tone = "" }) {
 
 function Login({ onLogin, notice }) {
   const action = useAction();
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const submit = (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -94,7 +95,10 @@ function Login({ onLogin, notice }) {
     <form onSubmit={submit}>
       <fieldset className="form-fields" disabled={action.pending}>
         <label>E-mail<input name="email" type="email" required autoComplete="username" /></label>
-        <label>Senha<input name="password" type="password" required autoComplete="current-password" /></label>
+        <label>Senha<span className="password-field"><input name="password" type={mostrarSenha ? "text" : "password"} required autoComplete="current-password" />
+          <button type="button" className="password-toggle" onClick={() => setMostrarSenha((visivel) => !visivel)} aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"} aria-pressed={mostrarSenha}>
+            <Icon name={mostrarSenha ? "eyeOff" : "eye"} />
+          </button></span></label>
         <ErrorNotice message={action.error} />
         <button>{action.pending ? "Entrando…" : <>Entrar<Icon name="arrow" /></>}</button>
       </fieldset>
