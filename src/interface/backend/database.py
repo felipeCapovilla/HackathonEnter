@@ -147,8 +147,25 @@ CREATE TABLE IF NOT EXISTS audit_events (
     entity_id TEXT NOT NULL,
     case_id TEXT,
     reason TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    prev_hash TEXT,
+    hash TEXT
 );
+
+-- audit_events é só de inserção: ninguém, nem o próprio código da API, tem um
+-- caminho para UPDATE/DELETE nela. Os gatilhos fecham a porta também para
+-- quem acessar o arquivo .db diretamente.
+CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events é imutável: UPDATE não é permitido');
+END;
+
+CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'audit_events é imutável: DELETE não é permitido');
+END;
 
 CREATE TABLE IF NOT EXISTS bank_contracts (
     id TEXT PRIMARY KEY,
@@ -282,6 +299,8 @@ CREATE INDEX IF NOT EXISTS engagement_case_idx ON engagement_events(case_id, use
 CREATE INDEX IF NOT EXISTS document_chunks_document_idx ON document_chunks(document_id, chunk_index);
 CREATE INDEX IF NOT EXISTS chat_conversations_case_idx ON document_chat_conversations(case_id, created_at);
 CREATE INDEX IF NOT EXISTS chat_messages_conversation_idx ON document_chat_messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS audit_events_created_idx ON audit_events(created_at);
+CREATE INDEX IF NOT EXISTS audit_events_case_idx ON audit_events(case_id);
 """
 
 # Colunas adicionadas depois da primeira versão do schema: (tabela, coluna, definição).
@@ -298,6 +317,11 @@ MIGRATED_COLUMNS = (
     ("lawyer_decisions", "requested_document", "TEXT"),
     ("negotiation_outcomes", "divergence_reason", "TEXT"),
     ("negotiation_outcomes", "reason", "TEXT"),
+    # "USER": banco escolheu o tipo no upload. "AI": IA classificou automaticamente.
+    ("documents", "type_source", "TEXT NOT NULL DEFAULT 'USER'"),
+    ("documents", "ai_type_reason", "TEXT"),
+    ("audit_events", "prev_hash", "TEXT"),
+    ("audit_events", "hash", "TEXT"),
 )
 
 

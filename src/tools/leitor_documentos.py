@@ -23,13 +23,16 @@ LIMITE_TEXTO = 24_000
 TEXTO_MINIMO = 400  # abaixo disso o PDF é tratado como escaneado e vai como arquivo
 
 TipoLido = Literal["AUTOS", "CONTRATO", "EXTRATO", "COMPROVANTE_CREDITO", "DOSSIE",
-                   "DEMONSTRATIVO_DIVIDA", "LAUDO_REFERENCIADO", "OUTRO"]
+                   "DEMONSTRATIVO_DIVIDA", "LAUDO_REFERENCIADO", "OUTRO", "RECUSADO"]
 
 PROMPT = """Você lê documentos de processos em que um cliente diz não reconhecer um empréstimo.
 Use só o que está escrito no documento; se um campo não aparece, devolva null.
 - tipo_documento: AUTOS (petição inicial ou peças do processo), CONTRATO, EXTRATO (extrato de conta),
   COMPROVANTE_CREDITO (comprovante de crédito/TED/registro no BACEN), DOSSIE (verificação de assinatura e documentos),
-  DEMONSTRATIVO_DIVIDA, LAUDO_REFERENCIADO ou OUTRO.
+  DEMONSTRATIVO_DIVIDA, LAUDO_REFERENCIADO, OUTRO ou RECUSADO.
+  Use RECUSADO só quando o conteúdo não tiver relação alguma com um processo bancário/judicial de
+  empréstimo (outro assunto por completo). Um documento legítimo do processo que não se encaixe nas
+  categorias específicas é OUTRO, nunca RECUSADO.
 - resumo: no máximo 2 frases, em português simples, sem jargão.
 - numero_contrato: número do contrato ou da operação de crédito.
 - valor_principal: valor do empréstimo ou do crédito liberado, em reais.

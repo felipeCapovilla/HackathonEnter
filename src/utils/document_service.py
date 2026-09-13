@@ -13,6 +13,8 @@ from fastapi import HTTPException, UploadFile
 from pypdf import PdfReader
 
 from src.interface.backend.config import Settings
+from src.tools.leitor_documentos import LeituraIndisponivel, ler_documento
+from .ai_document_classifier import AIDocumentClassification, classify_by_keywords
 from .document_type_validator import validate_document_type
 from src.interface.backend.repository import Repository
 from src.interface.backend.schemas import DocumentStatus, DocumentType, DocumentTypeStatus, SourceParty
@@ -44,7 +46,7 @@ class DocumentService:
         *,
         case_id: str,
         upload: UploadFile,
-        declared_type: DocumentType,
+        declared_type: DocumentType | None,
         source_party: SourceParty,
         request_id: str | None,
     ) -> dict:
@@ -134,21 +136,56 @@ class DocumentService:
             if page_count == 0:
                 quality_flags.add("DOCUMENT_WITHOUT_PAGES")
             sample = "\n".join(validation_sample)
-            validation = validate_document_type(DocumentType(document["declared_type"]), sample)
-            status = (
-                DocumentStatus.COMPLETED_WITH_WARNINGS.value
-                if quality_flags or validation.status.value == "UNCONFIRMED"
-                else DocumentStatus.COMPLETED.value
-            )
-            self.repository.update_document_extraction(
-                document_id,
-                status=status,
-                page_count=page_count,
-                pages_extracted=pages_extracted,
-                quality_flags=sorted(quality_flags),
-                detected_type=validation.detected_type,
-                type_status=validation.status,
-            )
+            if document.get("type_source") == "AI":
+                # Banco não escolheu o tipo: a IA classifica o arquivo aqui, mas
+                # esse resultado não é a leitura consultiva. O resumo que aparece
+                # nas telas só é persistido quando o advogado o solicita.
+                try:
+                    leitura = ler_documento(path, sample, "não informado (classificação automática pela IA)")
+                except LeituraIndisponivel:
+                    classification = classify_by_keywords(sample)
+                else:
+                    rejeitado = leitura.tipo_documento == "RECUSADO"
+                    classification = AIDocumentClassification(
+                        document_type=None if rejeitado else DocumentType(leitura.tipo_documento),
+                        rejected=rejeitado, reason=leitura.resumo, source="IA",
+                    )
+                if classification.rejected:
+                    declared_type = DocumentType.OUTRO
+                    detected_type = None
+                    type_status = DocumentTypeStatus.AI_REJECTED
+                else:
+                    declared_type = classification.document_type or DocumentType.OUTRO
+                    detected_type = declared_type
+                    type_status = DocumentTypeStatus.AI_CONFIRMED
+                status = DocumentStatus.COMPLETED_WITH_WARNINGS.value if quality_flags or classification.rejected else DocumentStatus.COMPLETED.value
+                self.repository.update_document_extraction(
+                    document_id,
+                    status=status,
+                    page_count=page_count,
+                    pages_extracted=pages_extracted,
+                    quality_flags=sorted(quality_flags),
+                    detected_type=detected_type,
+                    type_status=type_status,
+                    declared_type=declared_type,
+                    ai_type_reason=classification.reason,
+                )
+            else:
+                validation = validate_document_type(DocumentType(document["declared_type"]), sample)
+                status = (
+                    DocumentStatus.COMPLETED_WITH_WARNINGS.value
+                    if quality_flags or validation.status.value == "UNCONFIRMED"
+                    else DocumentStatus.COMPLETED.value
+                )
+                self.repository.update_document_extraction(
+                    document_id,
+                    status=status,
+                    page_count=page_count,
+                    pages_extracted=pages_extracted,
+                    quality_flags=sorted(quality_flags),
+                    detected_type=validation.detected_type,
+                    type_status=validation.status,
+                )
             completed = True
         except Exception as exc:
             completed = False

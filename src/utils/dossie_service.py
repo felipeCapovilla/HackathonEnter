@@ -103,11 +103,13 @@ class DossieService:
             warnings.append("O tipo documental não foi confirmado pelo validador determinístico.")
         elif document["type_status"] == "USER_CONFIRMED":
             warnings.append("O tipo documental foi confirmado pelo usuário com ressalvas.")
+        elif document["type_status"] == "AI_CONFIRMED":
+            warnings.append("O tipo documental foi classificado automaticamente pela IA no upload.")
         if document["status"] == "COMPLETED_WITH_WARNINGS":
             warnings.append("A extração documental terminou com ressalvas; consulte a qualidade das páginas.")
         unavailable = (
             document["declared_type"] != "DOSSIE"
-            or document["type_status"] in {"REMOVED", "MISMATCH", "PENDING"}
+            or document["type_status"] in {"REMOVED", "MISMATCH", "PENDING", "AI_REJECTED"}
             or document["status"] not in {"COMPLETED", "COMPLETED_WITH_WARNINGS"}
         )
         if unavailable:
@@ -131,7 +133,7 @@ class DossieService:
     def _validate_document(document: dict) -> None:
         if document["declared_type"] != "DOSSIE":
             raise ValueError("A análise requer um documento declarado como dossiê.")
-        if document["type_status"] in {"REMOVED", "MISMATCH", "PENDING"}:
+        if document["type_status"] in {"REMOVED", "MISMATCH", "PENDING", "AI_REJECTED"}:
             raise ValueError("O documento foi removido ou aguarda confirmação do tipo documental.")
         if document["status"] not in {"COMPLETED", "COMPLETED_WITH_WARNINGS"}:
             raise ValueError("A extração do documento precisa estar concluída antes da análise.")
