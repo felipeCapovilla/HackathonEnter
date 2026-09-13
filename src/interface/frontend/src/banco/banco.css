@@ -162,3 +162,13 @@ button.ghost:hover { background: #f6f7fa; box-shadow: none; }
 .leitura-ia ul { margin: 6px 0 0 !important; padding-left: 18px; }
 .leitura-ia .leitura-alerta { color: var(--danger, #a82f26); font-weight: 600; }
 .leitura-ia button { min-height: 30px; padding: 4px 10px; font-size: .75rem; }
+
+/* Pior caso e gasto real lado a lado, sem número de diferença */
+.lado-a-lado { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+.lado-a-lado div { display: grid; gap: 4px; padding: 16px; border-radius: 10px; background: var(--surface-sunken, #f4f2ee); }
+.lado-a-lado span { font-size: .8rem; color: var(--muted); }
+.lado-a-lado strong { font-family: var(--font-display, inherit); font-size: 1.7rem; color: #1c2742; }
+.componentes { display: grid; gap: 2px; margin-top: 8px; }
+.weekly-chart .grid.zero { stroke: #c9d0de; }
+.weekly-chart .bar-negative { fill: #c2413b; }
+@media (max-width: 700px) { .lado-a-lado { grid-template-columns: minmax(0, 1fr); } }

@@ -24,7 +24,7 @@ function FormDecisao({ caseId, recomendacao, onChange }) {
   const acao = useAction();
   const pricing = recomendacao.pricing;
   const [escolha, setEscolha] = useState(recomendacao.recommendation);
-  const [valor, setValor] = useState(pricing?.opening_value ?? "");
+  const [valor, setValor] = useState(pricing?.recommended_value ?? pricing?.opening_value ?? "");
   const [motivo, setMotivo] = useState("");
   const maximo = pricing?.walk_away_value;
   const acima = escolha === "ACORDO" && maximo != null && Number(valor) > maximo + 0.01;
@@ -55,7 +55,7 @@ function FormDecisao({ caseId, recomendacao, onChange }) {
       </div>
       {escolha === "ACORDO" && <label>Valor da proposta
         <input type="number" min="1" step="0.01" required value={valor} onChange={(event) => setValor(event.target.value)} />
-        {pricing && <small className="muted">Recomendado: comece em {moeda(pricing.opening_value)} e suba no máximo até {moeda(maximo)}.</small>}
+        {pricing && <small className="muted">Recomendado: {moeda(pricing.recommended_value ?? pricing.opening_value)}{pricing.market_low != null ? `. Acordos parecidos fecham entre ${moeda(pricing.market_low)} e ${moeda(pricing.market_high)}` : ""}. Acima de {moeda(maximo)}, acordo não compensa.</small>}
       </label>}
       {acima && <p className="alerta-valor">Esse valor passa do máximo ({moeda(maximo)}): defender sai mais barato para a empresa.</p>}
       {escolha === "RECUPERAR" && <label>Documento a pedir à empresa
@@ -81,8 +81,9 @@ function Roteiro({ caseId, decisao, pricing }) {
     <div className="panel-heading"><span className="panel-icon"><Icon name="scale" /></span><div><h3>Roteiro da negociação</h3><p>O que fazer até o autor responder.</p></div></div>
     <ol className="roteiro-passos">
       <li>Ofereça <b>{moeda(decisao.proposed_value)}</b>.</li>
+      {pricing?.market_low != null && <li>Acordos parecidos fecham entre {moeda(pricing.market_low)} e {moeda(pricing.market_high)}.</li>}
       {maximo != null && <li>Se o autor pedir mais, você pode aceitar até <b>{moeda(maximo)}</b>.</li>}
-      {maximo != null && <li>Acima de {moeda(maximo)}, não feche: defender custa menos para a empresa.</li>}
+      {maximo != null && <li><b>Acima de {moeda(maximo)}, acordo não compensa:</b> defender sai mais barato para a empresa.</li>}
       <li>Sem resposta em 7 dias, cobre o autor. Registre abaixo tudo o que ele responder.</li>
     </ol>
     <button type="button" className="subtle" disabled={acao.pending} onClick={gerar}><Icon name="spark" />{acao.pending ? "Redigindo…" : "Gerar mensagem de proposta"}</button>

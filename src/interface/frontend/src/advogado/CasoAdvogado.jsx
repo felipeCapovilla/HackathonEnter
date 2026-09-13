@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import { request } from "../api";
 import { useAction, useResource } from "../hooks";
 import { Icon } from "../Brand";
-import { useActiveTime } from "../useActiveTime";
 import { LinhaDoTempo, PainelDaFase } from "./PainelDaFase";
 import { Recomendacao } from "./Recomendacao";
 import { VisualizadorDocumentos } from "./VisualizadorDocumentos";
@@ -13,7 +12,6 @@ import "./advogado.css";
 export function CasoAdvogado({ caseId }) {
   const recurso = useResource(`/cases/${caseId}`);
   const acao = useAction();
-  useActiveTime(caseId, true);
   const detalhe = recurso.data;
   const fase = detalhe?.fase;
   const recomendacao = detalhe?.analyses?.[0];

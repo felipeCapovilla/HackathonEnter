@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .database import connection_for
+from .divergencias import custo_caminho_recomendado
 from .fluxo import calcular_fase
 from .schemas import (
     CaseCreate,
@@ -792,6 +793,8 @@ class Repository:
             if record["status"] == "ACEITO":
                 # Acordo aceito é desfecho: encerra o processo no ciclo de vida da decisão.
                 self._close_decision(connection, decision["id"], "ACORDO_ACEITO", record["created_at"])
+        if record["status"] == "ACEITO":
+            self.refresh_divergence_balance(case_id)
         return record
 
     @staticmethod
@@ -818,6 +821,7 @@ class Repository:
             if decision is not None:
                 outcome = "SENTENCA_FAVORAVEL" if record["result"] == "EXITO" else "SENTENCA_DESFAVORAVEL"
                 self._close_decision(connection, decision["id"], outcome, record["created_at"])
+        self.refresh_divergence_balance(case_id)
         return record
 
     def list_judicial_outcomes(self, case_id: str) -> list[dict]:
@@ -865,6 +869,7 @@ class Repository:
             updated = connection.execute(
                 "SELECT * FROM lawyer_decisions WHERE id = ?", (decision_id,)
             ).fetchone()
+        self.refresh_divergence_balance(updated["case_id"])
         return dict(updated)
 
     def lawyer_performance(self, lawyer_id: str, favorable: frozenset[str]) -> dict:
@@ -938,6 +943,53 @@ class Repository:
                 "judicials": linhas("SELECT * FROM judicial_outcomes WHERE case_id = ? ORDER BY created_at DESC LIMIT 1"),
             }
         return calcular_fase(**dados)
+
+    def refresh_divergence_balance(self, case_id: str) -> dict | None:
+        """Recalcula o saldo estimado da divergência do processo encerrado (interno, sem tela)."""
+        with connection_for(self.database_path) as connection:
+            decisao = connection.execute(
+                "SELECT * FROM lawyer_decisions WHERE case_id = ? ORDER BY created_at DESC LIMIT 1", (case_id,)).fetchone()
+            if decisao is None:
+                return None
+            analise = connection.execute("SELECT recommendation, policy_output, pricing FROM analyses WHERE id = ?",
+                                         (decisao["analysis_id"],)).fetchone()
+            causa = connection.execute("SELECT value_of_claim FROM cases WHERE id = ?", (case_id,)).fetchone()["value_of_claim"] or 0.0
+            aceito = connection.execute(
+                "SELECT closed_value FROM negotiation_outcomes WHERE decision_id = ? AND status = 'ACEITO' ORDER BY created_at DESC LIMIT 1",
+                (decisao["id"],)).fetchone()
+            sentenca = connection.execute(
+                "SELECT condemnation_value FROM judicial_outcomes WHERE case_id = ? ORDER BY created_at DESC LIMIT 1", (case_id,)).fetchone()
+            gasto = aceito["closed_value"] if aceito else sentenca["condemnation_value"] if sentenca else (
+                0.0 if decisao["outcome"] == "SENTENCA_FAVORAVEL" else
+                decisao["proposed_value"] if decisao["outcome"] == "ACORDO_ACEITO" else None)
+            pricing = json.loads(analise["pricing"]) if analise and analise["pricing"] else {}
+            limite = pricing.get("walk_away_value")
+            divergiu = analise is not None and (decisao["action"] != analise["recommendation"] or (
+                aceito is not None and limite is not None and aceito["closed_value"] > limite + 0.01))
+            caminho = (custo_caminho_recomendado(analise["recommendation"], json.loads(analise["policy_output"] or "{}"), causa)
+                       if divergiu and gasto is not None else None)
+            connection.execute("DELETE FROM divergence_balances WHERE decision_id = ?", (decisao["id"],))
+            if caminho is None:
+                return None
+            record = {"decision_id": decisao["id"], "case_id": case_id, "recommended_action": analise["recommendation"],
+                      "chosen_action": decisao["action"], "divergence_reason": decisao["divergence_reason"],
+                      "recommended_path_cost": caminho, "real_cost": float(gasto), "balance": round(caminho - float(gasto), 2),
+                      "computed_at": _now()}
+            connection.execute(
+                """INSERT INTO divergence_balances (decision_id, case_id, recommended_action, chosen_action, divergence_reason,
+                recommended_path_cost, real_cost, balance, computed_at) VALUES (:decision_id, :case_id, :recommended_action,
+                :chosen_action, :divergence_reason, :recommended_path_cost, :real_cost, :balance, :computed_at)""", record)
+        return record
+
+    def observed_acceptance(self, bank_id: str) -> list[tuple[float, float, bool]]:
+        """(oferta, valor da causa, aceito) das respostas finais de negociação da empresa."""
+        with connection_for(self.database_path) as connection:
+            rows = connection.execute(
+                """SELECT n.offered_value, c.value_of_claim, n.status FROM negotiation_outcomes n
+                JOIN cases c ON c.id = n.case_id
+                WHERE c.bank_id = ? AND n.status IN ('ACEITO', 'RECUSADO', 'SEM_RESPOSTA')
+                  AND n.offered_value > 0 AND c.value_of_claim > 0""", (bank_id,)).fetchall()
+        return [(row["offered_value"], row["value_of_claim"], row["status"] == "ACEITO") for row in rows]
 
     def lawyer_queue(self, lawyer_id: str) -> list[dict]:
         """Processos do advogado na ordem da próxima ação: o que precisa dele primeiro."""

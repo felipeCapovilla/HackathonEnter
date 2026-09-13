@@ -25,7 +25,8 @@ from uuid import uuid4
 from contracts.schema import AnaliseDossie, CaseFeatures, Honorario, ParametrosContrato
 from scripts.seed_demo import DEMO_DATABASE_PATH, seed_demo
 from src.interface.backend.database import connection_for, initialize_database
-from src.policy.constants import P3
+from src.policy.referencia import chance_aceite
+from src.interface.backend.repository import Repository
 from src.policy.engine import decidir
 from src.policy.service import ACAO_PARA_API, FEATURE_LABELS, PolicyService
 
@@ -51,10 +52,10 @@ ESCRITORIOS = (
 # minutos: tempo ativo típico por caso | carimbo: chance de decidir sem abrir nada
 PERFIS = {
     "exemplar":    dict(segue=0.95, desvio="DEFESA", markup=0.00, abre_docs=0.95, minutos=7.0, carimbo=0.02),
-    "consistente": dict(segue=0.88, desvio="DEFESA", markup=0.15, abre_docs=0.85, minutos=9.0, carimbo=0.05),
-    "defensor":    dict(segue=0.66, desvio="DEFESA", markup=0.10, abre_docs=0.80, minutos=12.0, carimbo=0.04),
-    "generoso":    dict(segue=0.90, desvio="ACORDO", markup=0.65, abre_docs=0.60, minutos=5.0, carimbo=0.15),
-    "apressado":   dict(segue=0.84, desvio="ACORDO", markup=0.35, abre_docs=0.30, minutos=3.0, carimbo=0.45),
+    "consistente": dict(segue=0.88, desvio="DEFESA", markup=0.05, abre_docs=0.85, minutos=9.0, carimbo=0.05),
+    "defensor":    dict(segue=0.66, desvio="DEFESA", markup=0.05, abre_docs=0.80, minutos=12.0, carimbo=0.04),
+    "generoso":    dict(segue=0.90, desvio="ACORDO", markup=0.25, abre_docs=0.60, minutos=5.0, carimbo=0.15),
+    "apressado":   dict(segue=0.84, desvio="ACORDO", markup=0.15, abre_docs=0.30, minutos=3.0, carimbo=0.45),
 }
 ADVOGADOS = (
     ("banco-unicamp", "esc-almeida-rocha", "Rafaela Menezes", "exemplar"),
@@ -86,6 +87,7 @@ TEXTO_MOTIVO = {
     "SISTEMA_SEM_EXPORTACAO": "Sistema legado não permite exportar o documento por operação.",
     "OUTRO": "Área responsável não retornou dentro do prazo.",
 }
+MOTIVOS_DE_DIVERGENCIA = ("FATO_NOVO", "ENTENDIMENTO_LOCAL", "PROVA_MAIS_FRACA", "PROVA_MAIS_FORTE", "SINAL_DO_AUTOR")
 DOCUMENTO_DO_PLANO = {"contrato": "CONTRATO", "extrato": "EXTRATO", "comprovante_credito": "COMPROVANTE_CREDITO"}
 TIPOS_DOCUMENTO = {"contrato": "CONTRATO", "extrato": "EXTRATO", "comprovante_credito": "COMPROVANTE_CREDITO",
                    "dossie": "DOSSIE", "demonstrativo": "DEMONSTRATIVO_DIVIDA", "laudo": "LAUDO_REFERENCIADO"}
@@ -124,8 +126,8 @@ def _iso(momento: datetime) -> str:
 
 def limpar(connection) -> None:
     casos = "SELECT id FROM cases WHERE is_simulated = 1"
-    for tabela in ("engagement_events", "negotiation_outcomes", "judicial_outcomes", "document_requests",
-                   "lawyer_decisions", "analyses"):
+    for tabela in ("divergence_balances", "engagement_events", "negotiation_outcomes", "judicial_outcomes",
+                   "document_requests", "lawyer_decisions", "analyses"):
         connection.execute(f"DELETE FROM {tabela} WHERE case_id IN ({casos})")
     connection.execute("DELETE FROM cases WHERE is_simulated = 1")
     ids_escritorios = tuple(e[0] for e in ESCRITORIOS)
@@ -194,6 +196,10 @@ def simular(database_path: Path, *, reset: bool = False, agora: datetime | None 
                 _simular_caso(connection, rng, agora, bank_id, linha, advogados[bank_id],
                               contrato_nogueira, contagem)
             cursor += quantidade
+    repositorio = Repository(database_path)
+    with connection_for(database_path) as connection:
+        simulados = [row[0] for row in connection.execute("SELECT id FROM cases WHERE is_simulated = 1")]
+    contagem["saldos_de_divergencia"] = sum(repositorio.refresh_divergence_balance(case_id) is not None for case_id in simulados)
     return contagem
 
 
@@ -252,10 +258,7 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
         for tipo in presentes:
             if rng.random() < perfil["abre_docs"]:
                 eventos.append(("DOCUMENT_OPENED", f"sim-{case_id[:8]}-{tipo}", 0, analisado + timedelta(minutes=rng.uniform(1, 15))))
-    minutos = perfil["minutos"] * (1.6 if limitacoes else 1.0) * (1.25 if linha["dossie"] else 1.0) * (0.25 if carimbo else 1.0)
-    segundos = int(min(3600, rng.lognormvariate(math.log(minutos * 60), 0.45)))
     decidido = min(agora - timedelta(minutes=5), analisado + timedelta(hours=rng.uniform(0.2, 60)))
-    eventos.append(("ACTIVE_TIME", None, segundos, decidido - timedelta(minutes=1)))
 
     # Decisão do advogado conforme o perfil.
     if rng.random() < perfil["segue"]:
@@ -266,16 +269,18 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
     proposto = None
     if acao == "ACORDO":
         if faixa:
-            proposto = faixa.alvo + perfil["markup"] * (faixa.walk_away - faixa.alvo) * rng.uniform(0.6, 1.5)
+            base_oferta = r.valor_recomendado or faixa.alvo
+            proposto = base_oferta + perfil["markup"] * max(0.0, faixa.walk_away - base_oferta) * rng.uniform(0.6, 1.5)
         else:
             proposto = 0.29 * linha["causa"] * (1 + perfil["markup"])
         proposto = round(proposto, 2)
     decision_id = str(uuid4())
     connection.execute(
-        """INSERT INTO lawyer_decisions (id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO lawyer_decisions (id, case_id, analysis_id, action, reason, proposed_value, created_at, lawyer_id,
+        divergence_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (decision_id, case_id, analysis_id, acao,
-         None if acao == recomendacao else "Divergência registrada pelo advogado.", proposto, _iso(decidido), user))
+         None if acao == recomendacao else "Divergência registrada pelo advogado.", proposto, _iso(decidido), user,
+         None if acao == recomendacao else rng.choice(MOTIVOS_DE_DIVERGENCIA)))
     eventos.append(("DECISION_REGISTERED", None, 0, decidido))
     contagem["decisoes"] += 1
 
@@ -283,7 +288,8 @@ def _simular_caso(connection, rng, agora, bank_id, linha, advogados, contrato_no
     negociacao_falhou = False
     if acao == "ACORDO" and (idade_decisao >= 5 or rng.random() < 0.5):
         abertura = faixa.abertura if faixa else 0.29 * linha["causa"]
-        p_aceita = min(0.85, max(0.08, P3.valor * (proposto / max(abertura, 1.0)) ** 1.2))
+        # A curva dos acordos da base, um pouco abaixo: a operação simulada aceita menos que o histórico.
+        p_aceita = chance_aceite(proposto, linha["causa"], fator=0.8)
         momento = decidido + timedelta(days=rng.uniform(1, 10))
         momento = min(momento, agora - timedelta(minutes=1))
         if rng.random() < p_aceita:

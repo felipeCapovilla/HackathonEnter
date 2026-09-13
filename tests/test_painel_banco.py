@@ -109,10 +109,10 @@ def test_outcomes_and_engagement_feed_bank_insights(tmp_path):
         assert advogado.post(f"/api/cases/{case_id}/negotiation-outcomes", json={"status": "RECUSADO"}).status_code == 409
         assert advogado.get(f"/api/cases/{case_id}").status_code == 200
         assert advogado.get(f"/api/documents/{document_id}/pages/1").status_code == 200
-        heartbeat = {"event_type": "ACTIVE_TIME", "active_seconds": 240}
-        assert advogado.post(f"/api/cases/{case_id}/engagement", json=heartbeat).status_code == 204
-        assert advogado.post(f"/api/cases/{case_id}/engagement", json={**heartbeat, "active_seconds": 301}).status_code == 422
-        assert banco.post(f"/api/cases/{case_id}/engagement", json=heartbeat).status_code == 403
+        aberto = {"event_type": "DOCUMENT_OPENED", "document_id": document_id}
+        assert advogado.post(f"/api/cases/{case_id}/engagement", json=aberto).status_code == 204
+        assert advogado.post(f"/api/cases/{case_id}/engagement", json={"event_type": "ACTIVE_TIME", "active_seconds": 60}).status_code == 422
+        assert banco.post(f"/api/cases/{case_id}/engagement", json=aberto).status_code == 403
 
         analysis = advogado.post(f"/api/cases/{case_id}/analyses").json()
         alvo = analysis["pricing"]["target_value"]
@@ -132,12 +132,13 @@ def test_outcomes_and_engagement_feed_bank_insights(tmp_path):
 
         insights = banco.get("/api/bank/insights").json()
         efetividade = insights["efetividade"]
-        assert (efetividade["decisoes"], efetividade["aderencia"], efetividade["acordos_fechados"]) == (1, 1.0, 1)
-        assert efetividade["economia_realizada"] == pytest.approx(analysis["pricing"]["savings_at_target"], abs=0.01)
-        assert efetividade["indice"] == pytest.approx(1 / 0.40, rel=1e-3)  # fechou 1 de 1 contra 40% esperados
-        assert insights["advogados"][0]["amostra_suficiente"] is False
-        assert insights["engajamento"]["tempo_ativo_mediano_min"] == 4.0
-        assert insights["engajamento"]["documentos_abertos_medio"] == 1
+        assert (efetividade["aderencia"]["taxa"], efetividade["acordos"]["fechados"], efetividade["aceitacao"]["taxa"]) == (1.0, 1, 1.0)
+        assert efetividade["economia"]["total"] == pytest.approx(analysis["pricing"]["similar_cases_cost"] - alvo, abs=0.01)
+        assert (efetividade["pior_caso"], efetividade["gasto_real"]) == (15000, pytest.approx(alvo))
+        assert efetividade["ticket"]["ticket_medio"] == pytest.approx(alvo)
+        score = insights["advogados"][0]["score"]
+        assert score["amostra_suficiente"] is False and score["componentes"]["aderencia"] == 100
+        assert "engajamento" not in insights
         assert advogado.get("/api/bank/insights").status_code == 403
 
 
@@ -180,8 +181,8 @@ def test_decision_outcome_without_values_still_feeds_the_panel(tmp_path):
         assert advogado.post(f"/api/cases/{case_id}/lawyer-decisions/{decision['id']}/outcome",
                              json={"outcome": "ACORDO_ACEITO"}).status_code == 201
         efetividade = banco.get("/api/bank/insights").json()["efetividade"]
-        assert efetividade["acordos_fechados"] == 1
-        assert efetividade["economia_realizada"] == pytest.approx(analysis["pricing"]["savings_at_target"], abs=0.01)
+        assert efetividade["acordos"]["fechados"] == 1
+        assert efetividade["economia"]["total"] == pytest.approx(analysis["pricing"]["similar_cases_cost"] - alvo, abs=0.01)
 
 
 @pytest.mark.parametrize(("texto", "motivo"), [
@@ -216,7 +217,9 @@ def test_simulated_operation_populates_every_panel_section(tmp_path):
     with connection_for(database) as connection:
         painel = build_bank_insights(connection, BANCO)
     assert painel["casos_simulados"] == 520
-    assert painel["efetividade"]["decisoes"] > 400 and painel["efetividade"]["indice"] is not None
+    assert painel["efetividade"]["encerrados"] > 100 and painel["efetividade"]["economia"]["processos"] > 100
+    assert painel["efetividade"]["gasto_real"] < painel["efetividade"]["pior_caso"]
+    assert all(linha["score"]["nota"] is not None for linha in painel["advogados"])
     escritorios = {f["nome"]: f for f in painel["escritorios"]}
     assert escritorios["Costa Lima Advocacia"]["mercado"] is not None
     assert escritorios["Nogueira Prado Advogados"]["mercado"] is None  # só um outro cliente: sem benchmark
